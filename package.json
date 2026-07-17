@@ -1,0 +1,25 @@
+{
+  "name": "@dhumdil-apps/pi-bundle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vendored Pi extensions and skills maintained by dhumdil-apps.",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "dependencies": { "@sinclair/typebox": "^0.34.41" },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/extension-settings/index.ts",
+      "./extensions/ask-user/index.ts",
+      "./extensions/powerbar/src",
+      "./extensions/pi-usage/index.ts",
+      "./extensions/usage-extension/index.ts",
+      "./extensions/manage-todo-list/index.ts"
+    ],
+    "skills": ["./skills"]
+  }
+}
