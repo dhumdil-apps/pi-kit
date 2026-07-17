@@ -7,7 +7,7 @@ separate packages.
 ## Install
 
 ```bash
-pi install git:github.com:dhumdil-apps/pi-bundle.git
+pi install git:git@github.com:dhumdil-apps/pi-bundle.git
 ```
 
 For a local test without changing settings:
