@@ -4,10 +4,9 @@ import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { askUserFancy } from "../ask-user/index.js";
 import { getSetting } from "../extension-settings/index.js";
-import { activePlanRelativePaths, applyPatch, detectGit, patchFailureStatus, porcelainPaths, runAcceptanceChecks, runPackageChecks, unexpectedDirtyPaths } from "./checkpoint.js";
+import { activePlanRelativePaths, detectGit, porcelainPaths, runAcceptanceChecks, runPackageChecks, unexpectedDirtyPaths } from "./checkpoint.js";
 import { latestPlanLink, loadPlan, persistPlan } from "./ledger.js";
-import { mergeRuns, runFromCompletion, runsFromDetails } from "./orchestration.js";
-import { canStartReviewFix, classifyTriage, createPlanState, forkPlanState, now, readyGate, roleForAgent, todosFromMarkdown, transition } from "./state.js";
+import { classifyTriage, createPlanState, forkPlanState, now, readyGate, todosFromMarkdown, transition } from "./state.js";
 import type { Checkpoint, CheckResult, Effort, PlanState, PlanTodo, TodoStatus } from "./types.js";
 import { REVIEW_TODO_PATTERN, STATE_VERSION } from "./types.js";
 
@@ -42,7 +41,6 @@ export default function planMode(pi: ExtensionAPI): void {
 	let spinnerTimer: ReturnType<typeof setInterval> | undefined;
 	let spinnerFrame = 0;
 	const orchestrationEnabled = () => parseStringSetting("orchestration", "on") === "on";
-	const subagentsEnabled = () => (getSetting("pi-subagents", "enabled", "off") ?? "off") === "on";
 
 	const command = async (program: string, args: string[], options?: { timeout?: number }) => {
 		const result = await pi.exec(program, args, { cwd: currentCwd, timeout: options?.timeout ?? 30_000 });
@@ -67,7 +65,6 @@ export default function planMode(pi: ExtensionAPI): void {
 	const powerbarText = (): { icon: string; text: string; color: string } | undefined => {
 		if (!active && !state) return undefined;
 		if (!state) return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Awaiting goal", color: "warning" };
-		if (state.pendingSupervisorRequests > 0) return { icon: "?", text: "Plan · Needs decision", color: "error" };
 		const completed = state.todos.filter((todo) => todo.status === "completed").length;
 		switch (state.phase) {
 			case "awaiting-goal": return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Awaiting goal", color: "warning" };
@@ -188,9 +185,7 @@ export default function planMode(pi: ExtensionAPI): void {
 		checkpointing = true;
 		try {
 			const reviewTodo = REVIEW_TODO_PATTERN.test(todo.title);
-			const checks = reviewTodo
-				? (state.review.fixPasses > 0 ? await runChecks(true) : state.validation)
-				: await runChecks(false, todo.acceptanceChecks);
+			const checks = reviewTodo ? await runChecks(true) : await runChecks(false, todo.acceptanceChecks);
 			const failed = checks.find((check) => !check.ok);
 			const dirty = state.gitMode === "git" ? porcelainPaths((await command("git", ["status", "--porcelain", "--untracked-files=all"])).stdout) : [];
 			const planFiles = activePlanRelativePaths(state);
@@ -255,38 +250,7 @@ export default function planMode(pi: ExtensionAPI): void {
 		active = false;
 		await persist();
 		refreshStatus(ctx);
-		sendUserMessage(ctx, `Execute the approved plan in ${state.ledgerPath}. You are the architect: ${subagentsEnabled() ? "implement each step yourself, or delegate a well-specified step to one foreground coder subagent at a time when that protects your context. Validate after each step (the coder does not run checks), then update the parent manage_todo_list. Never run more than one subagent at once." : "subagents are disabled, so implement each step yourself inline. Validate after each step, then update the parent manage_todo_list."}`);
-	};
-
-	const recordRuns = async (ctx: ExtensionContext, runs: ReturnType<typeof runsFromDetails>) => {
-		if (!state || !runs.length) return;
-		const previousWorkers = state.orchestrationRuns.filter((run) => run.role === "coder" && run.status === "completed").length;
-		const merged = mergeRuns(state, runs);
-		if (!merged.changed) return;
-		const workers = state.orchestrationRuns.filter((run) => run.role === "coder" && run.status === "completed").length;
-		if (state.phase === "reviewing" && workers > previousWorkers) state.review.fixPasses++;
-		for (const run of state.phase === "reviewing" ? runs.filter((item) => item.role === "explorer" && item.status === "completed") : []) {
-			const value = run.structuredOutput as { required?: unknown; optional?: unknown; rejected?: unknown; findings?: unknown } | undefined;
-			const strings = (items: unknown): string[] => Array.isArray(items) ? items.filter((item): item is string => typeof item === "string") : [];
-			const classification = state.review.classification ??= { required: [], optional: [], rejected: [] };
-			classification.required.push(...strings(value?.required));
-			classification.optional.push(...strings(value?.optional));
-			classification.rejected.push(...strings(value?.rejected));
-			if (Array.isArray(value?.findings)) {
-				for (const finding of value.findings) {
-					if (typeof finding === "string") classification.optional.push(finding);
-					else if (finding && typeof finding === "object") {
-						const item = finding as { severity?: unknown; title?: unknown; evidence?: unknown };
-						const text = [item.title, item.evidence].filter((part): part is string => typeof part === "string").join(" — ");
-						if (text) (/critical|high|required/i.test(String(item.severity)) ? classification.required : classification.optional).push(text);
-					}
-				}
-			}
-			if (!value && run.summary) classification.optional.push(run.summary);
-			state.review.findings = [...classification.required.map((item) => `Required: ${item}`), ...classification.optional.map((item) => `Optional: ${item}`), ...classification.rejected.map((item) => `Rejected: ${item}`)];
-		}
-		await persist();
-		refreshStatus(ctx);
+		sendUserMessage(ctx, `Execute the approved plan in ${state.ledgerPath}. You are the architect: implement each step yourself, validate after each step, then update the parent manage_todo_list.`);
 	};
 
 	pi.registerTool({
@@ -301,64 +265,14 @@ export default function planMode(pi: ExtensionAPI): void {
 			transition(state, triage.classification === "trivial" ? "planning" : "discovering");
 			await persist();
 			refreshStatus(ctx);
-			return { content: [{ type: "text" as const, text: triage.classification === "trivial" ? "Trivial path accepted. Explore read-only and produce a concise inline plan." : `Triage recorded as ${triage.classification}. ${subagentsEnabled() ? "Read the relevant code (delegate recon to one foreground explorer only when it saves substantial context)" : "Subagents are disabled: read the relevant code inline yourself"}, ask unresolved decisions with ask_user, then write the plan inline.` }], details: triage };
-		},
-	});
-
-	pi.registerTool({
-		name: "plan_apply_patch",
-		label: "Integrate Plan Patch",
-		description: "Preflight and apply a captured Plan Mode worker patch with git apply --3way. A failed preflight leaves the main tree untouched and permits one sequential redispatch.",
-		parameters: Type.Object({ todoId: Type.Integer({ minimum: 1 }), patchPath: Type.String() }),
-		async execute(_id, params) {
-			if (!state || state.phase !== "executing") return { content: [{ type: "text" as const, text: "Patch integration is available only while executing an active plan." }], isError: true, details: { ok: false, blocked: false, status: "unavailable", attempts: 0, stage: "check", output: "" } };
-			const existing = state.patches.find((item) => item.todoId === params.todoId && item.patchPath === params.patchPath);
-			const record = existing ?? { todoId: params.todoId, patchPath: params.patchPath, status: "pending" as const, attempts: 0 };
-			if (!existing) state.patches.push(record);
-			if (record.attempts >= 2) {
-				record.status = "blocked";
-				record.reason = "Patch integration and the single redispatch were already exhausted.";
-				transition(state, "blocked");
-				await persist();
-				return { content: [{ type: "text" as const, text: record.reason }], isError: true, details: { ok: false, blocked: true, status: record.status, attempts: record.attempts, stage: "check", output: record.reason } };
-			}
-			record.attempts++;
-			const result = await applyPatch(command, params.patchPath);
-			if (result.ok) record.status = "applied";
-			else {
-				record.status = patchFailureStatus(record.attempts);
-				record.reason = result.output || `${result.stage} failed`;
-				if (record.status === "blocked") transition(state, "blocked");
-			}
-			await persist();
-			return { content: [{ type: "text" as const, text: result.ok ? `Applied ${params.patchPath}. Run slice validation before completing todo ${params.todoId}.` : record.status === "redispatched" ? `Patch preflight failed without changing the main tree. Redispatch todo ${params.todoId} once to a fresh sequential worker, then call plan_resolve_redispatch.` : `Patch integration is blocked: ${record.reason}` }], isError: !result.ok, details: { ...result, blocked: record.status === "blocked", status: record.status, attempts: record.attempts } };
-		},
-	});
-
-	pi.registerTool({
-		name: "plan_resolve_redispatch",
-		label: "Resolve Plan Redispatch",
-		description: "Record the outcome of the one fresh sequential worker redispatch after a worktree patch preflight conflict.",
-		parameters: Type.Object({ todoId: Type.Integer({ minimum: 1 }), success: Type.Boolean(), reason: Type.String() }),
-		async execute(_id, params) {
-			if (!state) return { content: [{ type: "text" as const, text: "No active plan." }], isError: true, details: { ok: false, status: "missing" } };
-			const patch = state.patches.find((item) => item.todoId === params.todoId && item.status === "redispatched");
-			if (!patch) return { content: [{ type: "text" as const, text: `Todo ${params.todoId} has no pending redispatch.` }], isError: true, details: { ok: false, status: "missing" } };
-			patch.status = params.success ? "applied" : "blocked";
-			patch.reason = params.reason;
-			if (!params.success) {
-				state.lastError = params.reason;
-				transition(state, "blocked");
-			}
-			await persist();
-			return { content: [{ type: "text" as const, text: params.success ? `Sequential redispatch accepted for todo ${params.todoId}; run its slice checks before completion.` : `Todo ${params.todoId} is blocked: ${params.reason}` }], isError: !params.success, details: { ok: params.success, status: patch.status } };
+			return { content: [{ type: "text" as const, text: triage.classification === "trivial" ? "Trivial path accepted. Explore read-only and produce a concise inline plan." : `Triage recorded as ${triage.classification}. Read the relevant code, ask unresolved decisions with ask_user, then write the plan inline.` }], details: triage };
 		},
 	});
 
 	pi.registerTool({
 		name: "plan_record_review_decision",
 		label: "Record Review Decision",
-		description: "Persist the parent orchestrator's classification and rationale for the single Plan Mode reviewer batch.",
+		description: "Persist the architect's classification and rationale for the Plan Mode review phase.",
 		parameters: Type.Object({ required: Type.Array(Type.String()), optional: Type.Array(Type.String()), rejected: Type.Array(Type.String()), rationale: Type.String() }),
 		async execute(_id, params) {
 			if (!state || state.phase !== "reviewing") return { content: [{ type: "text" as const, text: "Review decisions can be recorded only in the reviewing phase." }], isError: true, details: { ok: false } };
@@ -376,36 +290,14 @@ export default function planMode(pi: ExtensionAPI): void {
 			await persist();
 			if (lastContext) refreshStatus(lastContext);
 		}
-		if (event.toolName === "subagent") {
-			const input = event.input as { agent?: string; async?: boolean; worktree?: boolean; tasks?: Array<{ agent?: string }> };
-			if (input.worktree) return { block: true, reason: "Serial plan execution edits the main worktree directly; worktree isolation is disabled." };
-			const rounds = Number.parseInt(parseStringSetting("review-fix-rounds", "1"), 10);
-			const targetsCoder = roleForAgent(input.agent || "") === "coder" || input.tasks?.some((task) => roleForAgent(task.agent || "") === "coder");
-			if (state.phase === "reviewing" && targetsCoder && !canStartReviewFix(state, rounds)) return { block: true, reason: "The configured single corrective coder pass has already been used." };
-		}
 		if (event.toolName === "manage_todo_list" && (event.input as { operation?: string }).operation === "write") {
 			if (!["executing", "reviewing"].includes(state.phase)) return { block: true, reason: `Plan Mode creates todos automatically from the approved plan when execution starts. Skip manage_todo_list while ${state.phase}; write or refine the plan draft instead.` };
-			const proposed = (event.input as { todos?: PlanTodo[] }).todos;
-			if (Array.isArray(proposed)) {
-				const completedImplementation = proposed.filter((todo) => todo.status === "completed" && !REVIEW_TODO_PATTERN.test(todo.title));
-				const completedReview = proposed.some((todo) => todo.status === "completed" && REVIEW_TODO_PATTERN.test(todo.title));
-				if (completedReview && (state.review.classification?.required.length ?? 0) > 0 && state.review.fixPasses < 1) return { block: true, reason: "Required review findings must receive the single corrective fix pass before completion." };
-				const unapplied = state.patches.find((patch) => completedImplementation.some((todo) => todo.id === patch.todoId) && patch.status !== "applied");
-				if (unapplied) return { block: true, reason: `Todo ${unapplied.todoId} has an unresolved patch integration (${unapplied.status}).` };
-			}
 		}
 		return undefined;
 	});
 
 	pi.on("tool_result", async (event, ctx) => {
 		if (!state) return;
-		if (event.toolName === "subagent" || event.toolName === "subagent_wait") await recordRuns(ctx, runsFromDetails(event.details, event.toolCallId));
-		if (event.toolName === "subagent_supervisor") {
-			const details = event.details as { pending?: unknown } | undefined;
-			state.pendingSupervisorRequests = Array.isArray(details?.pending) ? details.pending.length : typeof details?.pending === "number" ? details.pending : state.pendingSupervisorRequests;
-			await persist();
-			refreshStatus(ctx);
-		}
 		if (event.toolName === "ask_user") {
 			const details = event.details as { question?: string; response?: { selections?: string[]; text?: string } } | undefined;
 			const answer = details?.response?.selections?.join(", ") || details?.response?.text;
@@ -430,27 +322,13 @@ export default function planMode(pi: ExtensionAPI): void {
 			} else {
 				transition(state, "reviewing");
 				state.review.round = 1;
-				sendUserMessage(ctx, `Review the implementation in ${state.ledgerPath}. ${subagentsEnabled() ? "Review it yourself, or delegate one foreground read-only explorer review when fresh eyes or context savings help." : "Subagents are disabled: review it yourself inline."} Classify findings as required, optional, or rejected with plan_record_review_decision; route required fixes through at most one corrective fix pass.`);
+				sendUserMessage(ctx, `Review the implementation in ${state.ledgerPath} with fresh eyes: reread the diff against the plan's goal and validation sections. Classify findings as required, optional, or rejected with plan_record_review_decision, fix required findings inline, then re-run the checks before completing the review todo.`);
 			}
 		}
 		await persist();
 		refreshStatus(ctx);
 		const newlyCompleted = state.todos.find((todo) => todo.status === "completed" && before.get(todo.id) !== "completed");
 		if (newlyCompleted) await checkpoint(ctx, newlyCompleted, before.get(newlyCompleted.id) || "in-progress");
-	});
-
-	pi.events.on("subagent:foreground-complete", (payload: unknown) => {
-		const ctx = lastContext;
-		if (ctx) void recordRuns(ctx, runFromCompletion(payload, "foreground"));
-	});
-	pi.events.on("subagent:async-complete", (payload: unknown) => {
-		const ctx = lastContext;
-		if (ctx) void recordRuns(ctx, runFromCompletion(payload, "async"));
-	});
-	pi.events.on("subagent:control-intercom", (_payload: unknown) => {
-		if (!state || !lastContext) return;
-		state.pendingSupervisorRequests++;
-		void persist().then(() => refreshStatus(lastContext!));
 	});
 
 	let lastContext: ExtensionContext | undefined;
@@ -465,11 +343,8 @@ export default function planMode(pi: ExtensionAPI): void {
 		if (!orchestrationEnabled() && state.phase !== "executing" && state.phase !== "reviewing") {
 			return { systemPrompt: `${event.systemPrompt}\n\n[PLAN MODE — INLINE]\nExplore read-only and produce a concise implementation plan for ${state.goal}. Do not edit. End with <!-- plan-ready -->. Ledger: ${state.ledgerPath}` };
 		}
-		const delegation = subagentsEnabled()
-			? { executing: "Implement each step yourself, or delegate a well-specified step to one foreground coder subagent at a time when that protects your context window (the coder edits only; it never runs checks). Never run more than one subagent at once.", discovery: "Understand the relevant code: read it yourself, or delegate recon to one foreground explorer subagent at a time when scanning many files would bloat your context." }
-			: { executing: "Subagents are disabled: implement every step yourself, inline. Do not call the subagent tool or load subagent skills.", discovery: "Subagents are disabled: read the relevant code inline yourself. Do not call the subagent tool or load subagent skills." };
-		if (state.phase === "executing" || state.phase === "reviewing") return { systemPrompt: `${event.systemPrompt}\n\n[PLAN ARCHITECT — ${state.phase.toUpperCase()}]\nYou are the architect: you own the plan, every decision, and all validation. ${delegation.executing} Validate after each step, then update the parent manage_todo_list. Plan ledger: ${state.ledgerPath}` };
-		return { systemPrompt: `${event.systemPrompt}\n\n[PLAN ARCHITECT — READ ONLY]\nDo not edit, write, install, commit, or run mutating shell commands. Plan ledger: ${state.ledgerPath}\nExploration scope: prefer targeted reads of specific files over broad searches. If project memory names a source root, go straight to it. Any search must stay inside the working directory or that source root, excluding vendored/cache dirs (node_modules, agent/git, agent/sessions). Never run home-directory-wide or filesystem-wide find/rg.\nDo not use manage_todo_list while planning — todos are created automatically from the approved plan when execution starts.\n1. Call plan_triage exactly once when phase is triage. Trivial requires one known file, obvious validation, and no ambiguity, architecture, security, or external research; otherwise choose standard/deep.\n2. ${delegation.discovery}\n3. Ask unresolved user decisions with ask_user.\n4. Write the plan yourself in your response: a Goal section, a "Plan:" heading with a numbered task list, a Validation section, and a Risks section. End with <!-- plan-ready -->.\nCurrent phase: ${state.phase}. Triage: ${state.triage?.classification || "pending"}. Successful runs: ${state.orchestrationRuns.filter((run) => run.status === "completed").map((run) => run.role).join(", ") || "none"}.` };
+		if (state.phase === "executing" || state.phase === "reviewing") return { systemPrompt: `${event.systemPrompt}\n\n[PLAN ARCHITECT — ${state.phase.toUpperCase()}]\nYou are the architect: you own the plan, every decision, and all validation. Implement each step yourself, validate after each step, then update the parent manage_todo_list. Plan ledger: ${state.ledgerPath}` };
+		return { systemPrompt: `${event.systemPrompt}\n\n[PLAN ARCHITECT — READ ONLY]\nDo not edit, write, install, commit, or run mutating shell commands. Plan ledger: ${state.ledgerPath}\nExploration scope: prefer targeted reads of specific files over broad searches. If project memory names a source root, go straight to it. Any search must stay inside the working directory or that source root, excluding vendored/cache dirs (node_modules, agent/git, agent/sessions). Never run home-directory-wide or filesystem-wide find/rg.\nDo not use manage_todo_list while planning — todos are created automatically from the approved plan when execution starts.\n1. Call plan_triage exactly once when phase is triage. Trivial requires one known file, obvious validation, and no ambiguity, architecture, security, or external research; otherwise choose standard/deep.\n2. Read the relevant code inline yourself.\n3. Ask unresolved user decisions with ask_user.\n4. Write the plan yourself in your response: a Goal section, a "Plan:" heading with a numbered task list, a Validation section, and a Risks section. End with <!-- plan-ready -->.\nCurrent phase: ${state.phase}. Triage: ${state.triage?.classification || "pending"}.` };
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
@@ -536,7 +411,7 @@ export default function planMode(pi: ExtensionAPI): void {
 				refreshStatus(ctx);
 				return;
 			}
-			if (input === "status") return notify(ctx, state ? `${state.slug}: ${state.phase}; ${state.todos.filter((todo) => todo.status === "completed").length}/${state.todos.length} todos; ${state.orchestrationRuns.length} child runs.` : "Awaiting a plan goal.");
+			if (input === "status") return notify(ctx, state ? `${state.slug}: ${state.phase}; ${state.todos.filter((todo) => todo.status === "completed").length}/${state.todos.length} todos.` : "Awaiting a plan goal.");
 			if (input === "save") return state ? persist().then(() => notify(ctx, `Saved ${state!.ledgerPath}`)) : notify(ctx, "No plan to save.", "warning");
 			if (input === "execute") return beginExecution(ctx);
 			if (input.startsWith("resume ")) {
@@ -570,7 +445,6 @@ export default function planMode(pi: ExtensionAPI): void {
 		{ id: "default-effort", label: "Default planning effort", defaultValue: "low", values: ["low", "high"] },
 		{ id: "orchestration", label: "Enforce plan-ready gate", defaultValue: "on", values: ["on", "off"] },
 		{ id: "quick-triage", label: "Allow trivial quick-plan escape", defaultValue: "on", values: ["on", "off"] },
-		{ id: "review-fix-rounds", label: "Corrective fix passes", defaultValue: "1", values: ["1"] },
 	] });
 
 	pi.on("session_start", async (event, ctx) => { lastContext = ctx; await reconstructSession(event, ctx); });

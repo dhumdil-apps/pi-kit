@@ -18,10 +18,10 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 
 ## Features
 
-- **plan-mode** — auto-starts a persistent, auditable workflow in every interactive parent session. Quick mode triages truly trivial changes to an inline plan; standard and deep work require fresh discovery plus one schema-valid planner handoff before approval. Execution delegates worker slices, checkpoints accepted todos, validates the project, and ends with a mandatory reviewer batch plus at most one corrective pass. `/plan deep|off|execute|resume|status`.
+- **plan-mode** — auto-starts a persistent, auditable, single-agent workflow in every interactive session. Quick mode triages truly trivial changes to an inline plan; standard and deep work read the code inline, then the agent writes the plan draft itself before approval. Execution implements each step inline, checkpoints accepted todos, validates the project, and ends with an inline review plus at most one corrective pass. `/plan deep|off|execute|resume|status`.
 - **permission-gate** — ask-user confirmation only for destructive commands (`rm -rf`, `git reset --hard`, `sudo`, …) and writes outside the project.
 - **memory** — minimal per-project `.pi/MEMORY.md`, injected each turn; `remember` tool + `/memory`.
-- **manage-todo-list**, **subagents**, **web-access**, **powerbar** (+ live quota via **pi-usage**), **usage-extension** (`/usage` history), **ask-user** modal + skill, **claude-style** prompt, **welcome** banner, bundled `dark` theme, and `/init` prompt. This machine selects its separate local `github-dark` theme.
+- **manage-todo-list**, **web-access**, **powerbar** (+ live quota via **pi-usage**), **usage-extension** (`/usage` history), **ask-user** modal + skill, **claude-style** prompt, **welcome** banner, bundled `dark` theme, and `/init` prompt. This machine selects its separate local `github-dark` theme.
 
 ## Install (local path)
 
@@ -54,10 +54,10 @@ npm run typecheck:plan
 ```
 
 `npm run typecheck` checks every vendored extension. It currently also reports
-upstream type/API drift in pi-subagents and pi-web-access; keep the focused gate
-green while those upstream errors are retired.
+upstream type/API drift in pi-web-access; keep the focused gate green while
+those upstream errors are retired.
 
-## Orchestrated Plan lifecycle
+## Plan lifecycle
 
 Plan files are timestamped under `.pi/plans/` as a readable Markdown ledger and
 a version-2 JSON state file. The current ledger is linked to the Pi session, so
@@ -65,23 +65,18 @@ startup/reload/resume restores it and a fork creates a child ledger with a
 `parentPlan` link. Extension Settings are global per-user and string-backed.
 
 The phases are `triage → discovering → deciding → planning → ready → executing
-→ reviewing → complete`, with `blocked` preserving recoverable state. Deep mode
-always orchestrates. Standard work cannot become ready without a successful
-scout/context handoff and exactly one accepted primary planner result.
+→ reviewing → complete`, with `blocked` preserving recoverable state. Plan Mode
+runs single-agent throughout — there is no subagent handoff. Standard/Deep work
+cannot become ready until the agent's own response contains a plan draft with
+a Goal section, a numbered task list, and a Validation section.
 
-Execution requires a clean Git tree except for the active ledger/state pair.
-Parallel workers are optional and only eligible for clean, dependency-ready,
-non-overlapping tasks marked `parallelSafe`; captured patches are preflighted
-with `git apply --3way --check` and never hand-merged. In a non-Git directory,
-plans, agents, todos, and review continue while worktrees and automatic commits
+Execution requires a clean Git tree except for the active ledger/state pair. In
+a non-Git directory, plans, todos, and review continue while automatic commits
 are disabled and the degraded mode is recorded.
 
-Useful settings in `/extension-settings`: `plan-mode.orchestration`,
-`plan-mode.quick-triage`, `plan-mode.max-discovery-agents`,
-`plan-mode.parallel-workers`, and the fixed one-pass
-`plan-mode.review-fix-rounds`. Web Access defaults to `auto-summary` in
+Useful settings in `/extension-settings`: `plan-mode.orchestration` and
+`plan-mode.quick-triage`. Web Access defaults to `auto-summary` in
 `~/.pi/web-search.json`.
 
-For the authoritative workflow contract, including orchestration enforcement,
-worktree rules, review, persistence, and recovery, see
-[docs/PLAN_MODE.md](docs/PLAN_MODE.md).
+For the authoritative workflow contract, including the ready gate, review, and
+persistence/recovery, see [docs/PLAN_MODE.md](docs/PLAN_MODE.md).

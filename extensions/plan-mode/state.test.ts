@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { canStartReviewFix, classifyTriage, createPlanPaths, createPlanState, forkPlanState, readyGate, roleForAgent, timestampPrefix, todosFromMarkdown, transition } from "./state.js";
+import { classifyTriage, createPlanPaths, createPlanState, forkPlanState, readyGate, timestampPrefix, todosFromMarkdown, transition } from "./state.js";
 
 const state = () => createPlanState({ cwd: "/tmp/project", goal: "Ship feature", effort: "low", sessionId: "session", date: new Date(2026, 6, 18, 12, 3, 4, 5) });
 
@@ -28,12 +28,6 @@ describe("plan state", () => {
 		expect(readyGate(plan)).toEqual({ ok: true });
 		plan.planMarkdown = "## Plan\n1. Implement the change";
 		expect(readyGate(plan).ok).toBe(false);
-	});
-
-	it("maps agent names to explorer/coder roles", () => {
-		expect(roleForAgent("explorer")).toBe("explorer");
-		expect(roleForAgent("my.coder")).toBe("coder");
-		expect(roleForAgent("scout")).toBe("other");
 	});
 
 	it("adds the mandatory review todo and uses local millisecond names", () => {
@@ -62,11 +56,4 @@ describe("plan state", () => {
 		expect(child.ledgerPath).not.toBe(parent.ledgerPath);
 	});
 
-	it("limits review correction to the configured single pass", () => {
-		const plan = state();
-		plan.phase = "reviewing";
-		expect(canStartReviewFix(plan, 1)).toBe(true);
-		plan.review.fixPasses = 1;
-		expect(canStartReviewFix(plan, 1)).toBe(false);
-	});
 });

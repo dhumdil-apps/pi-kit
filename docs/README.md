@@ -20,7 +20,7 @@ that loads it.
 - The Git repository is the source for extensions, skills, prompts, themes,
   tests, and portable documentation.
 - `~/.pi/agent/settings.json` is the source for the currently selected model,
-  theme, package path, and subagent overrides on this machine.
+  theme, and package path on this machine.
 - `~/.pi/agent/settings-extensions.json` stores global, string-backed extension
   settings changed through `/extension-settings`.
 - `~/.pi/web-search.json` stores Web Access configuration.

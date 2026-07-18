@@ -6,7 +6,7 @@
   "keywords": ["pi-package"],
   "license": "MIT",
   "scripts": {
-    "test": "vitest run extensions/plan-mode extensions/pi-subagents/src/runs/shared/worktree.test.ts extensions/pi-subagents/src/extension/execution-policy.test.ts",
+    "test": "vitest run extensions/plan-mode",
     "typecheck:plan": "tsc --noEmit --target ES2023 --module ESNext --moduleResolution Bundler --allowImportingTsExtensions --skipLibCheck --strict --types node extensions/plan-mode/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -45,15 +45,13 @@
       "./extensions/welcome/index.ts",
       "./extensions/claude-style/index.ts",
       "./extensions/permission-gate/index.ts",
-      "./extensions/pi-subagents/index.ts",
       "./extensions/pi-web-access/index.ts"
     ],
     "skills": [
       "./skills",
-      "./extensions/pi-subagents/skills",
       "./extensions/pi-web-access/skills"
     ],
-    "prompts": ["./prompts", "./extensions/pi-subagents/prompts"],
+    "prompts": ["./prompts"],
     "themes": ["./themes"]
   }
 }

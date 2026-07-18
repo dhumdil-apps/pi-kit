@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getSetting } from "../extension-settings/index.js";
+import { collectUsageData } from "../usage-extension/data.js";
 
 async function git(pi: ExtensionAPI, cwd: string, args: string[]) {
   try {
@@ -16,6 +17,13 @@ interface PlanState {
   goal: string;
   phase: string;
   todos: Array<{ status: string }>;
+}
+
+function formatUsdSpend(cost: number): string {
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  if (cost < 1) return `$${cost.toFixed(2)}`;
+  if (cost < 100) return `$${cost.toFixed(1)}`;
+  return `$${Math.round(cost)}`;
 }
 
 async function getActivePlan(cwd: string): Promise<string> {
@@ -58,6 +66,10 @@ export default function welcomeExtension(pi: ExtensionAPI): void {
     const dirtyOutput = await git(pi, cwd, ["status", "--porcelain"]);
     const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
     const activePlan = await getActivePlan(cwd);
+    const usage = await collectUsageData().catch(() => null);
+    const usageSummary = usage
+      ? `📊 **Usage (USD)**: Today ${formatUsdSpend(usage.today.totals.cost)} · 30 days ${formatUsdSpend(usage.last30Days.totals.cost)} · All time ${formatUsdSpend(usage.allTime.totals.cost)}`
+      : "";
     const autoPlan = getSetting("plan-mode", "auto-start", "on") === "on";
 
     const nextSteps = autoPlan
@@ -70,7 +82,7 @@ export default function welcomeExtension(pi: ExtensionAPI): void {
 ${BANNER}
 \`\`\`
 
-📂 **Project**: \`${cwd}\` · branch \`${branch}\` · ${dirtyCount === 0 ? "clean" : `${dirtyCount} modified`}${activePlan === "None" ? "" : `\n• **Active Plan**: ${activePlan}`}
+📂 **Project**: \`${cwd}\` · branch \`${branch}\` · ${dirtyCount === 0 ? "clean" : `${dirtyCount} modified`}${activePlan === "None" ? "" : `\n• **Active Plan**: ${activePlan}`}${usageSummary ? `\n${usageSummary}` : ""}
 
 ${nextSteps}
 
@@ -79,7 +91,6 @@ ${nextSteps}
 • **permission-gate** — confirms only destructive commands (\`rm -rf\`, \`git reset --hard\`, \`sudo\`…)
 • **memory** — \`.pi/MEMORY.md\` decisions & learnings, injected each turn; \`/memory\` to view
 • **manage-todo-list** — live task progress widget; \`/todos\`
-• **subagents** — serial explorer/coder handoffs on the parent's model (\`subagent\` tool, off by default); \`/subagents\`
 • **web-access** — \`web_search\` / \`fetch_content\`; defaults to automatic cited summaries
 • **powerbar** — status footer: git, tokens, context %, quota; \`/extension-settings\` to tune
 • **usage** — historical spend & token analytics; \`/usage\`

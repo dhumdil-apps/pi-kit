@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { LegacyPlanStateV1, OrchestrationRun, Phase, PlanState, PlanTodo, TriageClass } from "./types.js";
+import type { LegacyPlanStateV1, Phase, PlanState, PlanTodo, TriageClass } from "./types.js";
 import { REVIEW_TODO_PATTERN, REVIEW_TODO_TITLE, STATE_VERSION } from "./types.js";
 
 const TRANSITIONS: Record<Phase, ReadonlySet<Phase>> = {
@@ -57,14 +57,11 @@ export function createPlanState(input: { cwd: string; goal: string; effort: "low
 		goal: input.goal,
 		effort: input.effort,
 		planMarkdown: "",
-		orchestrationRuns: [],
 		decisions: [],
 		todos: [],
 		checkpoints: [],
-		patches: [],
 		validation: [],
-		review: { promptSent: false, round: 0, fixPasses: 0, findings: [] },
-		pendingSupervisorRequests: 0,
+		review: { promptSent: false, round: 0, findings: [] },
 		gitMode: "non-git",
 	};
 }
@@ -82,14 +79,6 @@ export function classifyTriage(input: { effort: "low" | "medium" | "high"; enabl
 	return { classification: "standard", reason: input.reason?.trim() || "The task was not proven to meet every trivial-task criterion." };
 }
 
-export function roleForAgent(agent: string): OrchestrationRun["role"] {
-	const normalized = agent.toLowerCase();
-	for (const role of ["explorer", "coder"] as const) {
-		if (normalized === role || normalized.endsWith(`.${role}`) || normalized.includes(role)) return role;
-	}
-	return "other";
-}
-
 export function readyGate(state: PlanState): { ok: boolean; reason?: string } {
 	if (state.triage?.classification === "trivial") return { ok: true };
 	const markdown = state.planMarkdown;
@@ -98,10 +87,6 @@ export function readyGate(state: PlanState): { ok: boolean; reason?: string } {
 	if (todosFromMarkdown(markdown).length === 0) return { ok: false, reason: "The plan must contain a numbered task list under a 'Plan:' heading." };
 	if (!/(?:^|\n)\s*(?:#{1,3}\s*)?validation\b:?/i.test(markdown)) return { ok: false, reason: "The plan must contain a Validation section." };
 	return { ok: true };
-}
-
-export function canStartReviewFix(state: PlanState, configuredRounds: number): boolean {
-	return state.phase === "reviewing" && state.review.fixPasses < Math.max(0, configuredRounds);
 }
 
 export function todosFromMarkdown(markdown: string): PlanTodo[] {

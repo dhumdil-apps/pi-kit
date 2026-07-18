@@ -47,13 +47,3 @@ export async function runAcceptanceChecks(runner: CommandRunner, commands: reado
 	return checks;
 }
 
-export async function applyPatch(runner: CommandRunner, patchPath: string): Promise<{ ok: boolean; stage: "check" | "apply"; output: string }> {
-	const check = await runner("git", ["apply", "--3way", "--check", patchPath], { timeout: 30_000 });
-	if (check.code !== 0) return { ok: false, stage: "check", output: `${check.stdout}\n${check.stderr}`.trim() };
-	const apply = await runner("git", ["apply", "--3way", patchPath], { timeout: 30_000 });
-	return { ok: apply.code === 0, stage: "apply", output: `${apply.stdout}\n${apply.stderr}`.trim() };
-}
-
-export function patchFailureStatus(attempts: number): "redispatched" | "blocked" {
-	return attempts <= 1 ? "redispatched" : "blocked";
-}

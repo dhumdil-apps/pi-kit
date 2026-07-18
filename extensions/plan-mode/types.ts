@@ -26,7 +26,6 @@ export interface PlanTodo {
 	dependencies?: number[];
 	files?: string[];
 	acceptanceChecks?: string[];
-	parallelSafe?: boolean;
 }
 
 export interface CheckResult {
@@ -46,26 +45,6 @@ export interface Checkpoint {
 	reason?: string;
 }
 
-export type OrchestrationRole = "explorer" | "coder" | "other";
-
-export interface OrchestrationRun {
-	key: string;
-	runId: string;
-	childIndex: number;
-	agent: string;
-	role: OrchestrationRole;
-	mode: "single" | "parallel" | "chain" | "unknown";
-	status: "running" | "completed" | "failed" | "detached";
-	startedAt?: string;
-	completedAt?: string;
-	summary?: string;
-	structuredOutput?: unknown;
-	artifactPath?: string;
-	sessionPath?: string;
-	error?: string;
-	usage?: unknown;
-}
-
 export interface PlanDecision {
 	timestamp: string;
 	question: string;
@@ -75,7 +54,6 @@ export interface PlanDecision {
 export interface ReviewState {
 	promptSent: boolean;
 	round: number;
-	fixPasses: number;
 	findings: string[];
 	classification?: {
 		required: string[];
@@ -83,14 +61,6 @@ export interface ReviewState {
 		rejected: string[];
 		rationale?: string;
 	};
-}
-
-export interface PatchIntegration {
-	todoId: number;
-	patchPath: string;
-	status: "pending" | "applied" | "redispatched" | "blocked";
-	attempts: number;
-	reason?: string;
 }
 
 export interface PlanState {
@@ -107,14 +77,11 @@ export interface PlanState {
 	effort: Effort;
 	triage?: { classification: TriageClass; reason: string; timestamp: string };
 	planMarkdown: string;
-	orchestrationRuns: OrchestrationRun[];
 	decisions: PlanDecision[];
 	todos: PlanTodo[];
 	checkpoints: Checkpoint[];
-	patches: PatchIntegration[];
 	validation: CheckResult[];
 	review: ReviewState;
-	pendingSupervisorRequests: number;
 	gitMode: "git" | "non-git";
 	baseCommit?: string;
 	lastError?: string;
