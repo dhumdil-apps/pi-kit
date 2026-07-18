@@ -38,9 +38,11 @@ async function getActivePlan(cwd: string): Promise<string> {
 }
 
 export default function welcomeExtension(pi: ExtensionAPI): void {
-  // We use a small timeout to let the session boot up
-  setTimeout(async () => {
-    const cwd = process.cwd();
+  pi.on("session_start", async (_event, ctx) => {
+    // Purely decorative banner: in headless/print mode it would land after the
+    // prompt and trigger a spurious extra turn, so interactive sessions only.
+    if (!ctx.hasUI) return;
+    const cwd = ctx.cwd;
     const branch = await git(pi, cwd, ["rev-parse", "--abbrev-ref", "HEAD"]) || "unknown";
     const dirtyOutput = await git(pi, cwd, ["status", "--porcelain"]);
     const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
@@ -71,5 +73,5 @@ export default function welcomeExtension(pi: ExtensionAPI): void {
       },
       { triggerTurn: false }
     );
-  }, 100);
+  });
 }
