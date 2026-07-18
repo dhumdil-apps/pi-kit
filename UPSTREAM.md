@@ -26,6 +26,13 @@ are reconstructed from that declaration plus the package's stated author.
 `pi-web-access`'s demo video/screenshot assets and `pi-memory-md`'s test suite
 were dropped from the vendored copy — neither is needed at runtime.
 
+`pi-memory-md`'s `nodejieba` dependency pulls in `@mapbox/node-pre-gyp@1.0.11`,
+which depends on a vulnerable `tar` with no patched release available
+(`npm audit fix [--force]` cannot resolve it). This is an install-time-only
+exposure — the vulnerable `tar` runs only when `node-pre-gyp` fetches
+`nodejieba`'s prebuilt native binary during `npm install`, never on pi's
+runtime path. Revisit if `nodejieba` or `@mapbox/node-pre-gyp` ship a fix.
+
 ## Local compatibility changes
 
 - Powerbar imports the vendored Extension Settings module by relative path.
