@@ -62,7 +62,12 @@ export default function createExtension(pi: ExtensionAPI): void {
 			(_tui: TUI, theme: Theme): Component & { dispose?(): void } => {
 				return {
 					render(width: number): string[] {
-						const line = renderBar(segments, settings, theme, width);
+						// Plan mode is safety-critical session state. Surface it while active even
+						// when an older saved Powerbar configuration predates its segment.
+						const renderSettings = segments.has("plan-mode") && !settings.left.includes("plan-mode") && !settings.right.includes("plan-mode")
+							? { ...settings, left: [...settings.left, "plan-mode"] }
+							: settings;
+						const line = renderBar(segments, renderSettings, theme, width);
 						return [line];
 					},
 					invalidate(): void {

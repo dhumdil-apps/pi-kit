@@ -18,7 +18,9 @@
       "./extensions/powerbar/src",
       "./extensions/pi-usage/index.ts",
       "./extensions/usage-extension/index.ts",
-      "./extensions/manage-todo-list/index.ts"
+      "./extensions/manage-todo-list/index.ts",
+      "./extensions/plan-mode/index.ts",
+      "./extensions/welcome/index.ts"
     ],
     "skills": ["./skills"]
   }

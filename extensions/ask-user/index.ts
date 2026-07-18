@@ -88,10 +88,23 @@ type AskOptionInput = QuestionOption | string;
 
 type AskDisplayMode = "overlay" | "inline";
 
-interface AskParams {
+type OptionConfidence = "low" | "medium" | "high";
+
+interface AskBatchQuestion {
    question: string;
    context?: string;
    options?: AskOptionInput[];
+   allowMultiple?: boolean;
+   allowFreeform?: boolean;
+   allowComment?: boolean;
+}
+
+interface AskParams {
+   question?: string;
+   context?: string;
+   options?: AskOptionInput[];
+   /** A related discovery batch. The tool collects 1-4 answers before returning to the agent. */
+   questions?: AskBatchQuestion[];
    allowMultiple?: boolean;
    allowFreeform?: boolean;
    allowComment?: boolean;
@@ -100,6 +113,26 @@ interface AskParams {
    commentToggleKey?: string | null;
    timeout?: number;
 }
+
+interface AskBatchAnswer {
+   question: string;
+   context?: string;
+   options: QuestionOption[];
+   response: AskResponse | null;
+}
+
+type AskToolDetails =
+   | {
+      question: string;
+      context?: string;
+      options: QuestionOption[];
+      response: AskResponse | null;
+      cancelled: boolean;
+   }
+   | {
+      questions: AskBatchAnswer[];
+      cancelled: boolean;
+   };
 
 type AskResponse =
    | {
@@ -111,14 +144,6 @@ type AskResponse =
       kind: "freeform";
       text: string;
    };
-
-interface AskToolDetails {
-   question: string;
-   context?: string;
-   options: QuestionOption[];
-   response: AskResponse | null;
-   cancelled: boolean;
-}
 
 type AskUIResult = AskResponse;
 
@@ -139,7 +164,12 @@ function coerceOption(option: unknown): QuestionOption | null {
          if (typeof value === "string" && value.trim()) {
             const description =
                typeof record.description === "string" && record.description.trim() ? record.description : undefined;
-            return description ? { title: value.trim(), description } : { title: value.trim() };
+            const rawConfidence = typeof record.confidence === "string" ? record.confidence.toLowerCase() : "";
+            const confidence: OptionConfidence | undefined =
+               rawConfidence === "low" || rawConfidence === "medium" || rawConfidence === "high"
+                  ? rawConfidence
+                  : undefined;
+            return { title: value.trim(), ...(description ? { description } : {}), ...(confidence ? { confidence } : {}) };
          }
       }
    }
@@ -149,8 +179,9 @@ function coerceOption(option: unknown): QuestionOption | null {
 function formatOptionsForMessage(options: QuestionOption[]): string {
    return options
       .map((option, index) => {
+         const confidence = option.confidence ? ` [${option.confidence} confidence]` : "";
          const desc = option.description ? ` — ${option.description}` : "";
-         return `${index + 1}. ${option.title}${desc}`;
+         return `${index + 1}. ${option.title}${confidence}${desc}`;
       })
       .join("\n");
 }
@@ -427,7 +458,7 @@ function buildCustomUIOptions(
          return {
             overlay: true,
             overlayOptions: {
-               anchor: "center" as const,
+               anchor: "bottom-center" as const,
                width: ASK_OVERLAY_WIDTH,
                minWidth: ASK_OVERLAY_MIN_WIDTH,
                maxHeight: "85%",
@@ -441,7 +472,7 @@ function buildCustomUIOptions(
          return {
             overlay: true,
             overlayOptions: {
-               anchor: "center" as const,
+               anchor: "bottom-center" as const,
                width: ASK_OVERLAY_WIDTH,
                minWidth: ASK_OVERLAY_MIN_WIDTH,
                maxHeight: "85%",
@@ -651,9 +682,10 @@ class MultiSelectList implements Component {
 
          const checkbox = this.checked.has(i) ? theme.fg("success", "[✓]") : theme.fg("dim", "[ ]");
          const num = theme.fg("dim", `${i + 1}.`);
+         const optionLabel = `${option.confidence ? `[${option.confidence}] ` : ""}${option.title}`;
          const title = isSelected
-            ? theme.fg("accent", theme.bold(option.title))
-            : theme.fg("text", theme.bold(option.title));
+            ? theme.fg("accent", theme.bold(optionLabel))
+            : theme.fg("text", theme.bold(optionLabel));
 
          const firstLine = `${prefix} ${num} ${checkbox} ${title}`;
          lines.push(truncateToWidth(firstLine, width, ""));
@@ -1819,26 +1851,235 @@ async function askViaDialogs(
    return createSelectionResponse([selected], comment);
 }
 
+async function askSingleFancyInternal(
+   ctx: any,
+   question: string,
+   normalizedContext: string | undefined,
+   options: QuestionOption[],
+   allowMultiple: boolean,
+   allowFreeform: boolean,
+   allowComment: boolean,
+   effectiveDisplayMode: AskDisplayMode,
+   shortcuts: ResolvedAskShortcuts,
+   timeout?: number,
+   signal?: AbortSignal,
+): Promise<AskUIResult | null> {
+   if (!ctx.hasUI || !ctx.ui) {
+      return askViaDialogs(ctx.ui, question, normalizedContext, options, allowMultiple, allowFreeform, allowComment, timeout);
+   }
+
+   if (options.length === 0) {
+      const prompt = normalizedContext ? `${question}\n\nContext:\n${normalizedContext}` : question;
+      const answer = await ctx.ui.input(prompt, "Type your answer...", timeout ? { timeout } : undefined);
+      return createFreeformResponse(answer);
+   }
+
+   let result: AskUIResult | null = null;
+   let overlayHandle: OverlayHandle | undefined;
+   let removeOverlayInputListener: (() => void) | undefined;
+   let hasAnnouncedHide = false;
+   try {
+      const customFactory = (tui: TUI, theme: Theme, keybindings: KeybindingsManager, done: (result: AskUIResult | null) => void) => {
+         if (signal) {
+            const onAbort = () => done(null);
+            signal.addEventListener("abort", onAbort, { once: true });
+         }
+
+         if (timeout && timeout > 0) {
+            setTimeout(() => done(null), timeout);
+         }
+
+         return new AskComponent(
+            question,
+            normalizedContext,
+            options,
+            allowMultiple,
+            allowFreeform,
+            allowComment,
+            effectiveDisplayMode,
+            tui,
+            theme,
+            keybindings,
+            shortcuts,
+            done,
+         );
+      };
+
+      const overlayToggle = shortcuts.overlayToggle;
+      if (
+         effectiveDisplayMode === "overlay"
+         && !overlayToggle.disabled
+         && typeof ctx.ui.onTerminalInput === "function"
+      ) {
+         removeOverlayInputListener = ctx.ui.onTerminalInput((data: any) => {
+            if (!overlayToggle.matches(data) || !overlayHandle) return undefined;
+            const nextHidden = !overlayHandle.isHidden();
+            overlayHandle.setHidden(nextHidden);
+            if (nextHidden && !hasAnnouncedHide) {
+               hasAnnouncedHide = true;
+               ctx.ui.notify?.(`ask_user hidden — press ${overlayToggle.spec} to reopen`, "info");
+            }
+            return { consume: true };
+         });
+      }
+
+      const customResult = await (ctx.ui as any).custom(
+         customFactory,
+         buildCustomUIOptions(effectiveDisplayMode, (handle: any) => {
+            overlayHandle = handle;
+         }),
+      ) as AskUIResult | null;
+
+      if (customResult !== undefined) {
+         result = customResult;
+      } else {
+         result = await askViaDialogs(ctx.ui, question, normalizedContext, options, allowMultiple, allowFreeform, allowComment, timeout);
+      }
+   } catch (error) {
+      return null;
+   } finally {
+      removeOverlayInputListener?.();
+   }
+
+   return result;
+}
+
+async function askBatchViaDialogs(
+   ctx: any,
+   questions: AskBatchQuestion[],
+   defaults: Pick<AskParams, "allowMultiple" | "allowFreeform" | "allowComment" | "timeout" | "displayMode" | "overlayToggleKey" | "commentToggleKey">,
+   shortcuts: ResolvedAskShortcuts,
+   signal?: AbortSignal,
+): Promise<AskBatchAnswer[] | null> {
+   const answers: AskBatchAnswer[] = [];
+   const timeout = defaults.timeout;
+   const displayMode = defaults.displayMode;
+   const envMode = process.env.PI_ASK_USER_DISPLAY_MODE?.trim().toLowerCase();
+   const envDisplayMode: AskDisplayMode | undefined =
+      envMode === "overlay" || envMode === "inline" ? envMode : undefined;
+   const effectiveDisplayMode: AskDisplayMode = displayMode ?? envDisplayMode ?? "overlay";
+
+   for (let index = 0; index < questions.length; index++) {
+      const item = questions[index];
+      const options = (item.options ?? []).map(coerceOption).filter((option): option is QuestionOption => option !== null);
+      const prefix = `[${index + 1}/${questions.length}] `;
+      const allowMultiple = item.allowMultiple ?? defaults.allowMultiple ?? false;
+      const allowFreeform = item.allowFreeform ?? defaults.allowFreeform ?? true;
+      const allowComment = item.allowComment ?? defaults.allowComment ?? false;
+
+      const result = await askSingleFancyInternal(
+         ctx,
+         `${prefix}${item.question}`,
+         item.context,
+         options,
+         allowMultiple,
+         allowFreeform,
+         allowComment,
+         effectiveDisplayMode,
+         shortcuts,
+         timeout,
+         signal,
+      );
+      answers.push({ question: item.question, context: item.context?.trim() || undefined, options, response: result });
+      if (!result) return null;
+   }
+   return answers;
+}
+
+export async function askUserFancy(
+   ctx: any,
+   params: AskParams,
+): Promise<AskResponse | null> {
+   const {
+      question,
+      options: rawOptions = [],
+      allowMultiple = false,
+      allowFreeform = true,
+      allowComment: requestedAllowComment,
+      displayMode,
+      overlayToggleKey,
+      commentToggleKey,
+      timeout,
+   } = params;
+
+   if (!question?.trim()) {
+      return null;
+   }
+
+   const envMode = process.env.PI_ASK_USER_DISPLAY_MODE?.trim().toLowerCase();
+   const envDisplayMode: AskDisplayMode | undefined =
+      envMode === "overlay" || envMode === "inline" ? envMode : undefined;
+   const effectiveDisplayMode: AskDisplayMode = displayMode ?? envDisplayMode ?? "overlay";
+   const allowComment = requestedAllowComment
+      ?? parseBooleanPreference(process.env.PI_ASK_USER_ALLOW_COMMENT)
+      ?? false;
+
+   const shortcuts: ResolvedAskShortcuts = {
+      overlayToggle: resolveShortcut(
+         overlayToggleKey,
+         process.env.PI_ASK_USER_OVERLAY_TOGGLE_KEY,
+         DEFAULT_OVERLAY_TOGGLE_KEY,
+      ),
+      commentToggle: resolveShortcut(
+         commentToggleKey,
+         process.env.PI_ASK_USER_COMMENT_TOGGLE_KEY,
+         DEFAULT_COMMENT_TOGGLE_KEY,
+      ),
+   };
+
+   const options = rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null);
+   const normalizedContext = params.context?.trim() || undefined;
+
+   return askSingleFancyInternal(
+      ctx,
+      question,
+      normalizedContext,
+      options,
+      allowMultiple,
+      allowFreeform,
+      allowComment,
+      effectiveDisplayMode,
+      shortcuts,
+      timeout,
+      ctx.signal,
+   );
+}
+
 export default function(pi: ExtensionAPI) {
    pi.registerTool({
       name: "ask_user",
       label: "Ask User",
       description:
-         "Ask the user a question with optional multiple-choice answers. Use this to gather information interactively. Ask exactly one focused question per call. Before calling, gather context with tools (read/web/ref) and pass a short summary via the context field.",
+         "Ask the user a focused question with optional choices. For tightly related discovery, use questions to collect a batch of 1-4 answers before the agent resumes. Before asking, gather context with tools (read/web/ref) and pass a short summary.",
       promptSnippet:
          "Ask the user one focused question with optional multiple-choice answers to gather information interactively",
       promptGuidelines: [
          "Before calling ask_user, gather context with tools (read/web/ref) and pass a short summary via the context field.",
          "Use ask_user when the user's intent is ambiguous, when a decision requires explicit user input, or when multiple valid options exist.",
-         "Ask exactly one focused question per ask_user call.",
-         "Do not combine multiple numbered, multipart, or unrelated questions into one ask_user prompt.",
+         "Ask exactly one focused question by default. Use questions only for a tightly related discovery batch of 1-4 independently answerable questions.",
+         "Do not combine unrelated questions into one ask_user batch.",
       ],
       // Block other tool calls in the same assistant turn until the user answers,
       // so the model can't batch ask_user with bash/edit/write and let those run
       // (potentially with side effects) before the user sees the prompt.
       executionMode: "sequential",
       parameters: Type.Object({
-         question: Type.String({ description: "The question to ask the user" }),
+         question: Type.Optional(Type.String({ description: "The focused question to ask the user. Required unless questions is provided." })),
+         questions: Type.Optional(Type.Array(
+            Type.Object({
+               question: Type.String({ description: "One focused question in a related discovery batch" }),
+               context: Type.Optional(Type.String({ description: "Evidence relevant to this question" })),
+               options: Type.Optional(Type.Array(Type.Object({
+                  title: Type.String({ description: "Short option label" }),
+                  description: Type.Optional(Type.String({ description: "Option trade-off or rationale" })),
+                  confidence: Type.Optional(StringEnum(["low", "medium", "high"] as const, { description: "Agent confidence in this option" })),
+               }))),
+               allowMultiple: Type.Optional(Type.Boolean()),
+               allowFreeform: Type.Optional(Type.Boolean()),
+               allowComment: Type.Optional(Type.Boolean()),
+            }),
+            { minItems: 1, maxItems: 4, description: "A batch of 1-4 tightly related discovery questions. Use instead of question, never alongside unrelated questions." },
+         )),
          context: Type.Optional(
             Type.String({
                description: "Relevant context to show before the question (summary of findings)",
@@ -1855,6 +2096,9 @@ export default function(pi: ExtensionAPI) {
                   title: Type.String({ description: "Short title for this option" }),
                   description: Type.Optional(
                      Type.String({ description: "Longer description explaining this option" }),
+                  ),
+                  confidence: Type.Optional(
+                     StringEnum(["low", "medium", "high"] as const, { description: "Agent confidence in this option" }),
                   ),
                }),
                { description: "List of options for the user to choose from" },
@@ -1901,6 +2145,7 @@ export default function(pi: ExtensionAPI) {
 
          const {
             question,
+            questions: batchQuestions,
             context,
             options: rawOptions = [],
             allowMultiple = false,
@@ -1918,6 +2163,7 @@ export default function(pi: ExtensionAPI) {
          const allowComment = requestedAllowComment
             ?? parseBooleanPreference(process.env.PI_ASK_USER_ALLOW_COMMENT)
             ?? false;
+
          const shortcuts: ResolvedAskShortcuts = {
             overlayToggle: resolveShortcut(
                overlayToggleKey,
@@ -1930,6 +2176,63 @@ export default function(pi: ExtensionAPI) {
                DEFAULT_COMMENT_TOGGLE_KEY,
             ),
          };
+
+         if (batchQuestions) {
+            if (batchQuestions.length < 1 || batchQuestions.length > 4 || batchQuestions.some((item) => !item.question?.trim())) {
+               return {
+                  content: [{ type: "text", text: "questions must contain 1-4 items with a non-empty question." }],
+                  isError: true,
+                  details: { error: "Invalid question batch" },
+               };
+            }
+            if (!ctx.hasUI || !ctx.ui) {
+               const text = batchQuestions.map((item, index) => {
+                  const options = (item.options ?? []).map(coerceOption).filter((option): option is QuestionOption => option !== null);
+                  return `${index + 1}. ${item.question}${item.context ? `\nContext: ${item.context}` : ""}${options.length ? `\n${formatOptionsForMessage(options)}` : ""}`;
+               }).join("\n\n");
+               return {
+                  content: [{ type: "text", text: `Ask requires interactive mode. Please answer this batch:\n\n${text}` }],
+                  isError: true,
+                  details: { questions: [], cancelled: true } as AskToolDetails,
+               };
+            }
+            const answers = await askBatchViaDialogs(
+               ctx,
+               batchQuestions,
+               {
+                  allowMultiple,
+                  allowFreeform,
+                  allowComment,
+                  timeout,
+                  displayMode,
+                  overlayToggleKey,
+                  commentToggleKey,
+               },
+               shortcuts,
+               signal,
+            );
+            if (!answers) {
+               pi.events.emit("ask:cancelled", { questions: batchQuestions });
+               return {
+                  content: [{ type: "text", text: "User cancelled the question batch" }],
+                  details: { questions: [], cancelled: true } as AskToolDetails,
+               };
+            }
+            pi.events.emit("ask:answered", { questions: answers });
+            return {
+               content: [{ type: "text", text: `User answered ${answers.length} related questions:\n${answers.map((answer, index) => `${index + 1}. ${answer.question}: ${answer.response ? formatResponseSummary(answer.response) : "cancelled"}`).join("\n")}` }],
+               details: { questions: answers, cancelled: false } as AskToolDetails,
+            };
+         }
+
+         if (!question?.trim()) {
+            return {
+               content: [{ type: "text", text: "question is required unless questions is provided." }],
+               isError: true,
+               details: { error: "Missing question" },
+            };
+         }
+
          const options = rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null);
          const normalizedContext = context?.trim() || undefined;
 
@@ -1949,124 +2252,24 @@ export default function(pi: ExtensionAPI) {
             };
          }
 
-         if (!ctx.hasUI || !ctx.ui) {
-            const optionText = options.length > 0 ? `\n\nOptions:\n${formatOptionsForMessage(options)}` : "";
-            const freeformHint = allowFreeform ? "\n\nYou can also answer freely." : "";
-            const commentHint = allowComment ? "\n\nAfter choosing an option, you may add an optional comment." : "";
-            const contextText = normalizedContext ? `\n\nContext:\n${normalizedContext}` : "";
-            return {
-               content: [
-                  {
-                     type: "text",
-                     text: `Ask requires interactive mode. Please answer:\n\n${question}${contextText}${optionText}${freeformHint}${commentHint}`,
-                  },
-               ],
-               isError: true,
-               details: { question, context: normalizedContext, options, response: null, cancelled: true } as AskToolDetails,
-            };
-         }
-
-         if (options.length === 0) {
-            const prompt = normalizedContext ? `${question}\n\nContext:\n${normalizedContext}` : question;
-            const answer = await ctx.ui.input(prompt, "Type your answer...", timeout ? { timeout } : undefined);
-            const response = createFreeformResponse(answer);
-
-            if (!response) {
-               return {
-                  content: [{ type: "text", text: "User cancelled the question" }],
-                  details: { question, context: normalizedContext, options, response: null, cancelled: true } as AskToolDetails,
-               };
-            }
-
-            pi.events.emit("ask:answered", { question, context: normalizedContext, response });
-            return {
-               content: [{ type: "text", text: `User answered: ${formatResponseSummary(response)}` }],
-               details: { question, context: normalizedContext, options, response, cancelled: false } as AskToolDetails,
-            };
-         }
-
          onUpdate?.({
             content: [{ type: "text", text: "Waiting for user input..." }],
             details: { question, context: normalizedContext, options, response: null, cancelled: false },
          });
 
-         let result: AskUIResult | null;
-         let overlayHandle: OverlayHandle | undefined;
-         let removeOverlayInputListener: (() => void) | undefined;
-         let hasAnnouncedHide = false;
-         try {
-            const customFactory = (tui: TUI, theme: Theme, keybindings: KeybindingsManager, done: (result: AskUIResult | null) => void) => {
-               if (signal) {
-                  const onAbort = () => done(null);
-                  signal.addEventListener("abort", onAbort, { once: true });
-               }
-
-               if (timeout && timeout > 0) {
-                  setTimeout(() => done(null), timeout);
-               }
-
-               return new AskComponent(
-                  question,
-                  normalizedContext,
-                  options,
-                  allowMultiple,
-                  allowFreeform,
-                  allowComment,
-                  effectiveDisplayMode,
-                  tui,
-                  theme,
-                  keybindings,
-                  shortcuts,
-                  done,
-               );
-            };
-
-            // Register a raw terminal input listener for the overlay-toggle key so the
-            // overlay can be toggled even while it is hidden (hidden overlays do not
-            // receive input). Inline mode does not need this because the prompt is
-            // already non-modal. Skipped entirely if the user disabled the shortcut.
-            const overlayToggle = shortcuts.overlayToggle;
-            if (
-               effectiveDisplayMode === "overlay"
-               && !overlayToggle.disabled
-               && typeof ctx.ui.onTerminalInput === "function"
-            ) {
-               removeOverlayInputListener = ctx.ui.onTerminalInput((data) => {
-                  if (!overlayToggle.matches(data) || !overlayHandle) return undefined;
-                  const nextHidden = !overlayHandle.isHidden();
-                  overlayHandle.setHidden(nextHidden);
-                  if (nextHidden && !hasAnnouncedHide) {
-                     hasAnnouncedHide = true;
-                     ctx.ui.notify?.(`ask_user hidden — press ${overlayToggle.spec} to reopen`, "info");
-                  }
-                  return { consume: true };
-               });
-            }
-
-            const customResult = await ctx.ui.custom<AskUIResult | null>(
-               customFactory,
-               buildCustomUIOptions(effectiveDisplayMode, (handle) => {
-                  overlayHandle = handle;
-               }),
-            );
-
-            if (customResult !== undefined) {
-               result = customResult;
-            } else {
-               // RPC/headless mode: degrade to select()/input() dialog protocol
-               result = await askViaDialogs(ctx.ui, question, normalizedContext, options, allowMultiple, allowFreeform, allowComment, timeout);
-            }
-         } catch (error) {
-            const message =
-               error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error);
-            return {
-               content: [{ type: "text", text: `Ask tool failed: ${message}` }],
-               isError: true,
-               details: { error: message },
-            };
-         } finally {
-            removeOverlayInputListener?.();
-         }
+         const result = await askSingleFancyInternal(
+            ctx,
+            question,
+            normalizedContext,
+            options,
+            allowMultiple,
+            allowFreeform,
+            allowComment,
+            effectiveDisplayMode,
+            shortcuts,
+            timeout,
+            signal,
+         );
 
          if (result === null) {
             pi.events.emit("ask:cancelled", { question, context: normalizedContext, options });
@@ -2094,10 +2297,11 @@ export default function(pi: ExtensionAPI) {
       },
 
       renderCall(args, theme) {
+         const batch = Array.isArray(args.questions) ? args.questions as Array<{ question?: string }> : undefined;
          const question = (args.question as string) || "";
          const rawOptions = Array.isArray(args.options) ? args.options : [];
          let text = theme.fg("toolTitle", theme.bold("ask_user "));
-         text += theme.fg("muted", question);
+         text += theme.fg("muted", batch ? `batch (${batch.length}): ${batch.map((item) => item.question ?? "<invalid>").join(" | ")}` : question);
          if (rawOptions.length > 0) {
             const labels = rawOptions.map((o: unknown) => coerceOption(o)?.title ?? "<invalid>");
             text += "\n" + theme.fg("dim", `  ${rawOptions.length} option(s): ${labels.join(", ")}`);
@@ -2126,7 +2330,22 @@ export default function(pi: ExtensionAPI) {
             return new Text(theme.fg("muted", waitingText), 0, 0);
          }
 
-         if (!details || details.cancelled || !details.response) {
+         if (!details || details.cancelled) {
+            return new Text(theme.fg("warning", "Cancelled"), 0, 0);
+         }
+
+         if ("questions" in details) {
+            let text = theme.fg("success", `✓ ${details.questions.length} answers collected`);
+            if (options.expanded) {
+               for (const [index, answer] of details.questions.entries()) {
+                  text += `\n${theme.fg("dim", `${index + 1}. ${answer.question}`)}`;
+                  if (answer.response) text += `\n  ${theme.fg("accent", formatResponseSummary(answer.response))}`;
+               }
+            }
+            return new Text(text, 0, 0);
+         }
+
+         if (!details.response) {
             return new Text(theme.fg("warning", "Cancelled"), 0, 0);
          }
 

@@ -1,6 +1,8 @@
 export interface QuestionOption {
 	title: string;
 	description?: string;
+	/** Agent confidence in this option; shown as a compact badge when provided. */
+	confidence?: "low" | "medium" | "high";
 }
 
 export interface AnnotatedRow {
@@ -112,7 +114,8 @@ function buildItemBlocks(
 
 		const numberPrefix = `${pointer} ${itemIndex + 1}. `;
 		const continuationPrefix = " ".repeat(numberPrefix.length);
-		const titleLines = wrapText(item.option.title, Math.max(8, normalizedWidth - numberPrefix.length));
+		const confidence = item.option.confidence ? `[${item.option.confidence}] ` : "";
+		const titleLines = wrapText(`${confidence}${item.option.title}`, Math.max(8, normalizedWidth - numberPrefix.length));
 		titleLines.forEach((line, lineIndex) => {
 			lines.push(padLine(lineIndex === 0 ? numberPrefix : continuationPrefix, line));
 		});
