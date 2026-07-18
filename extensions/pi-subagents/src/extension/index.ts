@@ -26,6 +26,8 @@ import { cleanupOldChainDirs } from "../shared/settings.ts";
 import { clearLegacyResultAnimationTimer, renderSubagentResult } from "../tui/render.ts";
 import { SubagentParams } from "./schemas.ts";
 import { validateChainInput } from "./chain-validation.ts";
+import { enforceExecutionPolicy, subagentExecutionEnabled, ENABLED_SETTING_ID, SETTINGS_EXTENSION_NAME, SUBAGENTS_DISABLED_TOOL_DESCRIPTION } from "./execution-policy.ts";
+import { setParentThinkingProvider } from "../runs/shared/parent-thinking.ts";
 import { createSubagentExecutor, type SubagentParamsLike } from "../runs/foreground/subagent-executor.ts";
 import { createAsyncJobTracker } from "../runs/background/async-job-tracker.ts";
 import { createResultWatcher } from "../runs/background/result-watcher.ts";
@@ -360,7 +362,10 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		return new SubagentControlNoticeComponent({ ...details, noticeText: formatSubagentControlNotice(details, content) }, theme);
 	});
 
-	const executeSubagentCollapsed = (id: string, params: SubagentParamsLike, signal: AbortSignal, onUpdate: ((result: AgentToolResult<Details>) => void) | undefined, ctx: ExtensionContext) => {
+	const executeSubagentCollapsed = async (id: string, params: SubagentParamsLike, signal: AbortSignal, onUpdate: ((result: AgentToolResult<Details>) => void) | undefined, ctx: ExtensionContext) => {
+		// Enforce here as well as in prepareArguments so the slash and
+		// prompt-template bridges cannot bypass the serial-only policy.
+		enforceExecutionPolicy(params, state);
 		if (ctx.hasUI) ctx.ui.setToolsExpanded(false);
 		return executor.execute(id, params, signal, onUpdate, ctx);
 	};
@@ -382,7 +387,10 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	const rpcBridge = registerSubagentRpcBridge({
 		events: pi.events,
 		getContext: () => state.lastUiContext,
-		execute: (id, params, signal, onUpdate, ctx) => executor.execute(id, params, signal, onUpdate, ctx),
+		execute: (id, params, signal, onUpdate, ctx) => {
+			enforceExecutionPolicy(params, state);
+			return executor.execute(id, params, signal, onUpdate, ctx);
+		},
 	});
 
 	function effectiveParallelTaskCount(tasks: Array<{ count?: unknown }> | undefined): number {
@@ -396,7 +404,9 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	const tool: ToolDefinition<typeof SubagentParams, Details> = {
 		name: "subagent",
 		label: "Subagent",
-		description: buildSubagentToolDescription(config),
+		// The description is fixed at registration; the execution guard re-checks
+		// the live setting on every call, so a mid-session toggle still applies.
+		description: subagentExecutionEnabled() ? buildSubagentToolDescription(config) : SUBAGENTS_DISABLED_TOOL_DESCRIPTION,
 		parameters: SubagentParams,
 
 		prepareArguments(args) {
@@ -404,6 +414,7 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 			// so the model sees which property is disallowed, what is allowed, and a
 			// valid example instead of `chain.N: must not have additional properties`.
 			validateChainInput(args);
+			enforceExecutionPolicy(args, state);
 			return args as never;
 		},
 
@@ -449,6 +460,12 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	};
 
 	pi.registerTool(tool);
+
+	setParentThinkingProvider(() => pi.getThinkingLevel());
+
+	pi.events.emit("pi-extension-settings:register", { name: SETTINGS_EXTENSION_NAME, settings: [
+		{ id: ENABLED_SETTING_ID, label: "Enable subagent execution", defaultValue: "off", values: ["off", "on"] },
+	] });
 
 	registerWaitTool(pi, state, waitToolConfig.enabled);
 

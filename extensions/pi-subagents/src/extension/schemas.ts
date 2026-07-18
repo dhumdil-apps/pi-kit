@@ -259,6 +259,11 @@ const SubagentParamsSchema = Type.Object({
 	worktree: Type.Optional(Type.Boolean({
 		description: "Create isolated git worktrees for parallel tasks; requires clean git state."
 	})),
+	allowedDirtyPaths: Type.Optional(Type.Array(Type.String(), {
+		minItems: 2,
+		maxItems: 2,
+		description: "Exact matching Plan Mode .pi/plans ledger/state pair permitted to be dirty when worktree isolation starts. No other paths are accepted.",
+	})),
 	chain: Type.Optional(Type.Array(ChainItem, { description: "CHAIN mode: sequential steps; each result becomes {previous}. append-step takes one tail step and may use {chain_dir}/{outputs.name}." })),
 	context: Type.Optional(Type.String({
 		enum: ["fresh", "fork"],

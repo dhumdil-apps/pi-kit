@@ -146,6 +146,7 @@ export interface SubagentParamsLike {
 	tasks?: TaskParam[];
 	concurrency?: number;
 	worktree?: boolean;
+	allowedDirtyPaths?: string[];
 	context?: "fresh" | "fork";
 	async?: boolean;
 	foregroundOnly?: boolean;
@@ -1996,6 +1997,7 @@ function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): AgentTool
 			worktreeSetupHook: deps.config.worktreeSetupHook,
 			worktreeSetupHookTimeoutMs: deps.config.worktreeSetupHookTimeoutMs,
 			worktreeBaseDir: deps.config.worktreeBaseDir,
+			allowedDirtyPaths: params.allowedDirtyPaths,
 			controlConfig,
 			controlIntercomTarget,
 			childIntercomTarget,
@@ -2035,6 +2037,7 @@ function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): AgentTool
 			worktreeSetupHook: deps.config.worktreeSetupHook,
 			worktreeSetupHookTimeoutMs: deps.config.worktreeSetupHookTimeoutMs,
 			worktreeBaseDir: deps.config.worktreeBaseDir,
+			allowedDirtyPaths: params.allowedDirtyPaths,
 			controlConfig,
 			controlIntercomTarget,
 			childIntercomTarget,
@@ -2088,6 +2091,7 @@ function runAsyncPath(data: ExecutionContextData, deps: ExecutorDeps): AgentTool
 			worktreeSetupHook: deps.config.worktreeSetupHook,
 			worktreeSetupHookTimeoutMs: deps.config.worktreeSetupHookTimeoutMs,
 			worktreeBaseDir: deps.config.worktreeBaseDir,
+			allowedDirtyPaths: params.allowedDirtyPaths,
 			controlConfig,
 			controlIntercomTarget,
 			childIntercomTarget: childIntercomTarget ? (agent, index) => childIntercomTarget(agent, index) : undefined,
@@ -2163,6 +2167,7 @@ async function runChainPath(data: ExecutionContextData, deps: ExecutorDeps): Pro
 		worktreeSetupHook: deps.config.worktreeSetupHook,
 		worktreeSetupHookTimeoutMs: deps.config.worktreeSetupHookTimeoutMs,
 		worktreeBaseDir: deps.config.worktreeBaseDir,
+		allowedDirtyPaths: params.allowedDirtyPaths,
 		timeoutMs: data.timeoutMs,
 		deadlineAt: data.deadlineAt,
 		turnBudget: data.turnBudget,
@@ -2318,6 +2323,7 @@ function createParallelWorktreeSetup(
 	setupHook: ExtensionConfig["worktreeSetupHook"],
 	setupHookTimeoutMs: ExtensionConfig["worktreeSetupHookTimeoutMs"],
 	baseDir: ExtensionConfig["worktreeBaseDir"],
+	allowedDirtyPaths?: string[],
 ): { setup?: WorktreeSetup; errorResult?: AgentToolResult<Details> } {
 	if (!enabled) return {};
 	try {
@@ -2328,6 +2334,7 @@ function createParallelWorktreeSetup(
 					? { hookPath: setupHook, timeoutMs: setupHookTimeoutMs }
 					: undefined,
 				baseDir,
+				allowedDirtyPaths,
 			}),
 		};
 	} catch (error) {
@@ -2711,6 +2718,7 @@ async function runParallelPath(data: ExecutionContextData, deps: ExecutorDeps): 
 				worktreeSetupHook: deps.config.worktreeSetupHook,
 				worktreeSetupHookTimeoutMs: deps.config.worktreeSetupHookTimeoutMs,
 				worktreeBaseDir: deps.config.worktreeBaseDir,
+				allowedDirtyPaths: params.allowedDirtyPaths,
 				controlConfig,
 				controlIntercomTarget: data.intercomBridge.active ? data.intercomBridge.orchestratorTarget : undefined,
 				childIntercomTarget: data.intercomBridge.active ? (agent, index) => resolveSubagentIntercomTarget(id, agent, index) : undefined,
@@ -2734,6 +2742,7 @@ async function runParallelPath(data: ExecutionContextData, deps: ExecutorDeps): 
 		deps.config.worktreeSetupHook,
 		deps.config.worktreeSetupHookTimeoutMs,
 		deps.config.worktreeBaseDir,
+		params.allowedDirtyPaths,
 	);
 	if (errorResult) return errorResult;
 

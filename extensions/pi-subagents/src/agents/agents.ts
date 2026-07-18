@@ -34,23 +34,14 @@ export interface AgentMemoryConfig {
 	path: string;
 }
 
-export const BUILTIN_AGENT_NAMES = [
-	"context-builder",
-	"delegate",
-	"oracle",
-	"planner",
-	"researcher",
-	"reviewer",
-	"scout",
-	"worker",
-] as const;
+export const BUILTIN_AGENT_NAMES = ["coder", "explorer"] as const;
 
-export function defaultSystemPromptMode(name: string): SystemPromptMode {
-	return name === "delegate" ? "append" : "replace";
+export function defaultSystemPromptMode(_name: string): SystemPromptMode {
+	return "replace";
 }
 
-export function defaultInheritProjectContext(name: string): boolean {
-	return name === "delegate";
+export function defaultInheritProjectContext(_name: string): boolean {
+	return false;
 }
 
 export function defaultInheritSkills(): boolean {

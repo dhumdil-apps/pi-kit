@@ -131,6 +131,7 @@ interface SubagentRunConfig {
 	worktreeSetupHook?: string;
 	worktreeSetupHookTimeoutMs?: number;
 	worktreeBaseDir?: string;
+	allowedDirtyPaths?: string[];
 	controlConfig?: ResolvedControlConfig;
 	controlIntercomTarget?: string;
 	childIntercomTargets?: Array<string | undefined>;
@@ -3044,6 +3045,7 @@ async function runSubagent(
 							? { hookPath: config.worktreeSetupHook, timeoutMs: config.worktreeSetupHookTimeoutMs }
 							: undefined,
 						baseDir: config.worktreeBaseDir,
+						allowedDirtyPaths: config.allowedDirtyPaths,
 					});
 				} catch (error) {
 					const setupError = error instanceof Error ? error.message : String(error);

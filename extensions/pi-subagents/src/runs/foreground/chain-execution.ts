@@ -456,6 +456,7 @@ interface ChainExecutionParams {
 	worktreeSetupHook?: string;
 	worktreeSetupHookTimeoutMs?: number;
 	worktreeBaseDir?: string;
+	allowedDirtyPaths?: string[];
 	timeoutMs?: number;
 	deadlineAt?: number;
 	turnBudget?: ResolvedTurnBudget;
@@ -686,6 +687,7 @@ export async function executeChain(params: ChainExecutionParams): Promise<ChainE
 							? { hookPath: params.worktreeSetupHook, timeoutMs: params.worktreeSetupHookTimeoutMs }
 							: undefined,
 						baseDir: params.worktreeBaseDir,
+						allowedDirtyPaths: params.allowedDirtyPaths,
 					});
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);

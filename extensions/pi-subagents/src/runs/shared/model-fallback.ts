@@ -212,23 +212,19 @@ export function resolveSubagentModelOverride(
 }
 
 export function resolveEffectiveSubagentModel(
-	explicitModel: string | boolean | undefined,
-	agentModel: string | boolean | undefined,
+	_explicitModel: string | boolean | undefined,
+	_agentModel: string | boolean | undefined,
 	parentModel: ParentModel | undefined,
 	availableModels: AvailableModelInfo[] | undefined,
 	preferredProvider?: string,
 	options?: Omit<ResolveSubagentModelOverrideOptions, "source">,
 ): string | undefined {
-	const resolved = resolveSubagentModelOverride(
-		explicitModel ?? agentModel,
-		parentModel,
-		availableModels,
-		preferredProvider,
-		{ ...options, source: explicitModel !== undefined ? "explicit" : "inherited" },
-	);
-	if (resolved || explicitModel === undefined) return resolved;
+	// Serial-only policy: children always run on the parent session's model.
+	// Explicit call params and agent-config model overrides are ignored so no
+	// configuration path (frontmatter, defaultModel, profiles, overrides) can
+	// diverge a child from the parent.
 	return resolveSubagentModelOverride(
-		agentModel,
+		undefined,
 		parentModel,
 		availableModels,
 		preferredProvider,

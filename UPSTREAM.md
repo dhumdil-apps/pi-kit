@@ -35,6 +35,8 @@ and run as the mandatory final review phase of plan execution).
 
 - Powerbar imports the vendored Extension Settings module by relative path.
 - Manage Todo List imports the current `@earendil-works/pi-*` package scope in place of its legacy `@mariozechner/pi-*` scope.
-- Headless and RPC mode compatibility safeguards added to `plan-mode` (notifying on headless start) and `ask-user` (preventing crash on single-question calls without UI).
-- `plan-mode` auto-starts planning in interactive sessions, animates a powerbar spinner, and bakes a "Review and simplify the changes" step into every plan.
+- Headless and RPC compatibility safeguards keep `plan-mode`, Welcome, and Ask User from hijacking or blocking non-interactive and child processes.
+- `plan-mode` is now a bundle-owned version-2 persistent orchestration state machine with triage, structured subagent handoffs, session-linked ledgers, scoped checkpoints, exact Plan-ledger dirty exceptions for worktrees, patch integration, validation, and a mandatory one-batch review/one-fix-pass workflow.
+- Pi Subagents accepts an exact matching `.pi/plans/*.md`/`.state.json` pair through `allowedDirtyPaths` while still rejecting all other dirty worktree state.
+- Plan-owned role policy adds `contact_supervisor`, removes reviewer edit/write authority, and uses local per-user thinking overrides.
 - `permission-gate` is scoped to destructive commands only (denylist), with an on/off toggle in extension-settings.

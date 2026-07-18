@@ -44,6 +44,7 @@ interface CreateWorktreesOptions {
 	agents?: string[];
 	setupHook?: WorktreeSetupHookConfig;
 	baseDir?: string;
+	allowedDirtyPaths?: string[];
 }
 
 interface ResolvedWorktreeSetupHook {
@@ -100,13 +101,44 @@ function runGitChecked(cwd: string, args: string[]): string {
 	return result.stdout;
 }
 
-function resolveRepoState(cwd: string): RepoState {
+function statusPath(line: string): string {
+	const raw = line.slice(3).trim();
+	const renamed = raw.includes(" -> ") ? raw.split(" -> ").at(-1)! : raw;
+	return renamed.replace(/^"|"$/g, "").replaceAll("\\", "/");
+}
+
+export function validateAllowedDirtyPaths(paths: readonly string[] | undefined): Set<string> {
+	if (!paths?.length) return new Set();
+	if (paths.length !== 2) {
+		throw new Error("allowedDirtyPaths must contain exactly one Plan Mode ledger/state pair.");
+	}
+	const normalized = paths.map((value) => value.replaceAll("\\", "/").replace(/^\.\//, ""));
+	for (const value of normalized) {
+		if (!/^\.pi\/plans\/[^/]+\.(?:md|state\.json)$/.test(value) || value.includes("..")) {
+			throw new Error(`allowedDirtyPaths may contain only exact .pi/plans ledger files; received ${value}`);
+		}
+	}
+	const md = normalized.find((value) => value.endsWith(".md"));
+	const state = normalized.find((value) => value.endsWith(".state.json"));
+	if (!md || !state || md.slice(0, -3) !== state.slice(0, -11)) {
+		throw new Error("allowedDirtyPaths must name the matching .md and .state.json files.");
+	}
+	return new Set(normalized);
+}
+
+export function unexpectedDirtyPaths(status: string, allowedDirtyPaths?: readonly string[]): string[] {
+	const allowed = validateAllowedDirtyPaths(allowedDirtyPaths);
+	return status.split("\n").filter(Boolean).map(statusPath).filter((value) => !allowed.has(value));
+}
+
+function resolveRepoState(cwd: string, allowedDirtyPaths?: string[]): RepoState {
 	const cwdRelative = resolveRepoCwdRelative(cwd);
 	const toplevel = runGitChecked(cwd, ["rev-parse", "--show-toplevel"]).trim();
 
-	const status = runGitChecked(toplevel, ["status", "--porcelain"]);
-	if (status.trim().length > 0) {
-		throw new Error("worktree isolation requires a clean git working tree. Commit or stash changes first.");
+	const status = runGitChecked(toplevel, ["status", "--porcelain", "--untracked-files=all"]);
+	const unexpected = unexpectedDirtyPaths(status, allowedDirtyPaths);
+	if (unexpected.length > 0) {
+		throw new Error(`worktree isolation requires a clean git working tree. Unexpected dirty paths: ${unexpected.join(", ")}`);
 	}
 
 	const baseCommit = runGitChecked(toplevel, ["rev-parse", "HEAD"]).trim();
@@ -511,7 +543,7 @@ function hasWorktreeChanges(diff: WorktreeDiff): boolean {
 }
 
 export function createWorktrees(cwd: string, runId: string, count: number, options?: CreateWorktreesOptions): WorktreeSetup {
-	const repo = resolveRepoState(cwd);
+	const repo = resolveRepoState(cwd, options?.allowedDirtyPaths);
 	const setupHook = resolveWorktreeSetupHook(repo.toplevel, options?.setupHook);
 	const baseDir = resolveWorktreeBaseDir(options?.baseDir, repo.toplevel);
 	const worktrees: WorktreeInfo[] = [];

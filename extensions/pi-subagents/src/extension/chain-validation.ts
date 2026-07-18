@@ -43,9 +43,9 @@ export const EXPAND_KEYS = allowedKeysOf(DynamicExpandSchema);
 export const EXPAND_FROM_KEYS = allowedKeysOf(ExpandFromSchema);
 export const COLLECT_KEYS = allowedKeysOf(DynamicCollectSchema);
 
-const CHAIN_STEP_EXAMPLE = '{"agent": "worker", "task": "do X"}';
-const PARALLEL_TASK_EXAMPLE = '{"agent": "worker", "task": "do X"}';
-const DYNAMIC_TEMPLATE_EXAMPLE = '{"agent": "worker", "task": "Review {item.path}"}';
+const CHAIN_STEP_EXAMPLE = '{"agent": "coder", "task": "do X"}';
+const PARALLEL_TASK_EXAMPLE = '{"agent": "coder", "task": "do X"}';
+const DYNAMIC_TEMPLATE_EXAMPLE = '{"agent": "coder", "task": "Review {item.path}"}';
 const EXPAND_EXAMPLE = '{"from": {"output": "targets", "path": "/items"}, "maxItems": 4}';
 const EXPAND_FROM_EXAMPLE = '{"output": "targets", "path": "/items"}';
 const COLLECT_EXAMPLE = '{"as": "reviews"}';

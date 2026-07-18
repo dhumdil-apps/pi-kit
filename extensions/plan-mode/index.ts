@@ -1,634 +1,583 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import type { ExtensionAPI, ExtensionContext, SessionStartEvent } from "@earendil-works/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
+import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { askUserFancy } from "../ask-user/index";
+import { askUserFancy } from "../ask-user/index.js";
 import { getSetting } from "../extension-settings/index.js";
-import { getChangedFiles } from "./review/git-diff.js";
-import { buildSimplifyPrompt } from "./review/prompt-builder.js";
-import type { ChangedFile } from "./review/types.js";
+import { activePlanRelativePaths, applyPatch, detectGit, patchFailureStatus, porcelainPaths, runAcceptanceChecks, runPackageChecks, unexpectedDirtyPaths } from "./checkpoint.js";
+import { latestPlanLink, loadPlan, persistPlan } from "./ledger.js";
+import { mergeRuns, runFromCompletion, runsFromDetails } from "./orchestration.js";
+import { canStartReviewFix, classifyTriage, createPlanState, forkPlanState, now, readyGate, roleForAgent, todosFromMarkdown, transition } from "./state.js";
+import type { Checkpoint, CheckResult, Effort, PlanState, PlanTodo, TodoStatus } from "./types.js";
+import { REVIEW_TODO_PATTERN, STATE_VERSION } from "./types.js";
 
-const STATE_VERSION = 1;
 const STATUS_KEY = "plan-mode";
 const EXTENSION_NAME = "plan-mode";
-const REVIEW_TODO_TITLE = "Review and simplify the changes";
-const REVIEW_TODO_PATTERN = /review.*simplif|simplif.*review/i;
 const SPINNER_FRAMES = ["◐", "◓", "◑", "◒"];
 
-type Phase = "exploring" | "ready" | "executing" | "blocked" | "complete";
-type TodoStatus = "not-started" | "in-progress" | "completed";
-
-interface PlanTodo {
-  id: number;
-  title: string;
-  description: string;
-  status: TodoStatus;
-}
-
-interface Checkpoint {
-  todoId: number;
-  todoTitle: string;
-  timestamp: string;
-  files: string[];
-  checks: Array<{ name: string; ok: boolean; output: string }>;
-  status: "committed" | "blocked" | "failed" | "skipped";
-  commit?: string;
-  reason?: string;
-}
-
-interface PlanState {
-  version: number;
-  slug: string;
-  createdAt: string;
-  updatedAt: string;
-  phase: Phase;
-  goal: string;
-  effort: "low" | "medium" | "high";
-  planMarkdown: string;
-  baselineDirtyPaths: string[];
-  todos: PlanTodo[];
-  checkpoints: Checkpoint[];
-  lastError?: string;
-  baseCommit?: string;
-  reviewPromptSent?: boolean;
-}
-
-function slugify(input: string): string {
-  const slug = input.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-  return slug || `plan-${new Date().toISOString().slice(0, 10)}`;
-}
-
-function now(): string { return new Date().toISOString(); }
-
-function textFromMessage(message: unknown): string {
-  const item = message as { role?: string; content?: unknown };
-  if (item.role !== "assistant") return "";
-  if (typeof item.content === "string") return item.content;
-  if (!Array.isArray(item.content)) return "";
-  return item.content
-    .filter((part): part is { type: string; text: string } => !!part && typeof part === "object" && (part as { type?: string }).type === "text" && typeof (part as { text?: unknown }).text === "string")
-    .map((part) => part.text)
-    .join("\n");
+function assistantText(messages: unknown[]): string {
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const item = messages[index] as { role?: string; content?: unknown };
+		if (item?.role !== "assistant") continue;
+		if (typeof item.content === "string") return item.content;
+		if (Array.isArray(item.content)) return item.content.filter((part): part is { type: string; text: string } => !!part && typeof part === "object" && (part as { type?: string }).type === "text" && typeof (part as { text?: unknown }).text === "string").map((part) => part.text).join("\n");
+	}
+	return "";
 }
 
 function isPlanResponse(text: string): boolean {
-  return /(?:^|\n)\s*(?:#{1,3}\s*)?plan\b:?/i.test(text) || /<!--\s*plan-ready\s*-->/i.test(text);
+	return /(?:^|\n)\s*(?:#{1,3}\s*)?plan\b:?/i.test(text) || /<!--\s*plan-ready\s*-->/i.test(text);
 }
 
-function extractTodos(markdown: string): PlanTodo[] {
-  const section = markdown.match(/(?:^|\n)\s*(?:#{1,3}\s*)?plan\b:?\s*\n([\s\S]*)/i)?.[1] ?? "";
-  const todos: PlanTodo[] = [];
-  for (const match of section.matchAll(/^\s*(\d+)[.)]\s+(.+)$/gm)) {
-    const title = match[2].replace(/[*`]/g, "").trim();
-    if (title.length > 3) todos.push({ id: todos.length + 1, title: title.slice(0, 100), description: title, status: "not-started" });
-  }
-  // The review pass is a mandatory final phase of every plan.
-  if (todos.length > 0 && !todos.some((todo) => REVIEW_TODO_PATTERN.test(todo.title))) {
-    todos.push({ id: todos.length + 1, title: REVIEW_TODO_TITLE, description: REVIEW_TODO_TITLE, status: "not-started" });
-  }
-  return todos;
-}
-
-async function git(pi: ExtensionAPI, cwd: string, args: string[]) {
-  return pi.exec("git", args, { cwd, timeout: 30_000 });
-}
-
-async function dirtyPaths(pi: ExtensionAPI, cwd: string): Promise<string[]> {
-  const result = await git(pi, cwd, ["status", "--porcelain"]);
-  if (result.code !== 0) return [];
-  return result.stdout.split("\n").filter(Boolean).map((line) => line.slice(3).split(" -> ").pop()!.trim()).filter(Boolean);
+function parseStringSetting(id: string, fallback: string): string {
+	return getSetting(EXTENSION_NAME, id, fallback) ?? fallback;
 }
 
 export default function planMode(pi: ExtensionAPI): void {
-  let state: PlanState | undefined;
-  let active = false;
-  let currentCwd = "";
-  let checkpointing = false;
-  let effort: "low" | "medium" | "high" = "medium";
-  let spinnerTimer: ReturnType<typeof setInterval> | undefined;
-  let spinnerFrame = 0;
+	let state: PlanState | undefined;
+	let active = false;
+	let currentCwd = "";
+	let effort: Effort = "low";
+	let checkpointing = false;
+	let spinnerTimer: ReturnType<typeof setInterval> | undefined;
+	let spinnerFrame = 0;
+	const orchestrationEnabled = () => parseStringSetting("orchestration", "on") === "on";
+	const subagentsEnabled = () => (getSetting("pi-subagents", "enabled", "off") ?? "off") === "on";
 
-  const startSpinner = (ctx: ExtensionContext) => {
-    if (spinnerTimer || !ctx.hasUI) return;
-    spinnerTimer = setInterval(() => {
-      pi.events.emit("powerbar:update", {
-        id: "plan-mode",
-        icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length],
-        text: state ? `Plan · exploring (${state.effort})` : "Plan · awaiting goal",
-        color: "warning",
-      });
-    }, 500);
-    // Never keep a headless/exiting process alive because of the animation.
-    (spinnerTimer as { unref?: () => void }).unref?.();
-  };
+	const command = async (program: string, args: string[], options?: { timeout?: number }) => {
+		const result = await pi.exec(program, args, { cwd: currentCwd, timeout: options?.timeout ?? 30_000 });
+		return { code: result.code, stdout: result.stdout, stderr: result.stderr };
+	};
 
-  const stopSpinner = () => {
-    if (spinnerTimer) {
-      clearInterval(spinnerTimer);
-      spinnerTimer = undefined;
-    }
-  };
+	const notify = (ctx: ExtensionContext, message: string, type: "info" | "warning" | "error" = "info") => {
+		if (ctx.hasUI) ctx.ui.notify(message, type);
+		else pi.sendMessage({ customType: `plan-notification-${type}`, content: `${type === "error" ? "❌" : type === "warning" ? "⚠️" : "ℹ️"} **Plan Mode**: ${message}`, display: true }, { triggerTurn: false });
+	};
 
-  const emitPowerbarStatus = (exploring: boolean) => {
-    // The spinner interval owns the plan-mode segment while exploring.
-    if (exploring && spinnerTimer) return;
-    const completed = state?.todos.filter((todo) => todo.status === "completed").length ?? 0;
-    const blocked = state?.phase === "blocked";
-    pi.events.emit("powerbar:update", {
-      id: "plan-mode",
-      icon: exploring ? "◌" : blocked ? "!" : "●",
-      text: exploring ? `Plan · ${state?.effort ?? effort}` : blocked ? "Plan · Blocked" : `Plan · Executing ${completed}/${state?.todos.length ?? 0}`,
-      color: blocked ? "error" : exploring ? "warning" : "accent",
-    });
-  };
+	const sendUserMessage = (ctx: ExtensionContext, message: string) => {
+		pi.sendUserMessage(message, ctx.isIdle() ? undefined : { deliverAs: "followUp" });
+	};
 
-  const planDir = () => join(currentCwd, ".pi", "plans");
-  const markdownPath = () => join(planDir(), `${state!.slug}.md`);
-  const statePath = () => join(planDir(), `${state!.slug}.state.json`);
+	const stopSpinner = () => {
+		if (!spinnerTimer) return;
+		clearInterval(spinnerTimer);
+		spinnerTimer = undefined;
+	};
 
-  const notify = (ctx: ExtensionContext, message: string, type: "info" | "warning" | "error" = "info") => {
-    if (ctx.hasUI) {
-      ctx.ui.notify(message, type);
-    } else {
-      pi.sendMessage(
-        {
-          customType: `plan-notification-${type}`,
-          content: `${type === "error" ? "❌" : type === "warning" ? "⚠️" : "ℹ️"} **Plan Mode**: ${message}`,
-          display: true,
-        },
-        { triggerTurn: false }
-      );
-    }
-  };
+	const powerbarText = (): { icon: string; text: string; color: string } | undefined => {
+		if (!active && !state) return undefined;
+		if (!state) return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Awaiting goal", color: "warning" };
+		if (state.pendingSupervisorRequests > 0) return { icon: "?", text: "Plan · Needs decision", color: "error" };
+		const completed = state.todos.filter((todo) => todo.status === "completed").length;
+		switch (state.phase) {
+			case "awaiting-goal": return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Awaiting goal", color: "warning" };
+			case "triage": return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Triage", color: "warning" };
+			case "discovering": return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Discovering", color: "warning" };
+			case "deciding": return { icon: "?", text: "Plan · Deciding", color: "warning" };
+			case "planning": return { icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length], text: "Plan · Planning", color: "warning" };
+			case "ready": return { icon: "✔", text: "Plan · Ready", color: "warning" };
+			case "executing": return { icon: "●", text: `Plan · Executing ${completed}/${state.todos.length}`, color: "accent" };
+			case "reviewing": return { icon: "◆", text: "Plan · Reviewing", color: "accent" };
+			case "blocked": return { icon: "!", text: "Plan · Blocked", color: "error" };
+			case "complete": return { icon: "✔", text: "Plan · Complete", color: "success" };
+		}
+	};
 
-  /** Commands and plan-end UI can run while the current agent turn is still settling. */
-  const sendUserMessage = (ctx: ExtensionContext, message: string) => {
-    if (ctx.isIdle()) pi.sendUserMessage(message);
-    else pi.sendUserMessage(message, { deliverAs: "followUp" });
-  };
+	const refreshStatus = (ctx: ExtensionContext) => {
+		const segment = powerbarText();
+		if (!segment) {
+			stopSpinner();
+			if (ctx.hasUI) ctx.ui.setStatus(STATUS_KEY, undefined);
+			pi.events.emit("powerbar:update", { id: "plan-mode", text: undefined });
+			return;
+		}
+		const animated = !state || ["awaiting-goal", "triage", "discovering", "planning"].includes(state.phase);
+		if (animated && ctx.hasUI && !spinnerTimer) {
+			spinnerTimer = setInterval(() => {
+				const next = powerbarText();
+				if (next) pi.events.emit("powerbar:update", { id: "plan-mode", ...next });
+			}, 500);
+			(spinnerTimer as { unref?: () => void }).unref?.();
+		} else if (!animated) stopSpinner();
+		if (ctx.hasUI) ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg(segment.color as never, segment.text));
+		pi.events.emit("powerbar:update", { id: "plan-mode", ...segment });
+	};
 
-  const clearPlanDisplay = (ctx: ExtensionContext) => {
-    stopSpinner();
-    if (ctx.hasUI) {
-      ctx.ui.setStatus(STATUS_KEY, undefined);
-      ctx.ui.setWorkingMessage();
-      ctx.ui.setWorkingIndicator();
-    }
-    pi.events.emit("powerbar:update", { id: "plan-mode", text: undefined });
-  };
+	const persist = async () => {
+		if (state) await persistPlan(state);
+	};
 
-  const setStatus = (ctx: ExtensionContext) => {
-    const completed = state?.todos.filter((todo) => todo.status === "completed").length ?? 0;
-    const phase = state?.phase;
-    const exploring = active && (!state || phase === "exploring");
-    const ready = active && phase === "ready";
-    const executing = phase === "executing";
-    const blocked = phase === "blocked";
-    if (!exploring && !ready && !executing && !blocked) return clearPlanDisplay(ctx);
+	const appendLink = () => {
+		if (!state) return;
+		pi.appendEntry("plan-mode", { version: STATE_VERSION, ledger: state.ledgerPath, state: state.statePath });
+	};
 
-    if (exploring) startSpinner(ctx);
-    else stopSpinner();
+	const initializeGoal = async (ctx: ExtensionContext, goal: string) => {
+		state = createPlanState({ cwd: ctx.cwd, goal, effort, sessionId: ctx.sessionManager.getSessionId() });
+		const git = await detectGit(command);
+		state.gitMode = git.isGit ? "git" : "non-git";
+		state.baseCommit = git.head;
+		await persist();
+		appendLink();
+		refreshStatus(ctx);
+	};
 
-    const text = exploring
-      ? `Plan · ${state?.effort ?? effort}`
-      : ready
-        ? "Plan · Ready"
-        : blocked
-          ? "Plan · Blocked"
-          : `Plan · Executing ${completed}/${state?.todos.length ?? 0}`;
-    const color = blocked ? "error" : exploring || ready ? "warning" : "accent";
-    if (ctx.hasUI) {
-      ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg(color, text));
-      ctx.ui.setWorkingIndicator();
-    }
-    if (ready) {
-      pi.events.emit("powerbar:update", { id: "plan-mode", icon: "✔", text: "Plan · Ready", color: "warning" });
-    } else {
-      emitPowerbarStatus(exploring);
-    }
-  };
+	const loadLinkedPlan = async (ctx: ExtensionContext, link: { state: string }, warningPrefix = "") => {
+		const loaded = await loadPlan(link.state, { cwd: ctx.cwd, sessionId: ctx.sessionManager.getSessionId() });
+		if (loaded.warning) notify(ctx, `${warningPrefix}${loaded.warning}`, "warning");
+		if (!loaded.state) return false;
+		state = loaded.state;
+		active = state.phase !== "complete";
+		effort = state.effort;
+		await persist();
+		refreshStatus(ctx);
+		return true;
+	};
 
-  const persist = async () => {
-    if (!state) return;
-    state.updatedAt = now();
-    await mkdir(planDir(), { recursive: true });
-    const header = `# Plan: ${state.goal}\n\n`;
-    const body = state.planMarkdown.startsWith("#") ? state.planMarkdown : `${header}${state.planMarkdown}`;
-    await writeFile(markdownPath(), body, "utf8");
-    await writeFile(statePath(), `${JSON.stringify(state, null, 2)}\n`, "utf8");
-  };
+	const reconstructSession = async (event: SessionStartEvent, ctx: ExtensionContext) => {
+		currentCwd = ctx.cwd;
+		const link = latestPlanLink(ctx.sessionManager.getEntries());
+		if (event.reason === "fork" && link) {
+			const loaded = await loadPlan(link.state, { cwd: ctx.cwd, sessionId: ctx.sessionManager.getSessionId() });
+			if (loaded.state) {
+				state = forkPlanState(loaded.state, { cwd: ctx.cwd, sessionId: ctx.sessionManager.getSessionId() });
+				await persist();
+				appendLink();
+				active = state.phase !== "complete";
+				refreshStatus(ctx);
+				return;
+			}
+		}
+		if (link && await loadLinkedPlan(ctx, link)) return;
+		state = undefined;
+		active = ctx.hasUI && parseStringSetting("auto-start", "on") === "on";
+		effort = parseStringSetting("default-effort", "low") === "high" ? "high" : "low";
+		refreshStatus(ctx);
+	};
 
-  const createState = async (goal: string) => {
-    let slug = slugify(goal);
-    // Auto-planning every session makes same-goal collisions likely; never
-    // silently overwrite an earlier plan's files.
-    const collides = await readFile(join(planDir(), `${slug}.state.json`), "utf8").then(() => true).catch(() => false);
-    if (collides) slug = `${slug.slice(0, 43)}-${now().replace(/[-:]/g, "").slice(0, 13)}`;
-    state = {
-      version: STATE_VERSION, slug, createdAt: now(), updatedAt: now(), phase: "exploring", goal, effort,
-      planMarkdown: "", baselineDirtyPaths: [], todos: [], checkpoints: [],
-    };
-    await persist();
-  };
+	const scripts = async (): Promise<Record<string, string>> => {
+		try { return (JSON.parse(await readFile(join(currentCwd, "package.json"), "utf8")) as { scripts?: Record<string, string> }).scripts ?? {}; }
+		catch { return {}; }
+	};
 
-  const runChecks = async (): Promise<Checkpoint["checks"]> => {
-    const checks: Checkpoint["checks"] = [];
-    let scripts: Record<string, string> = {};
-    try { scripts = JSON.parse(await readFile(join(currentCwd, "package.json"), "utf8")).scripts ?? {}; } catch { return checks; }
-    for (const name of ["lint", "typecheck", "test", "build"]) {
-      if (!scripts[name]) continue;
-      const result = await pi.exec("npm", ["run", name], { cwd: currentCwd, timeout: name === "test" ? 120_000 : 60_000 });
-      const output = `${result.stdout}\n${result.stderr}`.trim().slice(-8000);
-      checks.push({ name, ok: result.code === 0, output });
-      if (result.code !== 0) break;
-    }
-    return checks;
-  };
+	const runChecks = async (full: boolean, acceptance: readonly string[] = []): Promise<CheckResult[]> => {
+		const project = await runPackageChecks(command, await scripts(), full ? ["lint", "typecheck", "test", "build"] : ["lint", "typecheck"]);
+		if (project.some((check) => !check.ok) || full) return project;
+		return [...project, ...await runAcceptanceChecks(command, acceptance)];
+	};
 
-  const checkpoint = async (ctx: ExtensionContext, todo: PlanTodo, previousStatus: TodoStatus) => {
-    if (!state || checkpointing || state.phase !== "executing") return;
-    checkpointing = true;
-    try {
-      const dirty = await dirtyPaths(pi, currentCwd);
-      const planFiles = [".pi/plans/" + basename(markdownPath()), ".pi/plans/" + basename(statePath())];
-      const changed = dirty.filter((path) => !planFiles.includes(path));
-      const overlappingBaseline = changed.filter((path) => state!.baselineDirtyPaths.includes(path));
-      const record: Checkpoint = { todoId: todo.id, todoTitle: todo.title, timestamp: now(), files: changed, checks: [], status: "skipped" };
-      if (overlappingBaseline.length > 0) {
-        record.status = "blocked";
-        record.reason = `Refusing automatic commit: pre-existing modified paths overlap this step: ${overlappingBaseline.join(", ")}`;
-        state.phase = "blocked";
-        state.lastError = record.reason;
-        state.checkpoints.push(record);
-        todo.status = previousStatus;
-        await persist();
-        setStatus(ctx);
-        notify(ctx, record.reason, "warning");
-        return;
-      }
-      record.checks = await runChecks();
-      const failed = record.checks.find((check) => !check.ok);
-      if (failed) {
-        record.status = "failed";
-        record.reason = `${failed.name} failed; checkpoint was not committed.`;
-        state.phase = "blocked";
-        state.lastError = record.reason;
-        state.checkpoints.push(record);
-        todo.status = previousStatus;
-        await persist();
-        setStatus(ctx);
-        notify(ctx, record.reason, "error");
-        return;
-      }
-      state.checkpoints.push(record);
-      await persist();
-      const scoped = [...changed, ...planFiles];
-      if (scoped.length === planFiles.length) {
-        record.status = "skipped";
-        record.reason = "No implementation files changed for this todo.";
-        await persist();
-        
-        const allCompleted = state.todos.every((t) => t.status === "completed");
-        if (allCompleted) {
-          state.phase = "complete";
-          active = false;
-          await persist();
-          setStatus(ctx);
-          notify(ctx, "All plan steps are complete! Plan execution finished.");
-        }
-        return;
-      }
-      const add = await git(pi, currentCwd, ["add", "--", ...scoped]);
-      if (add.code !== 0) throw new Error(add.stderr || "git add failed");
-      const commit = await git(pi, currentCwd, ["commit", "-m", `plan(${state.slug}): complete step ${todo.id} — ${todo.title.slice(0, 60)}`]);
-      if (commit.code !== 0) throw new Error(commit.stderr || "git commit failed");
-      const revision = await git(pi, currentCwd, ["rev-parse", "HEAD"]);
-      record.status = "committed";
-      record.commit = revision.stdout.trim();
-      await persist();
-      notify(ctx, `Checkpoint committed for todo ${todo.id}: ${record.commit.slice(0, 8)}`);
+	const ensureCleanForExecution = async (): Promise<{ ok: boolean; reason?: string }> => {
+		if (!state || state.gitMode === "non-git") return { ok: true };
+		const result = await command("git", ["status", "--porcelain", "--untracked-files=all"]);
+		if (result.code !== 0) return { ok: false, reason: result.stderr || "git status failed" };
+		const unexpected = unexpectedDirtyPaths(porcelainPaths(result.stdout), state);
+		return unexpected.length ? { ok: false, reason: `Execution requires a clean worktree. Clean these paths first: ${unexpected.join(", ")}` } : { ok: true };
+	};
 
-      const allCompleted = state.todos.every((t) => t.status === "completed");
-      if (allCompleted) {
-        state.phase = "complete";
-        active = false;
-        await persist();
-        setStatus(ctx);
-        notify(ctx, "All plan steps are complete! Plan execution finished.");
-      }
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      if (state) {
-        state.phase = "blocked";
-        state.lastError = `Checkpoint failed: ${reason}`;
-        state.checkpoints.push({ todoId: todo.id, todoTitle: todo.title, timestamp: now(), files: [], checks: [], status: "failed", reason });
-        todo.status = previousStatus;
-        await persist();
-      }
-      setStatus(ctx);
-      notify(ctx, `Checkpoint failed: ${reason}`, "error");
-    } finally { checkpointing = false; }
-  };
+	const completePlanIfDone = async (ctx: ExtensionContext) => {
+		if (!state || !state.todos.length || !state.todos.every((todo) => todo.status === "completed")) return;
+		transition(state, "complete");
+		active = false;
+		await persist();
+		refreshStatus(ctx);
+		notify(ctx, "All plan steps are complete.");
+	};
 
-  const beginExecution = async (ctx: ExtensionContext) => {
-    if (!state) return;
-    const resuming = state.phase === "blocked" || state.phase === "executing";
-    state.phase = "executing";
-    active = false;
-    if (!resuming) {
-      state.todos = extractTodos(state.planMarkdown);
-      const head = await git(pi, currentCwd, ["rev-parse", "HEAD"]);
-      state.baseCommit = head.code === 0 ? head.stdout.trim() : undefined;
-      state.reviewPromptSent = false;
-    }
-    state.baselineDirtyPaths = await dirtyPaths(pi, currentCwd);
-    await persist();
-    setStatus(ctx);
-    if (resuming) {
-      sendUserMessage(ctx, `Resume executing the saved plan at ${markdownPath()}. Use manage_todo_list to continue tracking progress. Complete the remaining steps.`);
-    } else {
-      sendUserMessage(ctx, `Execute the saved plan at ${markdownPath()}. First use manage_todo_list to replace the current list with the saved plan steps. Keep exactly one step in-progress. After each successful step, mark it completed immediately; the plan extension will run project checks and create a scoped Git checkpoint automatically. Stop if a checkpoint reports a failure or blocked state.`);
-    }
-  };
+	const checkpoint = async (ctx: ExtensionContext, todo: PlanTodo, previousStatus: TodoStatus) => {
+		if (!state || checkpointing || (state.phase !== "executing" && state.phase !== "reviewing")) return;
+		checkpointing = true;
+		try {
+			const reviewTodo = REVIEW_TODO_PATTERN.test(todo.title);
+			const checks = reviewTodo
+				? (state.review.fixPasses > 0 ? await runChecks(true) : state.validation)
+				: await runChecks(false, todo.acceptanceChecks);
+			const failed = checks.find((check) => !check.ok);
+			const dirty = state.gitMode === "git" ? porcelainPaths((await command("git", ["status", "--porcelain", "--untracked-files=all"])).stdout) : [];
+			const planFiles = activePlanRelativePaths(state);
+			const changed = dirty.filter((path) => !planFiles.includes(path));
+			const record: Checkpoint = { todoId: todo.id, todoTitle: todo.title, timestamp: now(), files: changed, checks, status: "skipped" };
+			if (failed) {
+				record.status = "failed";
+				record.reason = `${failed.name} failed.`;
+				todo.status = previousStatus;
+				state.checkpoints.push(record);
+				state.lastError = record.reason;
+				transition(state, "blocked");
+				await persist();
+				refreshStatus(ctx);
+				return;
+			}
+			state.validation = checks;
+			state.checkpoints.push(record);
+			await persist();
+			if (state.gitMode === "git" && (changed.length || planFiles.length)) {
+				const scoped = [...changed, ...planFiles];
+				const add = await command("git", ["add", "--", ...scoped]);
+				if (add.code !== 0) throw new Error(add.stderr || "git add failed");
+				const commit = await command("git", ["commit", "-m", `plan(${state.slug}): complete step ${todo.id} — ${todo.title.slice(0, 60)}`]);
+				if (commit.code !== 0) throw new Error(commit.stderr || "git commit failed");
+				const revision = await command("git", ["rev-parse", "HEAD"]);
+				record.status = "committed";
+				record.commit = revision.stdout.trim();
+			} else {
+				record.status = "skipped";
+				record.reason = state.gitMode === "non-git" ? "Non-git project; checkpoint commit disabled." : "No implementation files changed.";
+			}
+			await persist();
+			await completePlanIfDone(ctx);
+		} catch (error) {
+			if (state) {
+				todo.status = previousStatus;
+				state.lastError = error instanceof Error ? error.message : String(error);
+				transition(state, "blocked");
+				await persist();
+			}
+			refreshStatus(ctx);
+			notify(ctx, state?.lastError || "Checkpoint failed.", "error");
+		} finally { checkpointing = false; }
+	};
 
-  const showPlanActions = async (ctx: ExtensionContext) => {
-    if (!ctx.hasUI) {
-      pi.sendMessage(
-        {
-          customType: "plan-actions-reminder",
-          content: `**Plan generated and saved!**\n\nRun \`/plan execute\` to start implementing the plan, or \`/plan off\` to exit planning mode.`,
-          display: true,
-        },
-        { triggerTurn: false }
-      );
-      return;
-    }
-    const result = await askUserFancy(ctx, {
-      question: "Plan mode — next action",
-      options: [
-        { title: "Execute", description: "Start implementing the plan" },
-        { title: "Refine", description: "Provide feedback to refine the plan" },
-        { title: "Save", description: "Save the current plan to disk" },
-        { title: "Exit", description: "Exit planning mode" }
-      ],
-      allowFreeform: false,
-    });
-    if (!result || result.kind !== "selection" || result.selections.length === 0) return;
-    const choice = result.selections[0];
-    if (choice === "Execute") {
-      if (!state || (state.phase !== "ready" && state.phase !== "blocked")) notify(ctx, "A ready or blocked saved plan is required before execution.", "warning");
-      else await beginExecution(ctx);
-      return;
-    }
-    if (choice === "Refine") {
-      if (!state) { notify(ctx, "Send the goal first, then refine the saved plan.", "warning"); return; }
-      const note = await ctx.ui.editor("How should the plan be refined?", "");
-      if (note?.trim()) sendUserMessage(ctx, `Refine the saved plan. Remain in read-only exploration mode. User feedback: ${note.trim()}`);
-      return;
-    }
-    if (choice === "Save") {
-      if (!state) notify(ctx, "Send the goal first so there is a plan to save.", "warning");
-      else { await persist(); notify(ctx, `Saved ${markdownPath()}`); }
-      return;
-    }
-    if (choice === "Exit") {
-      active = false;
-      if (state && (state.phase === "exploring" || state.phase === "executing" || state.phase === "blocked")) {
-        state.phase = "complete";
-      }
-      if (state) await persist();
-      setStatus(ctx);
-      notify(ctx, "Plan mode exited.");
-    }
-  };
+	const beginExecution = async (ctx: ExtensionContext) => {
+		if (!state) return;
+		if (state.phase !== "ready" && state.phase !== "blocked") return notify(ctx, `Plan cannot execute from phase ${state.phase}.`, "warning");
+		const gate = orchestrationEnabled() ? readyGate(state) : { ok: true as const };
+		if (!gate.ok) return notify(ctx, gate.reason || "Plan is not ready.", "warning");
+		const clean = await ensureCleanForExecution();
+		if (!clean.ok) {
+			state.lastError = clean.reason;
+			transition(state, "blocked");
+			await persist();
+			refreshStatus(ctx);
+			return notify(ctx, clean.reason!, "warning");
+		}
+		state.todos = todosFromMarkdown(state.planMarkdown);
+		transition(state, "executing");
+		active = false;
+		await persist();
+		refreshStatus(ctx);
+		sendUserMessage(ctx, `Execute the approved plan in ${state.ledgerPath}. You are the architect: ${subagentsEnabled() ? "implement each step yourself, or delegate a well-specified step to one foreground coder subagent at a time when that protects your context. Validate after each step (the coder does not run checks), then update the parent manage_todo_list. Never run more than one subagent at once." : "subagents are disabled, so implement each step yourself inline. Validate after each step, then update the parent manage_todo_list."}`);
+	};
 
-  const enablePlanning = (ctx: ExtensionContext, level: "low" | "high", message: string) => {
-    effort = level;
-    state = undefined;
-    active = true;
-    setStatus(ctx);
-    notify(ctx, message);
-  };
+	const recordRuns = async (ctx: ExtensionContext, runs: ReturnType<typeof runsFromDetails>) => {
+		if (!state || !runs.length) return;
+		const previousWorkers = state.orchestrationRuns.filter((run) => run.role === "coder" && run.status === "completed").length;
+		const merged = mergeRuns(state, runs);
+		if (!merged.changed) return;
+		const workers = state.orchestrationRuns.filter((run) => run.role === "coder" && run.status === "completed").length;
+		if (state.phase === "reviewing" && workers > previousWorkers) state.review.fixPasses++;
+		for (const run of state.phase === "reviewing" ? runs.filter((item) => item.role === "explorer" && item.status === "completed") : []) {
+			const value = run.structuredOutput as { required?: unknown; optional?: unknown; rejected?: unknown; findings?: unknown } | undefined;
+			const strings = (items: unknown): string[] => Array.isArray(items) ? items.filter((item): item is string => typeof item === "string") : [];
+			const classification = state.review.classification ??= { required: [], optional: [], rejected: [] };
+			classification.required.push(...strings(value?.required));
+			classification.optional.push(...strings(value?.optional));
+			classification.rejected.push(...strings(value?.rejected));
+			if (Array.isArray(value?.findings)) {
+				for (const finding of value.findings) {
+					if (typeof finding === "string") classification.optional.push(finding);
+					else if (finding && typeof finding === "object") {
+						const item = finding as { severity?: unknown; title?: unknown; evidence?: unknown };
+						const text = [item.title, item.evidence].filter((part): part is string => typeof part === "string").join(" — ");
+						if (text) (/critical|high|required/i.test(String(item.severity)) ? classification.required : classification.optional).push(text);
+					}
+				}
+			}
+			if (!value && run.summary) classification.optional.push(run.summary);
+			state.review.findings = [...classification.required.map((item) => `Required: ${item}`), ...classification.optional.map((item) => `Optional: ${item}`), ...classification.rejected.map((item) => `Rejected: ${item}`)];
+		}
+		await persist();
+		refreshStatus(ctx);
+	};
 
-  /** When the review todo starts, hand the agent a scoped simplify-review prompt. */
-  const maybeSendReviewPrompt = async (ctx: ExtensionContext, before: Map<number, TodoStatus>) => {
-    if (!state || state.reviewPromptSent) return;
-    const reviewTodo = state.todos.find((todo) => REVIEW_TODO_PATTERN.test(todo.title));
-    if (!reviewTodo || reviewTodo.status !== "in-progress" || before.get(reviewTodo.id) === "in-progress") return;
-    state.reviewPromptSent = true;
-    await persist();
+	pi.registerTool({
+		name: "plan_triage",
+		label: "Plan Triage",
+		description: "Classify the active plan goal before discovery. Trivial is allowed only for one known local file with obvious validation and no ambiguity, architecture, security, or external research.",
+		parameters: Type.Object({ classification: Type.Union([Type.Literal("trivial"), Type.Literal("standard"), Type.Literal("deep")]), reason: Type.String() }),
+		async execute(_id, params, _signal, _update, ctx) {
+			if (!state) return { content: [{ type: "text" as const, text: "No active plan goal." }], isError: true, details: { classification: "none" } };
+			const triage = classifyTriage({ effort: state.effort, enabled: parseStringSetting("quick-triage", "on") === "on", proposed: params.classification, reason: params.reason });
+			state.triage = { ...triage, timestamp: now() };
+			transition(state, triage.classification === "trivial" ? "planning" : "discovering");
+			await persist();
+			refreshStatus(ctx);
+			return { content: [{ type: "text" as const, text: triage.classification === "trivial" ? "Trivial path accepted. Explore read-only and produce a concise inline plan." : `Triage recorded as ${triage.classification}. ${subagentsEnabled() ? "Read the relevant code (delegate recon to one foreground explorer only when it saves substantial context)" : "Subagents are disabled: read the relevant code inline yourself"}, ask unresolved decisions with ask_user, then write the plan inline.` }], details: triage };
+		},
+	});
 
-    let files: ChangedFile[] = [];
-    try {
-      files = await getChangedFiles(pi, currentCwd, { files: [], ref: state.baseCommit ?? "HEAD", staged: false });
-    } catch { /* fall through to checkpoint fallback */ }
-    if (files.length === 0) {
-      // No git diff available (no repo / bad base ref): fall back to the files
-      // recorded by execution checkpoints, without line ranges.
-      const seen = new Set<string>();
-      files = state.checkpoints
-        .flatMap((checkpoint) => checkpoint.files)
-        .filter((path) => (seen.has(path) ? false : (seen.add(path), true)))
-        .map((path) => ({ path, status: "modified" as const }));
-    }
-    const implementation = files.filter((file) => !file.path.startsWith(".pi/plans/"));
-    if (implementation.length === 0) {
-      sendUserMessage(ctx, "Review phase: no implementation files changed during execution. Mark the review todo completed via manage_todo_list.");
-      return;
-    }
-    sendUserMessage(
-      ctx,
-      `${buildSimplifyPrompt(implementation)}\n\nThis is the final review phase of the plan. When the review is done, mark the review todo completed via manage_todo_list.`,
-    );
-  };
+	pi.registerTool({
+		name: "plan_apply_patch",
+		label: "Integrate Plan Patch",
+		description: "Preflight and apply a captured Plan Mode worker patch with git apply --3way. A failed preflight leaves the main tree untouched and permits one sequential redispatch.",
+		parameters: Type.Object({ todoId: Type.Integer({ minimum: 1 }), patchPath: Type.String() }),
+		async execute(_id, params) {
+			if (!state || state.phase !== "executing") return { content: [{ type: "text" as const, text: "Patch integration is available only while executing an active plan." }], isError: true, details: { ok: false, blocked: false, status: "unavailable", attempts: 0, stage: "check", output: "" } };
+			const existing = state.patches.find((item) => item.todoId === params.todoId && item.patchPath === params.patchPath);
+			const record = existing ?? { todoId: params.todoId, patchPath: params.patchPath, status: "pending" as const, attempts: 0 };
+			if (!existing) state.patches.push(record);
+			if (record.attempts >= 2) {
+				record.status = "blocked";
+				record.reason = "Patch integration and the single redispatch were already exhausted.";
+				transition(state, "blocked");
+				await persist();
+				return { content: [{ type: "text" as const, text: record.reason }], isError: true, details: { ok: false, blocked: true, status: record.status, attempts: record.attempts, stage: "check", output: record.reason } };
+			}
+			record.attempts++;
+			const result = await applyPatch(command, params.patchPath);
+			if (result.ok) record.status = "applied";
+			else {
+				record.status = patchFailureStatus(record.attempts);
+				record.reason = result.output || `${result.stage} failed`;
+				if (record.status === "blocked") transition(state, "blocked");
+			}
+			await persist();
+			return { content: [{ type: "text" as const, text: result.ok ? `Applied ${params.patchPath}. Run slice validation before completing todo ${params.todoId}.` : record.status === "redispatched" ? `Patch preflight failed without changing the main tree. Redispatch todo ${params.todoId} once to a fresh sequential worker, then call plan_resolve_redispatch.` : `Patch integration is blocked: ${record.reason}` }], isError: !result.ok, details: { ...result, blocked: record.status === "blocked", status: record.status, attempts: record.attempts } };
+		},
+	});
 
-  pi.registerCommand("plan", {
-    description: "Plan workflow (auto-starts each session): /plan, /plan deep, /plan save, /plan execute, /plan off, /plan resume <slug>, /plan status",
-    handler: async (args, ctx) => {
-      currentCwd = ctx.cwd;
-      const input = args.trim();
-      if (input === "off" || input === "exit") {
-        active = false;
-        if (state && (state.phase === "exploring" || state.phase === "executing" || state.phase === "blocked")) {
-          state.phase = "complete";
-        }
-        if (state) await persist();
-        setStatus(ctx);
-        notify(ctx, "Plan exploration/execution disabled.");
-        return;
-      }
-      if (input.startsWith("resume ")) {
-        const slug = slugify(input.slice(7));
-        try {
-          state = JSON.parse(await readFile(join(planDir(), `${slug}.state.json`), "utf8")) as PlanState;
-          effort = state.effort ?? "medium";
-          active = state.phase === "exploring" || state.phase === "ready";
-          setStatus(ctx);
-          notify(ctx, `Resumed ${slug} (${state.phase}).`);
-          if (active) sendUserMessage(ctx, `Resume planning from ${markdownPath()}. Read the saved plan and state, then continue read-only exploration.`);
-        } catch { notify(ctx, `No saved plan named ${slug}.`, "error"); }
-        return;
-      }
-      if (input === "status") {
-        notify(ctx, state ? `${state.slug}: ${state.phase}; ${state.todos.filter((todo) => todo.status === "completed").length}/${state.todos.length} todos complete.` : "No active plan.");
-        return;
-      }
-      if (input === "save") {
-        if (!state) notify(ctx, "No active plan to save.", "warning");
-        else { await persist(); notify(ctx, `Saved ${markdownPath()}`); }
-        return;
-      }
-      if (input === "execute") {
-        if (!state || (state.phase !== "ready" && state.phase !== "blocked")) {
-          notify(ctx, "A ready or blocked saved plan is required before execution.", "warning");
-        } else {
-          await beginExecution(ctx);
-        }
-        return;
-      }
-      if (input === "deep") {
-        enablePlanning(ctx, "high", active && !state
-          ? "Deep planning armed. Send your goal in the next message."
-          : "Plan mode enabled (deep). Send your goal in the next message.");
-        return;
-      }
-      if (!input) {
-        if (state && (state.phase === "ready" || state.phase === "blocked" || state.phase === "executing" || active)) {
-          await showPlanActions(ctx);
-        } else {
-          enablePlanning(ctx, "low", "Plan mode enabled (quick). Send your goal in the next message. Use /plan deep for a thorough investigation.");
-        }
-        return;
-      }
-      notify(ctx, "Use /plan, /plan deep, /plan save, /plan execute, /plan off, /plan resume <slug>, or /plan status.", "warning");
-    },
-  });
+	pi.registerTool({
+		name: "plan_resolve_redispatch",
+		label: "Resolve Plan Redispatch",
+		description: "Record the outcome of the one fresh sequential worker redispatch after a worktree patch preflight conflict.",
+		parameters: Type.Object({ todoId: Type.Integer({ minimum: 1 }), success: Type.Boolean(), reason: Type.String() }),
+		async execute(_id, params) {
+			if (!state) return { content: [{ type: "text" as const, text: "No active plan." }], isError: true, details: { ok: false, status: "missing" } };
+			const patch = state.patches.find((item) => item.todoId === params.todoId && item.status === "redispatched");
+			if (!patch) return { content: [{ type: "text" as const, text: `Todo ${params.todoId} has no pending redispatch.` }], isError: true, details: { ok: false, status: "missing" } };
+			patch.status = params.success ? "applied" : "blocked";
+			patch.reason = params.reason;
+			if (!params.success) {
+				state.lastError = params.reason;
+				transition(state, "blocked");
+			}
+			await persist();
+			return { content: [{ type: "text" as const, text: params.success ? `Sequential redispatch accepted for todo ${params.todoId}; run its slice checks before completion.` : `Todo ${params.todoId} is blocked: ${params.reason}` }], isError: !params.success, details: { ok: params.success, status: patch.status } };
+		},
+	});
 
-  const EXPLORATION_PROMPT = `[PLAN MODE — EXPLORATION ONLY]
+	pi.registerTool({
+		name: "plan_record_review_decision",
+		label: "Record Review Decision",
+		description: "Persist the parent orchestrator's classification and rationale for the single Plan Mode reviewer batch.",
+		parameters: Type.Object({ required: Type.Array(Type.String()), optional: Type.Array(Type.String()), rejected: Type.Array(Type.String()), rationale: Type.String() }),
+		async execute(_id, params) {
+			if (!state || state.phase !== "reviewing") return { content: [{ type: "text" as const, text: "Review decisions can be recorded only in the reviewing phase." }], isError: true, details: { ok: false } };
+			state.review.classification = params;
+			state.review.findings = [`Rationale: ${params.rationale}`, ...params.required.map((item) => `Required: ${item}`), ...params.optional.map((item) => `Optional: ${item}`), ...params.rejected.map((item) => `Rejected: ${item}`)];
+			await persist();
+			return { content: [{ type: "text" as const, text: `Recorded ${params.required.length} required, ${params.optional.length} optional, and ${params.rejected.length} rejected review findings.` }], details: { ok: true } };
+		},
+	});
 
-HARD CONSTRAINTS
-- You are investigating and planning, never implementing.
-- Do not edit, write, delete, install, commit, or run mutating shell commands.
-- Read-only shell commands are allowed (e.g. ls, cat, grep, rg, find, git log, git diff, git show).
+	pi.on("tool_call", async (event) => {
+		if (!state || state.phase === "complete") return;
+		if (event.toolName === "ask_user" && (state.phase === "discovering" || state.phase === "planning")) {
+			transition(state, "deciding");
+			await persist();
+			if (lastContext) refreshStatus(lastContext);
+		}
+		if (event.toolName === "subagent") {
+			const input = event.input as { agent?: string; async?: boolean; worktree?: boolean; tasks?: Array<{ agent?: string }> };
+			if (input.worktree) return { block: true, reason: "Serial plan execution edits the main worktree directly; worktree isolation is disabled." };
+			const rounds = Number.parseInt(parseStringSetting("review-fix-rounds", "1"), 10);
+			const targetsCoder = roleForAgent(input.agent || "") === "coder" || input.tasks?.some((task) => roleForAgent(task.agent || "") === "coder");
+			if (state.phase === "reviewing" && targetsCoder && !canStartReviewFix(state, rounds)) return { block: true, reason: "The configured single corrective coder pass has already been used." };
+		}
+		if (event.toolName === "manage_todo_list" && (event.input as { operation?: string }).operation === "write") {
+			if (!["executing", "reviewing"].includes(state.phase)) return { block: true, reason: `Plan Mode creates todos automatically from the approved plan when execution starts. Skip manage_todo_list while ${state.phase}; write or refine the plan draft instead.` };
+			const proposed = (event.input as { todos?: PlanTodo[] }).todos;
+			if (Array.isArray(proposed)) {
+				const completedImplementation = proposed.filter((todo) => todo.status === "completed" && !REVIEW_TODO_PATTERN.test(todo.title));
+				const completedReview = proposed.some((todo) => todo.status === "completed" && REVIEW_TODO_PATTERN.test(todo.title));
+				if (completedReview && (state.review.classification?.required.length ?? 0) > 0 && state.review.fixPasses < 1) return { block: true, reason: "Required review findings must receive the single corrective fix pass before completion." };
+				const unapplied = state.patches.find((patch) => completedImplementation.some((todo) => todo.id === patch.todoId) && patch.status !== "applied");
+				if (unapplied) return { block: true, reason: `Todo ${unapplied.todoId} has an unresolved patch integration (${unapplied.status}).` };
+			}
+		}
+		return undefined;
+	});
 
-PROCESS
-- Inspect code and documentation first; gather evidence before asking questions.
-- Identify gaps between the stated goal and what the codebase supports.
-- Use ask_user for clarification: one focused question normally, or one batch of 1-4 tightly related questions for connected discovery.
-- Give each choice a low/medium/high confidence and a concise rationale.
-- Ask in rounds; do not analyze answers until the full batch returns.
+	pi.on("tool_result", async (event, ctx) => {
+		if (!state) return;
+		if (event.toolName === "subagent" || event.toolName === "subagent_wait") await recordRuns(ctx, runsFromDetails(event.details, event.toolCallId));
+		if (event.toolName === "subagent_supervisor") {
+			const details = event.details as { pending?: unknown } | undefined;
+			state.pendingSupervisorRequests = Array.isArray(details?.pending) ? details.pending.length : typeof details?.pending === "number" ? details.pending : state.pendingSupervisorRequests;
+			await persist();
+			refreshStatus(ctx);
+		}
+		if (event.toolName === "ask_user") {
+			const details = event.details as { question?: string; response?: { selections?: string[]; text?: string } } | undefined;
+			const answer = details?.response?.selections?.join(", ") || details?.response?.text;
+			if (details?.question && answer) {
+				state.decisions.push({ timestamp: now(), question: details.question, answer });
+				if (state.phase === "deciding") transition(state, "planning");
+				await persist();
+			}
+		}
+		if (event.toolName !== "manage_todo_list") return;
+		const details = event.details as { operation?: string; todos?: PlanTodo[] } | undefined;
+		if (details?.operation !== "write" || !Array.isArray(details.todos)) return;
+		const before = new Map(state.todos.map((todo) => [todo.id, todo.status]));
+		state.todos = details.todos.map((todo) => ({ ...state!.todos.find((item) => item.id === todo.id), ...todo }));
+		const reviewTodo = state.todos.find((todo) => REVIEW_TODO_PATTERN.test(todo.title));
+		if (reviewTodo?.status === "in-progress" && before.get(reviewTodo.id) !== "in-progress") {
+			const fullChecks = await runChecks(true);
+			state.validation = fullChecks;
+			if (fullChecks.some((check) => !check.ok)) {
+				state.lastError = "Full validation failed before review.";
+				transition(state, "blocked");
+			} else {
+				transition(state, "reviewing");
+				state.review.round = 1;
+				sendUserMessage(ctx, `Review the implementation in ${state.ledgerPath}. ${subagentsEnabled() ? "Review it yourself, or delegate one foreground read-only explorer review when fresh eyes or context savings help." : "Subagents are disabled: review it yourself inline."} Classify findings as required, optional, or rejected with plan_record_review_decision; route required fixes through at most one corrective fix pass.`);
+			}
+		}
+		await persist();
+		refreshStatus(ctx);
+		const newlyCompleted = state.todos.find((todo) => todo.status === "completed" && before.get(todo.id) !== "completed");
+		if (newlyCompleted) await checkpoint(ctx, newlyCompleted, before.get(newlyCompleted.id) || "in-progress");
+	});
 
-OUTPUT CONTRACT
-End your final proposal with exactly these sections, then the marker alone on the last line:
+	pi.events.on("subagent:foreground-complete", (payload: unknown) => {
+		const ctx = lastContext;
+		if (ctx) void recordRuns(ctx, runFromCompletion(payload, "foreground"));
+	});
+	pi.events.on("subagent:async-complete", (payload: unknown) => {
+		const ctx = lastContext;
+		if (ctx) void recordRuns(ctx, runFromCompletion(payload, "async"));
+	});
+	pi.events.on("subagent:control-intercom", (_payload: unknown) => {
+		if (!state || !lastContext) return;
+		state.pendingSupervisorRequests++;
+		void persist().then(() => refreshStatus(lastContext!));
+	});
 
-## Goal
-One sentence stating the outcome.
-## Evidence
-Key findings, with file paths.
-## Assumptions
-What you could not verify.
-## Plan
-Numbered implementation steps. The final numbered step must always be exactly: "Review and simplify the changes". Do not merge it into another step.
-## Validation
-How the change will be verified.
-## Risks
-What could break.
+	let lastContext: ExtensionContext | undefined;
+	pi.on("turn_start", async (_event, ctx) => { lastContext = ctx; currentCwd = ctx.cwd; });
 
-<!-- plan-ready -->`;
+	pi.on("before_agent_start", async (event, ctx) => {
+		lastContext = ctx;
+		currentCwd = ctx.cwd;
+		if (!active && !state) return;
+		if (!state) await initializeGoal(ctx, event.prompt.trim() || "Untitled plan");
+		if (!state) return;
+		if (!orchestrationEnabled() && state.phase !== "executing" && state.phase !== "reviewing") {
+			return { systemPrompt: `${event.systemPrompt}\n\n[PLAN MODE — INLINE]\nExplore read-only and produce a concise implementation plan for ${state.goal}. Do not edit. End with <!-- plan-ready -->. Ledger: ${state.ledgerPath}` };
+		}
+		const delegation = subagentsEnabled()
+			? { executing: "Implement each step yourself, or delegate a well-specified step to one foreground coder subagent at a time when that protects your context window (the coder edits only; it never runs checks). Never run more than one subagent at once.", discovery: "Understand the relevant code: read it yourself, or delegate recon to one foreground explorer subagent at a time when scanning many files would bloat your context." }
+			: { executing: "Subagents are disabled: implement every step yourself, inline. Do not call the subagent tool or load subagent skills.", discovery: "Subagents are disabled: read the relevant code inline yourself. Do not call the subagent tool or load subagent skills." };
+		if (state.phase === "executing" || state.phase === "reviewing") return { systemPrompt: `${event.systemPrompt}\n\n[PLAN ARCHITECT — ${state.phase.toUpperCase()}]\nYou are the architect: you own the plan, every decision, and all validation. ${delegation.executing} Validate after each step, then update the parent manage_todo_list. Plan ledger: ${state.ledgerPath}` };
+		return { systemPrompt: `${event.systemPrompt}\n\n[PLAN ARCHITECT — READ ONLY]\nDo not edit, write, install, commit, or run mutating shell commands. Plan ledger: ${state.ledgerPath}\nExploration scope: prefer targeted reads of specific files over broad searches. If project memory names a source root, go straight to it. Any search must stay inside the working directory or that source root, excluding vendored/cache dirs (node_modules, agent/git, agent/sessions). Never run home-directory-wide or filesystem-wide find/rg.\nDo not use manage_todo_list while planning — todos are created automatically from the approved plan when execution starts.\n1. Call plan_triage exactly once when phase is triage. Trivial requires one known file, obvious validation, and no ambiguity, architecture, security, or external research; otherwise choose standard/deep.\n2. ${delegation.discovery}\n3. Ask unresolved user decisions with ask_user.\n4. Write the plan yourself in your response: a Goal section, a "Plan:" heading with a numbered task list, a Validation section, and a Risks section. End with <!-- plan-ready -->.\nCurrent phase: ${state.phase}. Triage: ${state.triage?.classification || "pending"}. Successful runs: ${state.orchestrationRuns.filter((run) => run.status === "completed").map((run) => run.role).join(", ") || "none"}.` };
+	});
 
-  pi.on("before_agent_start", async (event, ctx) => {
-    // Execution must explicitly supersede any plan-only context left by an older
-    // plan extension or a queued follow-up turn. Without this handoff, models can
-    // correctly but unhelpfully refuse the execution kickoff as a plan-mode write.
-    if (state?.phase === "executing") {
-      return {
-        systemPrompt: `${event.systemPrompt}\n\n[PLAN EXECUTION HANDOFF]
-The exploration phase is over. You are now authorized and expected to implement the saved plan.
-- Any earlier plan-mode/read-only instruction is superseded for this turn.
-- Use edit, write, bash, Git, and manage_todo_list as needed.
-- Follow the execution kickoff and keep exactly one todo in progress.
-- Report blockers instead of refusing solely because planning previously occurred.`,
-      };
-    }
-    if (!active) return;
-    if (!state) {
-      currentCwd = ctx.cwd;
-      await createState(event.prompt.trim() || "Untitled plan");
-      setStatus(ctx);
-    }
-    const effortLevel = state?.effort ?? effort;
-    const effortPrompt = effortLevel === "low"
-      ? "For this quick exploration, provide a high-level plan targeting only core files. Keep evidence gathering fast and focused, and avoid exhaustive edge-case analysis."
-      : "For this deep discovery, perform an exceptionally thorough investigation. Inspect test files, build configurations, and dependencies. Analyze side-effects and plan a detailed verification strategy.";
+	pi.on("agent_end", async (event, ctx) => {
+		lastContext = ctx;
+		if (!state || !active) return;
+		const text = assistantText(event.messages as unknown[]);
+		if (!isPlanResponse(text)) return;
+		state.planMarkdown = text;
+		const gate = orchestrationEnabled() ? readyGate(state) : { ok: true as const };
+		if (!gate.ok) {
+			state.lastError = gate.reason;
+			if (state.phase !== "planning") transition(state, "planning");
+			await persist();
+			refreshStatus(ctx);
+			notify(ctx, `${gate.reason} The displayed draft is not executable.`, "warning");
+			sendUserMessage(ctx, `Continue orchestration for ${state.ledgerPath}. ${gate.reason}`);
+			return;
+		}
+		if (state.phase !== "planning") transition(state, "planning");
+		state.todos = todosFromMarkdown(state.planMarkdown);
+		transition(state, "ready");
+		await persist();
+		refreshStatus(ctx);
+		await showActions(ctx);
+	});
 
-    return { systemPrompt: `${event.systemPrompt}\n\n${EXPLORATION_PROMPT}\n\n${effortPrompt}` };
-  });
+	const showActions = async (ctx: ExtensionContext) => {
+		if (!state) return;
+		if (!ctx.hasUI) return pi.sendMessage({ customType: "plan-actions-reminder", content: "Plan ready. Run `/plan execute` or `/plan off`.", display: true }, { triggerTurn: false });
+		const result = await askUserFancy(ctx, { question: "Plan mode — next action", options: [{ title: "Execute", description: "Start orchestrated implementation" }, { title: "Refine", description: "Add feedback and return to planning" }, { title: "Save", description: "Persist the ledger now" }, { title: "Exit", description: "End this plan" }], allowFreeform: false });
+		if (result?.kind !== "selection") return;
+		const choice = result.selections[0];
+		if (choice === "Execute") return beginExecution(ctx);
+		if (choice === "Refine") {
+			const note = await askUserFancy(ctx, { question: "How should the plan be refined?", options: [], allowFreeform: true });
+			const text = note?.kind === "freeform" ? note.text : note?.kind === "selection" ? note.comment : undefined;
+			if (text) {
+				state.decisions.push({ timestamp: now(), question: "Plan refinement", answer: text });
+				transition(state, "planning");
+				await persist();
+				sendUserMessage(ctx, `Refine the plan using this feedback: ${text}`);
+			}
+			return;
+		}
+		if (choice === "Save") return persist().then(() => notify(ctx, `Saved ${state!.ledgerPath}`));
+		if (choice === "Exit") {
+			transition(state, "complete");
+			active = false;
+			await persist();
+			refreshStatus(ctx);
+		}
+	};
 
-  pi.on("context", async (event) => {
-    if (state?.phase !== "executing") return;
-    return {
-      messages: event.messages.filter((message) => {
-        const candidate = message as { customType?: string };
-        // Legacy @devkade/pi-plan persisted this hidden context in sessions.
-        // It must not override the explicit execution handoff after migration.
-        return candidate.customType !== "plan-mode-context";
-      }),
-    };
-  });
+	pi.registerCommand("plan", {
+		description: "Orchestrated plan workflow: /plan, /plan deep, /plan execute, /plan save, /plan off, /plan resume <slug>, /plan status",
+		handler: async (args, ctx) => {
+			lastContext = ctx;
+			currentCwd = ctx.cwd;
+			const input = args.trim();
+			if (input === "off" || input === "exit") {
+				active = false;
+				if (state && state.phase !== "complete") transition(state, "complete");
+				await persist();
+				refreshStatus(ctx);
+				return;
+			}
+			if (input === "status") return notify(ctx, state ? `${state.slug}: ${state.phase}; ${state.todos.filter((todo) => todo.status === "completed").length}/${state.todos.length} todos; ${state.orchestrationRuns.length} child runs.` : "Awaiting a plan goal.");
+			if (input === "save") return state ? persist().then(() => notify(ctx, `Saved ${state!.ledgerPath}`)) : notify(ctx, "No plan to save.", "warning");
+			if (input === "execute") return beginExecution(ctx);
+			if (input.startsWith("resume ")) {
+				const slug = input.slice(7).trim();
+				const loaded = await loadLinkedPlan(ctx, { state: join(ctx.cwd, ".pi", "plans", `${slug}.state.json`) }, "Resume: ");
+				if (loaded) appendLink();
+				return;
+			}
+			if (input === "deep") {
+				effort = "high";
+				state = undefined;
+				active = true;
+				refreshStatus(ctx);
+				return notify(ctx, "Deep planning armed. Send the goal next.");
+			}
+			if (!input) {
+				if (state?.phase === "ready") return showActions(ctx);
+				effort = "low";
+				state = undefined;
+				active = true;
+				refreshStatus(ctx);
+				return notify(ctx, "Quick planning armed. Send the goal next.");
+			}
+			notify(ctx, "Use /plan, /plan deep, /plan execute, /plan save, /plan off, /plan resume <slug>, or /plan status.", "warning");
+		},
+	});
 
-  pi.on("agent_end", async (event, ctx) => {
-    currentCwd = ctx.cwd;
-    if (!active || !state) return;
-    const text = [...event.messages].reverse().map(textFromMessage).find(Boolean) ?? "";
-    if (!isPlanResponse(text)) return;
-    state.planMarkdown = text;
-    state.todos = extractTodos(text);
-    state.phase = "ready";
-    await persist();
-    setStatus(ctx);
-    await showPlanActions(ctx);
-  });
+	pi.events.emit("powerbar:register-segment", { id: "plan-mode", label: "Plan Mode" });
+	pi.events.emit("pi-extension-settings:register", { name: EXTENSION_NAME, settings: [
+		{ id: "auto-start", label: "Auto-start planning", defaultValue: "on", values: ["on", "off"] },
+		{ id: "default-effort", label: "Default planning effort", defaultValue: "low", values: ["low", "high"] },
+		{ id: "orchestration", label: "Enforce plan-ready gate", defaultValue: "on", values: ["on", "off"] },
+		{ id: "quick-triage", label: "Allow trivial quick-plan escape", defaultValue: "on", values: ["on", "off"] },
+		{ id: "review-fix-rounds", label: "Corrective fix passes", defaultValue: "1", values: ["1"] },
+	] });
 
-  pi.on("tool_result", async (event, ctx) => {
-    if (!state || state.phase !== "executing" || event.toolName !== "manage_todo_list") return;
-    const details = event.details as { operation?: string; todos?: PlanTodo[] } | undefined;
-    if (details?.operation !== "write" || !Array.isArray(details.todos)) return;
-    const before = new Map(state.todos.map((todo) => [todo.id, todo.status]));
-    state.todos = details.todos.map((todo) => ({ ...todo }));
-    await persist();
-    setStatus(ctx);
-    await maybeSendReviewPrompt(ctx, before);
-    const newlyCompleted = state.todos.find((todo) => todo.status === "completed" && before.get(todo.id) !== "completed");
-    if (newlyCompleted) {
-      await checkpoint(ctx, newlyCompleted, before.get(newlyCompleted.id) || "in-progress");
-    } else {
-      const allCompleted = state.todos.every((t) => t.status === "completed");
-      if (allCompleted) {
-        state.phase = "complete";
-        active = false;
-        await persist();
-        setStatus(ctx);
-        notify(ctx, "All plan steps are complete! Plan execution finished.");
-      }
-    }
-  });
-
-  pi.events.emit("powerbar:register-segment", { id: "plan-mode", label: "Plan Mode" });
-  pi.events.emit("pi-extension-settings:register", {
-    name: EXTENSION_NAME,
-    settings: [
-      { id: "auto-start", label: "Auto-start planning on session start", defaultValue: "on", values: ["on", "off"] },
-      { id: "default-effort", label: "Default planning effort", defaultValue: "low", values: ["low", "high"] },
-    ],
-  });
-
-  pi.on("session_start", async (_event, ctx) => {
-    currentCwd = ctx.cwd;
-    // Auto-plan is interactive-only: headless/print sessions answer directly.
-    if (ctx.hasUI && !state && getSetting(EXTENSION_NAME, "auto-start", "on") === "on") {
-      effort = getSetting(EXTENSION_NAME, "default-effort", "low") === "high" ? "high" : "low";
-      active = true;
-    }
-    setStatus(ctx);
-  });
-  pi.on("session_shutdown", async (_event, ctx) => { clearPlanDisplay(ctx); });
+	pi.on("session_start", async (event, ctx) => { lastContext = ctx; await reconstructSession(event, ctx); });
+	pi.on("session_shutdown", async (_event, ctx) => {
+		stopSpinner();
+		if (ctx.hasUI) ctx.ui.setStatus(STATUS_KEY, undefined);
+		pi.events.emit("powerbar:update", { id: "plan-mode", text: undefined });
+		lastContext = undefined;
+	});
 }

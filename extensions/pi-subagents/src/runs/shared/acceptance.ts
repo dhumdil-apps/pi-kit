@@ -92,10 +92,10 @@ function inferLevel(input: {
 		&& /\bpatch\s+(?:(?:\.{0,2}[\\/])?(?:[\w.-]+[\\/])+[\w.-]+|[\w.-]+\.[a-z0-9]+\b|(?:the\s+)?parser\b)/.test(task);
 	const taskMayWrite = taskMayMutate(input.task ?? "") || intent.kind === "implementation" || rolePatchTask;
 	const readOnlyAgent = input.acceptanceRole === "read-only"
-		|| (input.acceptanceRole === undefined && /\b(?:reviewer|scout|context-builder|researcher|analyst)\b/.test(agent));
+		|| (input.acceptanceRole === undefined && /\b(?:explorer|reviewer|scout|context-builder|researcher|analyst)\b/.test(agent));
 	const writeTask = taskMayWrite
 		|| (input.acceptanceRole === "writer" && !readOnlyTask)
-		|| (input.acceptanceRole === undefined && /\bworker\b/.test(agent) && !readOnlyTask);
+		|| (input.acceptanceRole === undefined && /\b(?:worker|coder)\b/.test(agent) && !readOnlyTask);
 	const inferredReadOnly = readOnlyTask || (input.acceptanceRole === "read-only" && !taskMayWrite);
 	const roleResolvesReadOnly = input.acceptanceRole !== undefined && inferredReadOnly;
 	const keywordRiskReadOnly = input.acceptanceRole === undefined ? intent.kind === "read-only" : inferredReadOnly;
@@ -112,7 +112,7 @@ function inferLevel(input: {
 			reasons,
 			criteria: ["Implement the requested change without widening scope", "Return evidence sufficient for an independent acceptance review"],
 			evidence: requiredEvidenceForLevel("reviewed"),
-			review: { agent: "reviewer", required: true },
+			review: { agent: "explorer", required: true },
 		};
 	}
 	if (writeTask && !readOnlyTask) {

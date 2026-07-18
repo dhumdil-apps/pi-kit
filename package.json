@@ -5,6 +5,11 @@
   "description": "Vendored Pi extensions and skills maintained by dhumdil-apps.",
   "keywords": ["pi-package"],
   "license": "MIT",
+  "scripts": {
+    "test": "vitest run extensions/plan-mode extensions/pi-subagents/src/runs/shared/worktree.test.ts extensions/pi-subagents/src/extension/execution-policy.test.ts",
+    "typecheck:plan": "tsc --noEmit --target ES2023 --module ESNext --moduleResolution Bundler --allowImportingTsExtensions --skipLibCheck --strict --types node extensions/plan-mode/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "@sinclair/typebox": "^0.34.41",
     "jiti": "2.7.0",
@@ -20,6 +25,12 @@
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/turndown": "^5.0.5",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
   },
   "pi": {
     "extensions": [

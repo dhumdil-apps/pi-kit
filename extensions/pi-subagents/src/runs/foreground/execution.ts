@@ -74,6 +74,7 @@ import { acceptanceFailureMessage, buildSkippedAcceptanceLedger, evaluateAccepta
 import { appendTurnBudgetSystemPrompt, formatTurnBudgetOutput, initialTurnBudgetState, turnBudgetDecision, turnBudgetDeferredNote, turnBudgetDeferredState, turnBudgetExceededMessage, turnBudgetSoftNote, turnBudgetState } from "../shared/turn-budget.ts";
 import { initialToolBudgetState, toolBudgetState } from "../shared/tool-budget.ts";
 import { resolveWatchdogConfig } from "../../watchdog/settings.ts";
+import { getParentThinkingLevel } from "../shared/parent-thinking.ts";
 import { createBoundedByteTail, createBoundedLineReader, formatProtocolOutputLimit, MAX_CHILD_STDERR_BYTES, projectChildLifecycle, type ChildLifecycleAction, type ProtocolOutputLimit } from "../shared/child-protocol.ts";
 import {
 	acceptChildWatchdogEvent,
@@ -194,7 +195,11 @@ async function runSingleAttempt(
 		originalTask?: string;
 	},
 ): Promise<SingleResult> {
-	const effectiveThinking = options.thinkingOverride ?? agent.thinking;
+	// Serial-only policy: children run at the parent session's thinking level.
+	// Only an explicit sanitization override (e.g. thinking forced off for
+	// Anthropic forks) beats it; agent frontmatter `thinking:` is a last resort
+	// when no parent level is known (e.g. detached child processes).
+	const effectiveThinking = options.thinkingOverride ?? getParentThinkingLevel() ?? agent.thinking;
 	const modelArg = applyThinkingSuffix(model, effectiveThinking, options.thinkingOverride !== undefined);
 	const watchdogConfig = resolveWatchdogConfig(options.cwd ?? runtimeCwd);
 	const childWatchdog = watchdogConfig.ok

@@ -27,10 +27,10 @@ async function getActivePlan(cwd: string): Promise<string> {
       const content = await readFile(join(planDir, file), "utf8").catch(() => "");
       if (!content) continue;
       const state = JSON.parse(content) as PlanState;
-      if (state.phase === "executing" || state.phase === "blocked") {
+      if (!["complete", "awaiting-goal"].includes(state.phase)) {
         const completed = state.todos.filter(t => t.status === "completed").length;
         const total = state.todos.length;
-        const statusStr = state.phase === "blocked" ? "⚠️ Blocked" : "⚡ Executing";
+				const statusStr = state.phase === "blocked" ? "⚠️ Blocked" : `🧭 ${state.phase[0].toUpperCase()}${state.phase.slice(1)}`;
         return `[${statusStr}] ${state.goal} (${completed}/${total} steps)`;
       }
     }
@@ -61,8 +61,8 @@ export default function welcomeExtension(pi: ExtensionAPI): void {
     const autoPlan = getSetting("plan-mode", "auto-start", "on") === "on";
 
     const nextSteps = autoPlan
-      ? `🧭 **Plan mode is ACTIVE (quick)** — describe your goal and I will explore read-only, ask focused questions, and propose a plan with an Execute/Refine menu.
-• Prefer thorough planning: \`/plan deep\` • Skip planning this session: \`/plan off\``
+      ? `🧭 **Plan mode is ACTIVE (quick)** — describe your goal. A truly local, unambiguous change stays inline; standard work runs read → decisions → an inline plan draft → approval.
+• Thorough planning: \`/plan deep\` • Skip planning: \`/plan off\` • Resume: \`/plan resume <slug>\``
       : `🧭 Auto-planning is off. Start it with \`/plan\` (quick) or \`/plan deep\` (thorough).`;
 
     const welcomeText = `
@@ -75,12 +75,12 @@ ${BANNER}
 ${nextSteps}
 
 🧩 **Extensions**
-• **plan-mode** — auto-planning with review phase; \`/plan deep|off|execute|resume|status\`
+• **plan-mode** — persistent orchestrated plans, scoped checkpoints, validation, and one review/fix pass; \`/plan deep|off|execute|resume|status\`
 • **permission-gate** — confirms only destructive commands (\`rm -rf\`, \`git reset --hard\`, \`sudo\`…)
 • **memory** — \`.pi/MEMORY.md\` decisions & learnings, injected each turn; \`/memory\` to view
 • **manage-todo-list** — live task progress widget; \`/todos\`
-• **subagents** — delegate to focused child sessions (\`subagent\` tool); \`/subagents\`
-• **web-access** — \`web_search\` / \`fetch_content\` tools, zero-config
+• **subagents** — serial explorer/coder handoffs on the parent's model (\`subagent\` tool, off by default); \`/subagents\`
+• **web-access** — \`web_search\` / \`fetch_content\`; defaults to automatic cited summaries
 • **powerbar** — status footer: git, tokens, context %, quota; \`/extension-settings\` to tune
 • **usage** — historical spend & token analytics; \`/usage\`
 • **ask-user** — the question/confirm modal used across plan mode and the gate

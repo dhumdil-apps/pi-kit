@@ -135,8 +135,8 @@ function taskHasReadOnlyDeliverable(taskText: string): boolean {
 }
 
 function hasImplementationIntent(agent: string, taskText: string): boolean {
-	if (/\breviewer\b/i.test(agent)) return REVIEWER_REQUIRED_EDIT_PATTERNS.some((pattern) => pattern.test(taskText));
-	if (agent === "worker") return WORKER_IMPLEMENTATION_PATTERNS.some((pattern) => pattern.test(taskText));
+	if (/\b(?:reviewer|explorer)\b/i.test(agent)) return REVIEWER_REQUIRED_EDIT_PATTERNS.some((pattern) => pattern.test(taskText));
+	if (agent === "worker" || agent === "coder") return WORKER_IMPLEMENTATION_PATTERNS.some((pattern) => pattern.test(taskText));
 	return GENERAL_IMPLEMENTATION_PATTERNS.some((pattern) => pattern.test(taskText));
 }
 
