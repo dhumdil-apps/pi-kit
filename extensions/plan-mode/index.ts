@@ -421,13 +421,50 @@ export default function planMode(pi: ExtensionAPI): void {
     },
   });
 
+  const EXPLORATION_PROMPT = `[PLAN MODE — EXPLORATION ONLY]
+
+HARD CONSTRAINTS
+- You are investigating and planning, never implementing.
+- Do not edit, write, delete, install, commit, or run mutating shell commands.
+- Read-only shell commands are allowed (e.g. ls, cat, grep, rg, find, git log, git diff, git show).
+
+PROCESS
+- Inspect code and documentation first; gather evidence before asking questions.
+- Identify gaps between the stated goal and what the codebase supports.
+- Use ask_user for clarification: one focused question normally, or one batch of 1-4 tightly related questions for connected discovery.
+- Give each choice a low/medium/high confidence and a concise rationale.
+- Ask in rounds; do not analyze answers until the full batch returns.
+
+OUTPUT CONTRACT
+End your final proposal with exactly these sections, then the marker alone on the last line:
+
+## Goal
+One sentence stating the outcome.
+## Evidence
+Key findings, with file paths.
+## Assumptions
+What you could not verify.
+## Plan
+Numbered implementation steps.
+## Validation
+How the change will be verified.
+## Risks
+What could break.
+
+<!-- plan-ready -->`;
+
   pi.on("before_agent_start", async (event, ctx) => {
     // Execution must explicitly supersede any plan-only context left by an older
     // plan extension or a queued follow-up turn. Without this handoff, models can
     // correctly but unhelpfully refuse the execution kickoff as a plan-mode write.
     if (state?.phase === "executing") {
       return {
-        systemPrompt: `${event.systemPrompt}\n\n[PLAN EXECUTION HANDOFF]\nThe exploration phase is over. You are now authorized and expected to implement the saved plan. Any earlier plan-mode/read-only instruction is superseded for this turn. Use edit, write, bash, Git, and manage_todo_list as needed. Follow the execution kickoff, keep one todo in progress, and report blockers rather than refusing solely because planning previously occurred.`,
+        systemPrompt: `${event.systemPrompt}\n\n[PLAN EXECUTION HANDOFF]
+The exploration phase is over. You are now authorized and expected to implement the saved plan.
+- Any earlier plan-mode/read-only instruction is superseded for this turn.
+- Use edit, write, bash, Git, and manage_todo_list as needed.
+- Follow the execution kickoff and keep exactly one todo in progress.
+- Report blockers instead of refusing solely because planning previously occurred.`,
       };
     }
     if (!active) return;
@@ -441,7 +478,7 @@ export default function planMode(pi: ExtensionAPI): void {
       ? "For this quick exploration, provide a high-level plan targeting only core files. Keep evidence gathering fast and focused, and avoid exhaustive edge-case analysis."
       : "For this deep discovery, perform an exceptionally thorough investigation. Inspect test files, build configurations, and dependencies. Analyze side-effects and plan a detailed verification strategy.";
 
-    return { systemPrompt: `${event.systemPrompt}\n\n[PLAN MODE — EXPLORATION ONLY]\nYou are investigating and planning, never implementing. Do not edit, write, delete, install, commit, or run mutating shell commands. Inspect code and documentation, identify goal gaps, and use ask_user for clarification. Ask one focused question normally; for tightly related discovery use one ask_user questions batch of 1-4 questions, each choice carrying low/medium/high confidence and a concise rationale. Gather evidence before questions. Ask in rounds; do not analyze answers until the full batch returns. End a final proposal with Goal, Evidence, Assumptions, Plan, Validation, Risks, and the exact marker <!-- plan-ready -->.\n\n${effortPrompt}` };
+    return { systemPrompt: `${event.systemPrompt}\n\n${EXPLORATION_PROMPT}\n\n${effortPrompt}` };
   });
 
   pi.on("context", async (event) => {
