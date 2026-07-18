@@ -32,3 +32,9 @@ Restart Pi after updating.
 
 Edit the source under `extensions/` or `skills/`. Keep upstream provenance in
 [`UPSTREAM.md`](UPSTREAM.md) when importing updates.
+
+To verify type correctness across typescript files:
+
+```bash
+npx -y --package typescript tsc --noEmit <path-to-file> --target esnext --module esnext --moduleResolution bundler --skipLibCheck
+```

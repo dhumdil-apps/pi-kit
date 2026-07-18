@@ -18,3 +18,4 @@ included here from that declaration.
 
 - Powerbar imports the vendored Extension Settings module by relative path.
 - Manage Todo List imports the current `@earendil-works/pi-*` package scope in place of its legacy `@mariozechner/pi-*` scope.
+- Headless and RPC mode compatibility safeguards added to `plan-mode` (notifying on headless start) and `ask-user` (preventing crash on single-question calls without UI).
