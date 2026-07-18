@@ -1,49 +1,42 @@
 /**
- * Permission Gate
+ * Permission Gate — destructive commands only.
  *
- * Claude Code-style approval prompts for risky tool calls.
- * - Read-only tools and read-only bash commands pass silently.
- * - Mutating bash, file writes outside the project cwd, and dangerous git
- *   commands prompt via askUserFancy: Allow once / Allow for session / Deny.
- * - Headless (no UI): gated calls are blocked with a chat notice, matching
- *   Claude Code's non-interactive default.
+ * Prompts (askUserFancy: Allow once / Allow for session / Deny) ONLY for:
+ * - Destructive bash commands: rm/rmdir/unlink/shred/dd/mkfs, sudo,
+ *   find -delete/-exec rm|mv, xargs rm|mv, recursive chmod/chown/chgrp,
+ *   and destructive git (reset --hard, clean, force push, branch -D,
+ *   stash drop/clear).
+ * - edit/write targeting paths OUTSIDE the project cwd.
+ *
+ * Everything else runs without prompting. Deliberately NOT gated: redirects
+ * and tee (can't cheaply tell truncate vs create), mv/cp (recoverable),
+ * package managers, kill. Known denylist limits: `bash -c "..."`, scripts,
+ * and aliases can smuggle destructive commands past the matcher.
+ *
+ * Headless (no UI): gated calls are blocked with a chat notice.
+ * Toggle via /extension-settings → permission-gate → enabled.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isAbsolute, resolve } from "path";
 import { askUserFancy } from "../ask-user/index";
+import { getSetting } from "../extension-settings/index.js";
 
-// Tools that never mutate anything.
-const READ_ONLY_TOOLS = new Set([
-	"read",
-	"grep",
-	"glob",
-	"ls",
-	"list",
-	"ask_user",
-	"manage_todo_list",
-]);
+const EXTENSION_NAME = "permission-gate";
 
-// First tokens of bash commands that are read-only on their own.
-const READ_ONLY_COMMANDS = new Set([
-	"ls", "cat", "head", "tail", "less", "grep", "rg", "fd", "find", "tree",
-	"pwd", "cd", "echo", "which", "type", "file", "stat", "wc", "du", "df",
-	"ps", "env", "printenv", "date", "whoami", "uname", "diff", "sort", "uniq",
-	"jq", "basename", "dirname", "realpath", "md5", "shasum", "column",
-]);
+// Wrappers/prefixes that may precede the real command.
+const WRAPPERS = new Set(["command", "nice", "nohup", "time", "env"]);
+const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
-// git subcommands that are read-only.
-const READ_ONLY_GIT = new Set([
-	"status", "log", "diff", "show", "branch", "remote", "stash", "blame",
-	"describe", "rev-parse", "ls-files", "ls-remote", "shortlog", "reflog",
-	"config",
-]);
-const MUTATING_GIT_STASH = /^git\s+stash\s+(push|pop|apply|drop|clear|save)/;
-const MUTATING_GIT_CONFIG = /^git\s+config\s+(?!--get|--list|-l\b)/;
-const MUTATING_GIT_BRANCH = /^git\s+branch\s+(-[dDmM]|--delete|--move)/;
+const DESTRUCTIVE_COMMANDS = new Set(["rm", "rmdir", "unlink", "shred", "dd"]);
 
-// Redirections / in-pipeline writers make a command mutating.
-const WRITE_MARKERS = /(^|[^>])>(?!&2)|>>|\btee\b|\bxargs\b.*\b(rm|mv|cp)\b/;
+const DESTRUCTIVE_GIT = [
+	/^git\s+reset\s+--hard\b/,
+	/^git\s+clean\b/,
+	/^git\s+push\s+.*(--force\b|--force-with-lease\b|-f\b|\s\+\S)/,
+	/^git\s+branch\s+(-D\b|--delete\s+--force\b)/,
+	/^git\s+stash\s+(drop|clear)\b/,
+];
 
 function splitSegments(command: string): string[] {
 	// Good-enough split on shell connectors; quoted connectors are rare in
@@ -54,32 +47,33 @@ function splitSegments(command: string): string[] {
 		.filter(Boolean);
 }
 
-function segmentIsReadOnly(segment: string): boolean {
+function segmentIsDestructive(segment: string): boolean {
 	const tokens = segment.split(/\s+/);
-	const cmd = tokens[0];
-	if (!cmd) return true;
-	if (cmd === "git") {
-		const sub = tokens[1];
-		if (!sub || !READ_ONLY_GIT.has(sub)) return false;
-		if (MUTATING_GIT_STASH.test(segment)) return false;
-		if (MUTATING_GIT_CONFIG.test(segment)) return false;
-		if (MUTATING_GIT_BRANCH.test(segment)) return false;
-		return true;
+	while (tokens.length && (WRAPPERS.has(tokens[0]) || ENV_ASSIGNMENT.test(tokens[0]))) {
+		tokens.shift();
 	}
-	if (cmd === "find" && /\s(-delete|-exec)\b/.test(segment)) return false;
-	return READ_ONLY_COMMANDS.has(cmd);
+	const cmd = tokens[0];
+	if (!cmd) return false;
+	const stripped = tokens.join(" ");
+	if (cmd === "sudo") return true;
+	if (DESTRUCTIVE_COMMANDS.has(cmd)) return true;
+	if (cmd.startsWith("mkfs")) return true;
+	if (cmd === "find" && /\s(-delete\b|-exec\s+(rm|mv)\b)/.test(stripped)) return true;
+	if (cmd === "xargs" && /\b(rm|mv)\b/.test(stripped)) return true;
+	if ((cmd === "chmod" || cmd === "chown" || cmd === "chgrp") && /\s-\w*R/.test(stripped)) return true;
+	if (cmd === "git") return DESTRUCTIVE_GIT.some((re) => re.test(stripped));
+	return false;
 }
 
-function bashIsReadOnly(command: string): boolean {
-	if (WRITE_MARKERS.test(command)) return false;
-	return splitSegments(command).every(segmentIsReadOnly);
+function bashIsDestructive(command: string): boolean {
+	return splitSegments(command).some(segmentIsDestructive);
 }
 
 function sessionKey(toolName: string, input: Record<string, unknown>): string {
 	if (toolName === "bash") {
 		const command = String(input.command ?? "");
-		// Key on the first two tokens ("git push", "npm install") so one
-		// session approval covers repeats of the same kind of command.
+		// Key on the first two tokens ("rm -rf", "git clean") so one session
+		// approval covers repeats of the same kind of command.
 		return `bash:${command.split(/\s+/).slice(0, 2).join(" ")}`;
 	}
 	return `tool:${toolName}`;
@@ -88,7 +82,16 @@ function sessionKey(toolName: string, input: Record<string, unknown>): string {
 export default function createExtension(pi: ExtensionAPI): void {
 	const sessionAllowed = new Set<string>();
 
+	pi.events.emit("pi-extension-settings:register", {
+		name: EXTENSION_NAME,
+		settings: [
+			{ id: "enabled", label: "Gate destructive commands", defaultValue: "on", values: ["on", "off"] },
+		],
+	});
+
 	pi.on("tool_call", async (event, ctx) => {
+		if (getSetting(EXTENSION_NAME, "enabled", "on") === "off") return undefined;
+
 		const toolName = event.toolName;
 		const input = (event.input ?? {}) as Record<string, unknown>;
 
@@ -96,8 +99,8 @@ export default function createExtension(pi: ExtensionAPI): void {
 
 		if (toolName === "bash") {
 			const command = String(input.command ?? "");
-			if (!bashIsReadOnly(command)) {
-				gateReason = `Run bash command:\n\n  ${command}`;
+			if (bashIsDestructive(command)) {
+				gateReason = `Run destructive bash command:\n\n  ${command}`;
 			}
 		} else if (toolName === "edit" || toolName === "write") {
 			const rawPath = String(input.path ?? input.file_path ?? "");
@@ -107,8 +110,6 @@ export default function createExtension(pi: ExtensionAPI): void {
 					gateReason = `${toolName} outside the project directory:\n\n  ${full}`;
 				}
 			}
-		} else if (READ_ONLY_TOOLS.has(toolName)) {
-			return undefined;
 		}
 
 		if (!gateReason) return undefined;

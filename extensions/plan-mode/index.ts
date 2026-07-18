@@ -2,9 +2,17 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { askUserFancy } from "../ask-user/index";
+import { getSetting } from "../extension-settings/index.js";
+import { getChangedFiles } from "./review/git-diff.js";
+import { buildSimplifyPrompt } from "./review/prompt-builder.js";
+import type { ChangedFile } from "./review/types.js";
 
 const STATE_VERSION = 1;
 const STATUS_KEY = "plan-mode";
+const EXTENSION_NAME = "plan-mode";
+const REVIEW_TODO_TITLE = "Review and simplify the changes";
+const REVIEW_TODO_PATTERN = /review.*simplif|simplif.*review/i;
+const SPINNER_FRAMES = ["◐", "◓", "◑", "◒"];
 
 type Phase = "exploring" | "ready" | "executing" | "blocked" | "complete";
 type TodoStatus = "not-started" | "in-progress" | "completed";
@@ -40,6 +48,8 @@ interface PlanState {
   todos: PlanTodo[];
   checkpoints: Checkpoint[];
   lastError?: string;
+  baseCommit?: string;
+  reviewPromptSent?: boolean;
 }
 
 function slugify(input: string): string {
@@ -71,6 +81,10 @@ function extractTodos(markdown: string): PlanTodo[] {
     const title = match[2].replace(/[*`]/g, "").trim();
     if (title.length > 3) todos.push({ id: todos.length + 1, title: title.slice(0, 100), description: title, status: "not-started" });
   }
+  // The review pass is a mandatory final phase of every plan.
+  if (todos.length > 0 && !todos.some((todo) => REVIEW_TODO_PATTERN.test(todo.title))) {
+    todos.push({ id: todos.length + 1, title: REVIEW_TODO_TITLE, description: REVIEW_TODO_TITLE, status: "not-started" });
+  }
   return todos;
 }
 
@@ -90,8 +104,33 @@ export default function planMode(pi: ExtensionAPI): void {
   let currentCwd = "";
   let checkpointing = false;
   let effort: "low" | "medium" | "high" = "medium";
+  let spinnerTimer: ReturnType<typeof setInterval> | undefined;
+  let spinnerFrame = 0;
+
+  const startSpinner = (ctx: ExtensionContext) => {
+    if (spinnerTimer || !ctx.hasUI) return;
+    spinnerTimer = setInterval(() => {
+      pi.events.emit("powerbar:update", {
+        id: "plan-mode",
+        icon: SPINNER_FRAMES[spinnerFrame++ % SPINNER_FRAMES.length],
+        text: state ? `Plan · exploring (${state.effort})` : "Plan · awaiting goal",
+        color: "warning",
+      });
+    }, 500);
+    // Never keep a headless/exiting process alive because of the animation.
+    (spinnerTimer as { unref?: () => void }).unref?.();
+  };
+
+  const stopSpinner = () => {
+    if (spinnerTimer) {
+      clearInterval(spinnerTimer);
+      spinnerTimer = undefined;
+    }
+  };
 
   const emitPowerbarStatus = (exploring: boolean) => {
+    // The spinner interval owns the plan-mode segment while exploring.
+    if (exploring && spinnerTimer) return;
     const completed = state?.todos.filter((todo) => todo.status === "completed").length ?? 0;
     const blocked = state?.phase === "blocked";
     pi.events.emit("powerbar:update", {
@@ -128,6 +167,7 @@ export default function planMode(pi: ExtensionAPI): void {
   };
 
   const clearPlanDisplay = (ctx: ExtensionContext) => {
+    stopSpinner();
     if (ctx.hasUI) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
       ctx.ui.setWorkingMessage();
@@ -139,18 +179,32 @@ export default function planMode(pi: ExtensionAPI): void {
   const setStatus = (ctx: ExtensionContext) => {
     const completed = state?.todos.filter((todo) => todo.status === "completed").length ?? 0;
     const phase = state?.phase;
-    const exploring = active;
+    const exploring = active && (!state || phase === "exploring");
+    const ready = active && phase === "ready";
     const executing = phase === "executing";
     const blocked = phase === "blocked";
-    if (!exploring && !executing && !blocked) return clearPlanDisplay(ctx);
+    if (!exploring && !ready && !executing && !blocked) return clearPlanDisplay(ctx);
 
-    const text = exploring ? `Plan · ${state?.effort ?? effort}` : blocked ? "Plan · Blocked" : `Plan · Executing ${completed}/${state?.todos.length ?? 0}`;
-    const color = blocked ? "error" : exploring ? "warning" : "accent";
+    if (exploring) startSpinner(ctx);
+    else stopSpinner();
+
+    const text = exploring
+      ? `Plan · ${state?.effort ?? effort}`
+      : ready
+        ? "Plan · Ready"
+        : blocked
+          ? "Plan · Blocked"
+          : `Plan · Executing ${completed}/${state?.todos.length ?? 0}`;
+    const color = blocked ? "error" : exploring || ready ? "warning" : "accent";
     if (ctx.hasUI) {
       ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg(color, text));
       ctx.ui.setWorkingIndicator();
     }
-    emitPowerbarStatus(exploring);
+    if (ready) {
+      pi.events.emit("powerbar:update", { id: "plan-mode", icon: "✔", text: "Plan · Ready", color: "warning" });
+    } else {
+      emitPowerbarStatus(exploring);
+    }
   };
 
   const persist = async () => {
@@ -164,7 +218,11 @@ export default function planMode(pi: ExtensionAPI): void {
   };
 
   const createState = async (goal: string) => {
-    const slug = slugify(goal);
+    let slug = slugify(goal);
+    // Auto-planning every session makes same-goal collisions likely; never
+    // silently overwrite an earlier plan's files.
+    const collides = await readFile(join(planDir(), `${slug}.state.json`), "utf8").then(() => true).catch(() => false);
+    if (collides) slug = `${slug.slice(0, 43)}-${now().replace(/[-:]/g, "").slice(0, 13)}`;
     state = {
       version: STATE_VERSION, slug, createdAt: now(), updatedAt: now(), phase: "exploring", goal, effort,
       planMarkdown: "", baselineDirtyPaths: [], todos: [], checkpoints: [],
@@ -278,6 +336,9 @@ export default function planMode(pi: ExtensionAPI): void {
     active = false;
     if (!resuming) {
       state.todos = extractTodos(state.planMarkdown);
+      const head = await git(pi, currentCwd, ["rev-parse", "HEAD"]);
+      state.baseCommit = head.code === 0 ? head.stdout.trim() : undefined;
+      state.reviewPromptSent = false;
     }
     state.baselineDirtyPaths = await dirtyPaths(pi, currentCwd);
     await persist();
@@ -340,33 +401,48 @@ export default function planMode(pi: ExtensionAPI): void {
     }
   };
 
-  const chooseEffort = async (ctx: ExtensionContext) => {
-    if (!ctx.hasUI) {
-      notify(ctx, "Plan exploration cannot be started in headless mode because it requires choosing an effort level.", "warning");
-      return;
-    }
-    const result = await askUserFancy(ctx, {
-      question: "Start plan exploration",
-      options: [
-        { title: "Quick", description: "Low effort planning" },
-        { title: "Deep", description: "Thorough investigation" }
-      ],
-      allowFreeform: false,
-    });
-    if (!result || result.kind !== "selection" || result.selections.length === 0) {
-      clearPlanDisplay(ctx);
-      return;
-    }
-    const choice = result.selections[0];
-    effort = choice === "Quick" ? "low" : "high";
+  const enablePlanning = (ctx: ExtensionContext, level: "low" | "high", message: string) => {
+    effort = level;
     state = undefined;
     active = true;
     setStatus(ctx);
-    notify(ctx, "Plan mode enabled. Send your goal or idea in the next message.");
+    notify(ctx, message);
+  };
+
+  /** When the review todo starts, hand the agent a scoped simplify-review prompt. */
+  const maybeSendReviewPrompt = async (ctx: ExtensionContext, before: Map<number, TodoStatus>) => {
+    if (!state || state.reviewPromptSent) return;
+    const reviewTodo = state.todos.find((todo) => REVIEW_TODO_PATTERN.test(todo.title));
+    if (!reviewTodo || reviewTodo.status !== "in-progress" || before.get(reviewTodo.id) === "in-progress") return;
+    state.reviewPromptSent = true;
+    await persist();
+
+    let files: ChangedFile[] = [];
+    try {
+      files = await getChangedFiles(pi, currentCwd, { files: [], ref: state.baseCommit ?? "HEAD", staged: false });
+    } catch { /* fall through to checkpoint fallback */ }
+    if (files.length === 0) {
+      // No git diff available (no repo / bad base ref): fall back to the files
+      // recorded by execution checkpoints, without line ranges.
+      const seen = new Set<string>();
+      files = state.checkpoints
+        .flatMap((checkpoint) => checkpoint.files)
+        .filter((path) => (seen.has(path) ? false : (seen.add(path), true)))
+        .map((path) => ({ path, status: "modified" as const }));
+    }
+    const implementation = files.filter((file) => !file.path.startsWith(".pi/plans/"));
+    if (implementation.length === 0) {
+      sendUserMessage(ctx, "Review phase: no implementation files changed during execution. Mark the review todo completed via manage_todo_list.");
+      return;
+    }
+    sendUserMessage(
+      ctx,
+      `${buildSimplifyPrompt(implementation)}\n\nThis is the final review phase of the plan. When the review is done, mark the review todo completed via manage_todo_list.`,
+    );
   };
 
   pi.registerCommand("plan", {
-    description: "Read-only exploration and recoverable plan workflow: /plan, /plan save, /plan execute, /plan off, /plan resume <slug>",
+    description: "Plan workflow (auto-starts each session): /plan, /plan deep, /plan save, /plan execute, /plan off, /plan resume <slug>, /plan status",
     handler: async (args, ctx) => {
       currentCwd = ctx.cwd;
       const input = args.trim();
@@ -409,15 +485,21 @@ export default function planMode(pi: ExtensionAPI): void {
         }
         return;
       }
+      if (input === "deep") {
+        enablePlanning(ctx, "high", active && !state
+          ? "Deep planning armed. Send your goal in the next message."
+          : "Plan mode enabled (deep). Send your goal in the next message.");
+        return;
+      }
       if (!input) {
         if (state && (state.phase === "ready" || state.phase === "blocked" || state.phase === "executing" || active)) {
           await showPlanActions(ctx);
         } else {
-          await chooseEffort(ctx);
+          enablePlanning(ctx, "low", "Plan mode enabled (quick). Send your goal in the next message. Use /plan deep for a thorough investigation.");
         }
         return;
       }
-      notify(ctx, "Use /plan with no arguments, then send the goal as your next normal message.", "warning");
+      notify(ctx, "Use /plan, /plan deep, /plan save, /plan execute, /plan off, /plan resume <slug>, or /plan status.", "warning");
     },
   });
 
@@ -445,7 +527,7 @@ Key findings, with file paths.
 ## Assumptions
 What you could not verify.
 ## Plan
-Numbered implementation steps.
+Numbered implementation steps. The final numbered step must always be exactly: "Review and simplify the changes". Do not merge it into another step.
 ## Validation
 How the change will be verified.
 ## Risks
@@ -514,6 +596,7 @@ The exploration phase is over. You are now authorized and expected to implement 
     state.todos = details.todos.map((todo) => ({ ...todo }));
     await persist();
     setStatus(ctx);
+    await maybeSendReviewPrompt(ctx, before);
     const newlyCompleted = state.todos.find((todo) => todo.status === "completed" && before.get(todo.id) !== "completed");
     if (newlyCompleted) {
       await checkpoint(ctx, newlyCompleted, before.get(newlyCompleted.id) || "in-progress");
@@ -530,6 +613,22 @@ The exploration phase is over. You are now authorized and expected to implement 
   });
 
   pi.events.emit("powerbar:register-segment", { id: "plan-mode", label: "Plan Mode" });
-  pi.on("session_start", async (_event, ctx) => { currentCwd = ctx.cwd; setStatus(ctx); });
+  pi.events.emit("pi-extension-settings:register", {
+    name: EXTENSION_NAME,
+    settings: [
+      { id: "auto-start", label: "Auto-start planning on session start", defaultValue: "on", values: ["on", "off"] },
+      { id: "default-effort", label: "Default planning effort", defaultValue: "low", values: ["low", "high"] },
+    ],
+  });
+
+  pi.on("session_start", async (_event, ctx) => {
+    currentCwd = ctx.cwd;
+    // Auto-plan is interactive-only: headless/print sessions answer directly.
+    if (ctx.hasUI && !state && getSetting(EXTENSION_NAME, "auto-start", "on") === "on") {
+      effort = getSetting(EXTENSION_NAME, "default-effort", "low") === "high" ? "high" : "low";
+      active = true;
+    }
+    setStatus(ctx);
+  });
   pi.on("session_shutdown", async (_event, ctx) => { clearPlanDisplay(ctx); });
 }

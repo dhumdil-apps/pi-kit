@@ -14,9 +14,6 @@
     "p-limit": "^6.1.0",
     "turndown": "^7.2.0",
     "unpdf": "^1.6.2",
-    "@orama/orama": "^3.1.12",
-    "gray-matter": "^4.0.3",
-    "nodejieba": "^3.5.8",
     "typebox": "^1.1.36"
   },
   "peerDependencies": {
@@ -28,6 +25,7 @@
     "extensions": [
       "./extensions/extension-settings/index.ts",
       "./extensions/ask-user/index.ts",
+      "./extensions/memory/index.ts",
       "./extensions/powerbar/src",
       "./extensions/pi-usage/index.ts",
       "./extensions/usage-extension/index.ts",
@@ -37,16 +35,12 @@
       "./extensions/claude-style/index.ts",
       "./extensions/permission-gate/index.ts",
       "./extensions/pi-subagents/index.ts",
-      "./extensions/pi-web-access/index.ts",
-      "./extensions/pi-simplify/index.ts",
-      "./extensions/pi-add-dir/index.ts",
-      "./extensions/pi-memory-md/index.ts"
+      "./extensions/pi-web-access/index.ts"
     ],
     "skills": [
       "./skills",
       "./extensions/pi-subagents/skills",
-      "./extensions/pi-web-access/skills",
-      "./extensions/pi-memory-md/skills"
+      "./extensions/pi-web-access/skills"
     ],
     "prompts": ["./prompts", "./extensions/pi-subagents/prompts"],
     "themes": ["./themes"]

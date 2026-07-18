@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { getSetting } from "../extension-settings/index.js";
 
 async function git(pi: ExtensionAPI, cwd: string, args: string[]) {
   try {
@@ -37,6 +38,16 @@ async function getActivePlan(cwd: string): Promise<string> {
   return "None";
 }
 
+const BANNER = [
+  "┌─────────────────────────────┐",
+  "│  ██████╗  ██╗   pi-bundle   │",
+  "│  ██╔══██╗ ██║   ─────────   │",
+  "│  ██████╔╝ ██║   plan first, │",
+  "│  ██╔═══╝  ██║   then build  │",
+  "│  ╚═╝      ╚═╝               │",
+  "└─────────────────────────────┘",
+].join("\n");
+
 export default function welcomeExtension(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     // Purely decorative banner: in headless/print mode it would land after the
@@ -47,22 +58,34 @@ export default function welcomeExtension(pi: ExtensionAPI): void {
     const dirtyOutput = await git(pi, cwd, ["status", "--porcelain"]);
     const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
     const activePlan = await getActivePlan(cwd);
+    const autoPlan = getSetting("plan-mode", "auto-start", "on") === "on";
+
+    const nextSteps = autoPlan
+      ? `🧭 **Plan mode is ACTIVE (quick)** — describe your goal and I will explore read-only, ask focused questions, and propose a plan with an Execute/Refine menu.
+• Prefer thorough planning: \`/plan deep\` • Skip planning this session: \`/plan off\``
+      : `🧭 Auto-planning is off. Start it with \`/plan\` (quick) or \`/plan deep\` (thorough).`;
 
     const welcomeText = `
+\`\`\`
+${BANNER}
+\`\`\`
 
-📂 **Project Status**:
-• **CWD**: \`${cwd}\`
-• **Git Branch**: \`${branch}\`
-• **Modified Files**: ${dirtyCount === 0 ? "_None_" : `\`${dirtyCount}\` file(s)`}
-• **Active Plan**: ${activePlan === "None" ? "_None_" : activePlan}
+📂 **Project**: \`${cwd}\` · branch \`${branch}\` · ${dirtyCount === 0 ? "clean" : `${dirtyCount} modified`}${activePlan === "None" ? "" : `\n• **Active Plan**: ${activePlan}`}
 
-⚡ **Quick Commands**:
-• \`/plan\` — Start interactive Planning Mode (Quick or Deep)
-• \`/extension-settings\` — Configure settings for all extensions
-• \`/usage\` — View token and provider usage statistics
-• \`! <cmd>\` — Execute a bash command directly in the shell
+${nextSteps}
 
-ℹ️ *Tip: You can use \`ctrl+c\` / \`ctrl+d\` to clear or exit, and \`escape\` to cancel a running tool.*
+🧩 **Extensions**
+• **plan-mode** — auto-planning with review phase; \`/plan deep|off|execute|resume|status\`
+• **permission-gate** — confirms only destructive commands (\`rm -rf\`, \`git reset --hard\`, \`sudo\`…)
+• **memory** — \`.pi/MEMORY.md\` decisions & learnings, injected each turn; \`/memory\` to view
+• **manage-todo-list** — live task progress widget; \`/todos\`
+• **subagents** — delegate to focused child sessions (\`subagent\` tool); \`/subagents\`
+• **web-access** — \`web_search\` / \`fetch_content\` tools, zero-config
+• **powerbar** — status footer: git, tokens, context %, quota; \`/extension-settings\` to tune
+• **usage** — historical spend & token analytics; \`/usage\`
+• **ask-user** — the question/confirm modal used across plan mode and the gate
+
+ℹ️ *\`! <cmd>\` runs bash directly · \`ctrl+c\`/\`ctrl+d\` clear/exit · \`escape\` cancels a running tool.*
 `;
 
     pi.sendMessage(
