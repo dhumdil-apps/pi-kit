@@ -5,7 +5,20 @@
   "description": "Vendored Pi extensions and skills maintained by dhumdil-apps.",
   "keywords": ["pi-package"],
   "license": "MIT",
-  "dependencies": { "@sinclair/typebox": "^0.34.41" },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.41",
+    "jiti": "2.7.0",
+    "yaml": "2.8.3",
+    "@mozilla/readability": "^0.6.0",
+    "linkedom": "^0.16.0",
+    "p-limit": "^6.1.0",
+    "turndown": "^7.2.0",
+    "unpdf": "^1.6.2",
+    "@orama/orama": "^3.1.12",
+    "gray-matter": "^4.0.3",
+    "nodejieba": "^3.5.8",
+    "typebox": "^1.1.36"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
@@ -22,10 +35,20 @@
       "./extensions/plan-mode/index.ts",
       "./extensions/welcome/index.ts",
       "./extensions/claude-style/index.ts",
-      "./extensions/permission-gate/index.ts"
+      "./extensions/permission-gate/index.ts",
+      "./extensions/pi-subagents/index.ts",
+      "./extensions/pi-web-access/index.ts",
+      "./extensions/pi-simplify/index.ts",
+      "./extensions/pi-add-dir/index.ts",
+      "./extensions/pi-memory-md/index.ts"
     ],
-    "skills": ["./skills"],
-    "prompts": ["./prompts"],
+    "skills": [
+      "./skills",
+      "./extensions/pi-subagents/skills",
+      "./extensions/pi-web-access/skills",
+      "./extensions/pi-memory-md/skills"
+    ],
+    "prompts": ["./prompts", "./extensions/pi-subagents/prompts"],
     "themes": ["./themes"]
   }
 }
