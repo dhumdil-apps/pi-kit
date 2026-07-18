@@ -20,8 +20,12 @@
       "./extensions/usage-extension/index.ts",
       "./extensions/manage-todo-list/index.ts",
       "./extensions/plan-mode/index.ts",
-      "./extensions/welcome/index.ts"
+      "./extensions/welcome/index.ts",
+      "./extensions/claude-style/index.ts",
+      "./extensions/permission-gate/index.ts"
     ],
-    "skills": ["./skills"]
+    "skills": ["./skills"],
+    "prompts": ["./prompts"],
+    "themes": ["./themes"]
   }
 }
