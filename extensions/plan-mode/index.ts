@@ -341,7 +341,10 @@ export default function planMode(pi: ExtensionAPI): void {
   };
 
   const chooseEffort = async (ctx: ExtensionContext) => {
-    if (!ctx.hasUI) return;
+    if (!ctx.hasUI) {
+      notify(ctx, "Plan exploration cannot be started in headless mode because it requires choosing an effort level.", "warning");
+      return;
+    }
     const result = await askUserFancy(ctx, {
       question: "Start plan exploration",
       options: [

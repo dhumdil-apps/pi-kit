@@ -2252,6 +2252,15 @@ export default function(pi: ExtensionAPI) {
             };
          }
 
+         if (!ctx.hasUI || !ctx.ui) {
+            const optionList = options.length ? `\n${formatOptionsForMessage(options)}` : "";
+            return {
+               content: [{ type: "text", text: `Ask requires interactive mode. Please answer this question:\n\n${question}${normalizedContext ? `\nContext: ${normalizedContext}` : ""}${optionList}` }],
+               isError: true,
+               details: { question, cancelled: true } as AskToolDetails,
+            };
+         }
+
          onUpdate?.({
             content: [{ type: "text", text: "Waiting for user input..." }],
             details: { question, context: normalizedContext, options, response: null, cancelled: false },
