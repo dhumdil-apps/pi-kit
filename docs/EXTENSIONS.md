@@ -8,16 +8,16 @@ extension.
 
 | Extension | Purpose | User surface | Default decision |
 | --- | --- | --- | --- |
-| Extension Settings | One global UI for registered extension settings | `/extension-settings` | Keep; settings are global and string-backed |
-| Ask User | Structured single/multi-select and freeform prompt, rendered inline | `ask_user` tool | Default UI for owned questions and confirmations |
-| Cancel Guard | Confirms interrupt keys before stopping a running agent | Red confirmation overlay | Always on in interactive TUI sessions |
-| Powerbar | Footer/status composition | configured through `/extension-settings` | On |
-| Pi Usage | Live provider quota data for Powerbar | Powerbar segments | On |
-| Usage Extension | Historical token/cost reporting | `/usage` | On |
-| Manage Todo List | Session execution progress | `manage_todo_list`, `/todos` | On |
-| Welcome | Startup map and flow summary | Interactive startup message | Interactive parent sessions only |
-| Claude Style | The working flow + behavior guidance, appended to every turn's system prompt | Automatic | On; see [FLOW.md](FLOW.md) |
-| Permission Gate | Confirmation for destructive commands, outside-project writes, `curl`/web access, and vendored-code reads | Ask User inline prompt | On; deliberately not a general approval gate |
+| Extension Preferences | One global UI for registered extension settings | `/extension-settings` | Keep; settings are global and string-backed |
+| Interactive Prompt | Structured single/multi-select and freeform prompt, rendered inline | `ask_user` tool | Default UI for owned questions and confirmations |
+| Interrupt Confirmation | Confirms interrupt keys before stopping a running agent | Red confirmation overlay | Always on in interactive TUI sessions |
+| Status Bar | Footer/status composition | configured through `/extension-settings` | On |
+| Usage Monitor | Live provider quota data for Status Bar | Status Bar segments | On |
+| Usage History | Historical token/cost reporting | `/usage` | On |
+| Progress Tracker | Session execution progress | `manage_todo_list`, `/todos` | On |
+| Session Dashboard | Startup map and flow summary | Interactive startup message | Interactive parent sessions only |
+| Agent Workflow | The working flow + behavior guidance, appended to every turn's system prompt | Automatic | On; see [FLOW.md](FLOW.md) |
+| Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, and vendored-code reads | Interactive Prompt inline prompt | On; deliberately not a general approval gate |
 
 ## Supporting resources
 
@@ -37,16 +37,16 @@ validates after each step, then reviews inline. Only the parent agent owns
 user interaction, todos, commits, and final acceptance — there is no subagent
 tool or child-process delegation.
 
-## Extension Settings registry
+## Extension Preferences registry
 
 These are the settings currently exposed through `/extension-settings`:
 
 | Extension | Keys |
 | --- | --- |
-| Permission Gate | `enabled` |
-| Powerbar | `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width` |
+| Minimal Action Confirmation | `enabled` |
+| Status Bar | `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width` |
 
-Powerbar defaults place `git-branch,tokens,context-usage` on the left and
+Status Bar defaults place `git-branch,tokens,context-usage` on the left and
 `provider,model,sub-hourly,sub-weekly` on the right. The local machine
 overrides separator, placement, bar style, and width; see
 [LOCAL_SETUP.md](LOCAL_SETUP.md#active-extension-settings).

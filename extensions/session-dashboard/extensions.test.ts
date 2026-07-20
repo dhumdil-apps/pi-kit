@@ -16,7 +16,7 @@ function activeExtensionNames(): string[] {
 	return pkg.pi.extensions.map((entry: string) => entry.split("/").filter(Boolean).at(-2));
 }
 
-describe("welcome extension deck", () => {
+describe("session dashboard extension deck", () => {
 	it("has presentation metadata for exactly the active manifest extensions", () => {
 		const names = activeExtensionNames();
 		expect(presentationCoverageErrors(names)).toEqual([]);

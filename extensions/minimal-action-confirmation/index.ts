@@ -1,5 +1,5 @@
 /**
- * Permission Gate — global, mode-independent guardrails.
+ * Minimal Action Confirmation — global, mode-independent guardrails.
  *
  * Prompts (askUserFancy: "Proceed" button, or type to deny) for every single
  * call — no session-wide or per-kind approval, by design: an annoying gate
@@ -30,14 +30,14 @@
  * and aliases can smuggle destructive commands past the matcher.
  *
  * Headless (no UI): gated calls are blocked with a chat notice.
- * Toggle via /extension-settings → permission-gate → enabled.
+ * Toggle via /extension-settings → Minimal Action Confirmation (stored as permission-gate) → enabled.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
-import { askUserFancy } from "../ask-user/index";
-import { getSetting } from "../extension-settings/index.js";
+import { askUserFancy } from "../interactive-prompt/index";
+import { getSetting } from "../extension-preferences/index.js";
 
 const EXTENSION_NAME = "permission-gate";
 
@@ -315,12 +315,12 @@ export default function createExtension(pi: ExtensionAPI): void {
 			pi.sendMessage(
 				{
 					customType: "permission-gate",
-					content: `⚠️ **Permission Gate**: blocked (no UI to confirm): ${gate.reason.split("\n")[0]}`,
+					content: `⚠️ **Minimal Action Confirmation**: blocked (no UI to confirm): ${gate.reason.split("\n")[0]}`,
 					display: true,
 				},
 				{ triggerTurn: false },
 			);
-			return { block: true, reason: "Blocked by permission gate: no UI available for confirmation." };
+			return { block: true, reason: "Blocked by minimal action confirmation: no UI available for confirmation." };
 		}
 
 		const response = await askUserFancy(ctx, {
@@ -335,10 +335,10 @@ export default function createExtension(pi: ExtensionAPI): void {
 			const guidance = response.text.trim();
 			return {
 				block: true,
-				reason: `Denied by user via permission gate. User guidance for next time: ${guidance}`,
+				reason: `Denied by user via minimal action confirmation. User guidance for next time: ${guidance}`,
 			};
 		}
 
-		return { block: true, reason: "Denied by user via permission gate." };
+		return { block: true, reason: "Denied by user via minimal action confirmation." };
 	});
 }

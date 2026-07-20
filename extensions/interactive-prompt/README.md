@@ -1,4 +1,4 @@
-# Ask User
+# Interactive Prompt
 
 Inline structured question UI for pi. Registers the `ask_user` tool, which
 renders single-select, multi-select, and freeform text prompts directly in the
@@ -17,7 +17,7 @@ TUI using pi's built-in primitives.
 ## Role in the bundle
 
 This is the interaction primitive the rest of the bundle builds on: the
-claude-style flow's Align step and permission-gate's confirmation prompts both
+agent-workflow flow's Align step and Minimal Action Confirmation's prompts both
 render through it. The companion skill lives in `skills/ask-user/`.
 
 ## Origin

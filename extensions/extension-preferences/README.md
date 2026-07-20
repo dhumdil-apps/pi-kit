@@ -1,4 +1,4 @@
-# Extension Settings
+# Extension Preferences
 
 Global, string-backed settings registry for pi extensions, plus one UI to
 configure everything registered with it.
@@ -12,8 +12,8 @@ configure everything registered with it.
 - Register settings at load time by emitting the
   `pi-extension-settings:register` event with a `SettingDefinition[]`.
 - Read/write programmatically via the exported `getSetting`/`setSetting`
-  helpers (this is how `permission-gate` reads its `enabled` toggle, and how
-  `powerbar` loads its layout).
+  helpers (this is how `minimal-action-confirmation` reads its `enabled` toggle, and how
+  `status-bar` loads its layout).
 
 See the header comment in [index.ts](index.ts) for code examples, and the
 settings registry table in [docs/EXTENSIONS.md](../../docs/EXTENSIONS.md).

@@ -21,7 +21,7 @@ It is intentionally denylist-based, not a general approval system. It prompts
 for recognized destructive commands, edit/write outside the project, `curl`
 or externally supplied web search/fetch tools, and vendored-code reads. It does not normally prompt for
 installs, pushes without force, mkdir, redirects, or other reversible work.
-See source comments in `extensions/permission-gate/index.ts` for known matcher
+See source comments in `extensions/minimal-action-confirmation/index.ts` for known matcher
 limits.
 
 ## Web access is blocked in headless runs

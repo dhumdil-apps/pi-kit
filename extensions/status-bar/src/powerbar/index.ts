@@ -7,7 +7,7 @@
 
 import type { ExtensionAPI, ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import type { OrderedListOption } from "../../../extension-settings/index.js";
+import type { OrderedListOption } from "../../../extension-preferences/index.js";
 import { renderBar, type Segment } from "./render.js";
 import { loadSettings, type PowerbarSettings, registerSettings } from "./settings.js";
 

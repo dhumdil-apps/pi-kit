@@ -17,52 +17,52 @@ export const EXTENSION_GROUPS = [
  */
 export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
-		name: "welcome",
+		name: "session-dashboard",
 		group: "ui",
 		description: "interactive startup map with project, spend, and bundle resources (automatic)",
 	},
 	{
-		name: "powerbar",
+		name: "status-bar",
 		group: "ui",
 		description: "status footer for git, tokens, context, model, and quota; `/extension-settings`",
 	},
 	{
-		name: "pi-usage",
+		name: "usage-monitor",
 		group: "ui",
 		description: "refreshes live provider quota data for Powerbar (automatic)",
 	},
 	{
-		name: "manage-todo-list",
+		name: "progress-tracker",
 		group: "flow",
 		description: "plan-step progress widget; `manage_todo_list`, `/todos`",
 	},
 	{
-		name: "permission-gate",
+		name: "minimal-action-confirmation",
 		group: "flow",
 		description: "per-call confirmation for destructive commands, external writes, curl/web access, and vendored-code reads",
 	},
 	{
-		name: "cancel-guard",
+		name: "interrupt-confirmation",
 		group: "flow",
 		description: "red confirmation before an interrupt stops a running agent (automatic)",
 	},
 	{
-		name: "ask-user",
+		name: "interactive-prompt",
 		group: "flow",
 		description: "inline choice and confirmation prompts; `ask_user`",
 	},
 	{
-		name: "claude-style",
+		name: "agent-workflow",
 		group: "flow",
 		description: "guides each turn through Explore → Align → Build → Review (automatic)",
 	},
 	{
-		name: "extension-settings",
+		name: "extension-preferences",
 		group: "config",
 		description: "shared extension settings; `/extension-settings`",
 	},
 	{
-		name: "usage-extension",
+		name: "usage-history",
 		group: "config",
 		description: "historical token and spend dashboard; `/usage`",
 	},

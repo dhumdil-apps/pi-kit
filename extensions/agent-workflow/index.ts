@@ -4,7 +4,7 @@
  * Appends a compact behavioral prompt to every agent turn's system prompt.
  * This is guidance, not enforcement: the flow below describes how work should
  * feel, while hard gates (destructive commands, web access, vendored code)
- * live in permission-gate.
+ * live in minimal-action-confirmation.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

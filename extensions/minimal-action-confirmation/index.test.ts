@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 const { askUserFancyMock } = vi.hoisted(() => ({ askUserFancyMock: vi.fn() }));
 
-vi.mock("../extension-settings/index.js", () => ({ getSetting: () => "on" }));
-vi.mock("../ask-user/index", () => ({ askUserFancy: askUserFancyMock }));
+vi.mock("../extension-preferences/index.js", () => ({ getSetting: () => "on" }));
+vi.mock("../interactive-prompt/index", () => ({ askUserFancy: askUserFancyMock }));
 
 import createPermissionGate, { bashUsesGuardedWebCommand, vendoredDirForBash } from "./index.js";
 
@@ -24,7 +24,7 @@ describe("bashUsesGuardedWebCommand", () => {
 
 describe("vendoredDirForBash", () => {
 	it("does not treat find filter operands as vendored reads", () => {
-		expect(vendoredDirForBash("find pi-bundle/extensions/welcome -maxdepth 2 -type f -not -path '*/node_modules/*' -print")).toBeUndefined();
+		expect(vendoredDirForBash("find pi-bundle/extensions/session-dashboard -maxdepth 2 -type f -not -path '*/node_modules/*' -print")).toBeUndefined();
 		expect(vendoredDirForBash("find . -path '*/node_modules/*' -prune -o -type f -print")).toBeUndefined();
 	});
 
@@ -58,7 +58,7 @@ describe("vendoredDirForBash", () => {
 		createPermissionGate(pi as never);
 
 		const context = { cwd: process.cwd(), hasUI: false };
-		await expect(toolCall?.({ toolName: "bash", input: { command: "find extensions/welcome -not -path '*/node_modules/*' -type f" } }, context)).resolves.toBeUndefined();
+		await expect(toolCall?.({ toolName: "bash", input: { command: "find extensions/session-dashboard -not -path '*/node_modules/*' -type f" } }, context)).resolves.toBeUndefined();
 		await expect(toolCall?.({ toolName: "bash", input: { command: "find node_modules/untrusted-package -type f" } }, context)).resolves.toMatchObject({ block: true });
 		expect(pi.sendMessage).toHaveBeenCalledTimes(1);
 	});

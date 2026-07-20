@@ -1,11 +1,11 @@
-# Claude Style
+# Agent Workflow
 
 Appends a compact behavioral prompt (`<pi_style>`) to every agent turn's
 system prompt. This is guidance, not enforcement: it describes tone, the
 ① Understand → ② Align → ③ Build → ④ Review working flow, and code/engineering
 rules. It directs the agent to brainstorm from local reasoning and repository
 context by default. Hard gates (destructive commands, web access, vendored-code
-reads) live in `permission-gate`.
+reads) live in `minimal-action-confirmation`.
 
 ## User surface
 

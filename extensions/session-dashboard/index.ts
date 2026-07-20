@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Markdown } from "@earendil-works/pi-tui";
-import { collectUsageData } from "../usage-extension/data.js";
+import { collectUsageData } from "../usage-history/data.js";
 import { renderExtensionDeck } from "./extensions.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -42,7 +42,7 @@ interface BundleResources {
 	prompts: string[];
 }
 
-/** Name an extension entry like "./extensions/ask-user/index.ts" → "ask-user". */
+/** Name an extension entry like "./extensions/interactive-prompt/index.ts" → "interactive-prompt". */
 function extensionName(entry: string): string {
 	const parts = entry.split("/").filter((p) => p && p !== ".");
 	const idx = parts.indexOf("extensions");
@@ -114,8 +114,8 @@ function renderPanel(rows: string[]): string {
 	return [`╭${"─".repeat(width + 4)}╮`, ...body, `╰${"─".repeat(width + 4)}╯`].join("\n");
 }
 
-export default function welcomeExtension(pi: ExtensionAPI): void {
-	pi.registerMessageRenderer("welcome", (message, _options, theme) => {
+export default function sessionDashboardExtension(pi: ExtensionAPI): void {
+	pi.registerMessageRenderer("session-dashboard", (message, _options, theme) => {
 		const content = typeof message.content === "string" ? message.content : message.content
 			.filter((item) => item.type === "text")
 			.map((item) => item.text)
@@ -205,7 +205,7 @@ ${bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : ""}
 
 		pi.sendMessage(
 			{
-				customType: "welcome",
+				customType: "session-dashboard",
 				content: welcomeText.trim(),
 				display: true,
 			},

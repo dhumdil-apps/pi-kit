@@ -1,4 +1,4 @@
-# Permission Gate
+# Minimal Action Confirmation
 
 Global, mode-independent guardrails. Prompts (via `ask_user`: "Proceed"
 button, or type to deny) for every gated call — deliberately no session-wide
@@ -45,8 +45,8 @@ commands past the matcher.
 
 ## User surface
 
-Inline ask-user prompts only; toggle via `/extension-settings` →
-permission-gate → `enabled`.
+Inline interactive-prompt prompts only; toggle via `/extension-settings` →
+Minimal Action Confirmation (stored as `permission-gate`) → `enabled`.
 
 ## Origin
 

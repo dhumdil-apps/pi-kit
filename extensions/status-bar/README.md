@@ -1,4 +1,4 @@
-# Powerbar
+# Status Bar
 
 Persistent powerline-style status bar with left/right segments updated via
 events. The core (`src/powerbar/`) listens for `powerbar:update` events,
@@ -15,7 +15,7 @@ emit one segment:
 | `src/powerbar-sub/` | `sub-hourly`, `sub-weekly` (from `pi-usage` events) |
 | `src/powerbar-os/` | `cpu`, `ram`, `disk`/SSD, `net` |
 
-All Powerbar progress bars use the theme accent normally, changing to warning
+All Status Bar progress bars use the theme accent normally, changing to warning
 and error at their configured usage thresholds. CPU, RAM, and SSD usage render
 as one high-contrast, partial-height bar per metric and show a `0%` placeholder
 until a sample is available. Context usage is labeled `ctx` and always uses
@@ -23,7 +23,7 @@ four bars; subscription hourly and weekly usage each use seven bars.
 
 ## User surface
 
-Configured through `/extension-settings` → powerbar: `left`, `right`,
+Configured through `/extension-settings` → Status Bar (stored as `powerbar`): `left`, `right`,
 `separator`, `placement`, `bar-style`, `bar-width`. Bundle defaults put
 `git-branch,tokens,context-usage` left and `provider,model,sub-hourly,sub-weekly`
 right.

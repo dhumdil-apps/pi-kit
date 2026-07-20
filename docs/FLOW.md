@@ -1,9 +1,9 @@
 # The working flow
 
 There is no plan mode, no phases, and no state machine. The flow below is
-**guidance** baked into the every-turn system prompt (the `claude-style`
+**guidance** baked into the every-turn system prompt (the `agent-workflow`
 extension); the only hard enforcement is a small set of global gates in
-`permission-gate`. The agent is trusted to follow the flow; the gates protect
+`minimal-action-confirmation`. The agent is trusted to follow the flow; the gates protect
 against the genuinely dangerous stuff regardless of what the agent decides.
 
 ## The flow (guidance)
@@ -22,7 +22,7 @@ Every task follows the same shape — no "trivial change" exception:
    direction, scope, and trade-offs come up front; wrong-direction work
    costs far more than questions. Answers may loop back into Understand —
    that's the loop working, not a detour. Once direction is clear, the plan
-   itself goes through `ask_user` the same way a permission-gate prompt
+   itself goes through `ask_user` the same way a minimal-action-confirmation prompt
    does: a single **Proceed** option, goal/steps/validation in the
    question. Typing anything instead of Proceed means *revise*, not
    *approve* — it's plan feedback, looping back into Align, not a finished
@@ -34,11 +34,11 @@ Every task follows the same shape — no "trivial change" exception:
    step's diff (the `simplify` skill) → commit. The todo list mirrors the
    plan's steps. Push never happens unless asked.
 4. **④ Review.** Reread the full diff against the goal; simplify and
-   fix before declaring done. If a permission-gate denial surfaced user
+   fix before declaring done. If a minimal-action-confirmation denial surfaced user
    guidance this session that hasn't been acted on, ask the user whether
    they want it addressed now.
 
-## The gates (enforced in code, `permission-gate`)
+## The gates (enforced in code, `minimal-action-confirmation`)
 
 Confirm on **every** call — no "allow for session" or per-kind approval
 anywhere. This is deliberate: if a gate turns out to be too annoying in

@@ -19,15 +19,15 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 
 ## Features
 
-- **claude-style** — the working flow ("measure twice, cut once") baked into
+- **agent-workflow** — the working flow ("measure twice, cut once") baked into
   every turn's system prompt as guidance, no "trivial change" shortcut:
   ① Understand (explore read-only) → ② Align (ask early and often, then get
   a plan go-ahead through the same Proceed/type-to-revise `ask_user` shape
-  as a permission-gate prompt; multi-phase plans persisted to
+  as a minimal-action-confirmation prompt; multi-phase plans persisted to
   `.pi/plans/<name>.md`) → ③ Build (steps with checks + a simplify pass
   before each commit) → ④ Review (full diff at the end). See
   [docs/FLOW.md](docs/FLOW.md).
-- **permission-gate** — the enforced guardrails: destructive commands, writes
+- **minimal-action-confirmation** — the enforced guardrails: destructive commands, writes
   outside the project, web access (`curl` plus any externally supplied web
   tools), reads into vendored code (`node_modules`, `vendor`,
   `.venv`), and recursive search/list (`find`, `grep -r`, `rg`, `tree`,
@@ -37,9 +37,9 @@ Start with the [documentation index](docs/README.md), then use the focused guide
   the current turn.
 - **project memory** — optional, user-owned `.pi/MEMORY.md`. The workflow reads
   it at task start when present; it is never injected, created, or updated automatically.
-- **manage-todo-list**, **powerbar** (+ live quota via
-  **pi-usage**), **usage-extension** (`/usage` history), **ask-user** inline
-  prompt + skill, **simplify** skill, **welcome** banner, bundled `dark` and
+- **progress-tracker**, **status-bar** (+ live quota via
+  **usage-monitor**), **usage-history** (`/usage` history), **interactive-prompt**
+  inline prompt + `ask-user` skill, **simplify** skill, **session-dashboard** banner, bundled `dark` and
   `github-dark` themes, and `/init` prompt. Config templates for a new machine
   live in [`setup/`](setup/).
 

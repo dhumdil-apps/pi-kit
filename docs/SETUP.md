@@ -63,7 +63,7 @@ Machine-local runtime data that Pi recreates or that shouldn't travel:
 
 Start `pi` in any project:
 
-- Welcome banner and powerbar appear, `github-dark` theme is active.
+- Session Dashboard and Status Bar appear, `github-dark` theme is active.
 - `/usage` opens the usage history.
 - A destructive command (e.g. asking it to `rm` something) triggers the
   permission gate.

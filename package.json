@@ -28,16 +28,16 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/extension-settings/index.ts",
-      "./extensions/ask-user/index.ts",
-      "./extensions/cancel-guard/index.ts",
-      "./extensions/claude-style/index.ts",
-      "./extensions/powerbar/src",
-      "./extensions/pi-usage/index.ts",
-      "./extensions/usage-extension/index.ts",
-      "./extensions/manage-todo-list/index.ts",
-      "./extensions/welcome/index.ts",
-      "./extensions/permission-gate/index.ts"
+      "./extensions/extension-preferences/index.ts",
+      "./extensions/interactive-prompt/index.ts",
+      "./extensions/interrupt-confirmation/index.ts",
+      "./extensions/agent-workflow/index.ts",
+      "./extensions/status-bar/src",
+      "./extensions/usage-monitor/index.ts",
+      "./extensions/usage-history/index.ts",
+      "./extensions/progress-tracker/index.ts",
+      "./extensions/session-dashboard/index.ts",
+      "./extensions/minimal-action-confirmation/index.ts"
     ],
     "skills": [
       "./skills"

@@ -3,8 +3,8 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { OrderedListOption, SettingDefinition } from "../../../extension-settings/index.js";
-import { getSetting } from "../../../extension-settings/index.js";
+import type { OrderedListOption, SettingDefinition } from "../../../extension-preferences/index.js";
+import { getSetting } from "../../../extension-preferences/index.js";
 
 export const EXTENSION_NAME = "powerbar";
 

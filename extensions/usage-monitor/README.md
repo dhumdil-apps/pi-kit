@@ -1,7 +1,7 @@
-# Pi Usage
+# Usage Monitor
 
 Live subscription/quota usage data for all providers (anthropic, copilot,
-gemini, antigravity, codex, kiro, zai). Feeds the powerbar's `sub-*` segments;
+gemini, antigravity, codex, kiro, zai). Feeds the Status Bar's `sub-*` segments;
 has no UI of its own.
 
 ## Events emitted
