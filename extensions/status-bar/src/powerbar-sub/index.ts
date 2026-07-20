@@ -1,8 +1,8 @@
 /**
  * Powerbar Sub Producer
  *
- * Shows subscription usage from pi-usage.
- * pi-usage is loaded by pi as a sibling extension (declared in package.json pi.extensions).
+ * Shows subscription usage from Usage Monitor.
+ * Usage Monitor is loaded by Pi as a sibling extension (declared in package.json pi.extensions).
  *
  * We listen to `usage-core:ready` and `usage-core:update-current`.
  * The state includes a `provider` field — when absent (e.g. Bedrock model),

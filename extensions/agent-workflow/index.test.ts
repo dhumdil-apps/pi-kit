@@ -51,4 +51,12 @@ describe("agent workflow lifecycle", () => {
 		expect(messages.at(-1)).toContain("[workflow-command:forensic:raw]");
 		expect(messages.at(-1)).toContain('raw="true"');
 	});
+
+	it("injects command ownership and pre-commit inspection discipline", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		expect(prompt.systemPrompt).toContain("repository or package manifest that owns the command");
+		expect(prompt.systemPrompt).toContain("git status --short");
+		expect(prompt.systemPrompt).toContain("Separate pre-existing changes");
+	});
 });

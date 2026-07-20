@@ -64,7 +64,7 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
   are local-first; deliberate shell web access through `curl` is consent-gated.
 - `plan-mode`: removed (2026-07-19). The phase/state machine, triage, ledger,
   gates, and `/plan` commands were replaced by the guidance flow in
-  [FLOW.md](FLOW.md) plus the global Permission Gate rules — guidance over
+  [FLOW.md](FLOW.md) plus the global Minimal Action Confirmation rules — guidance over
   rules, gates only where content is genuinely dangerous.
 - `interactive-prompt` and `skills/ask-user`: removed (2026-07-20).
   Planning is conversational; only safety confirmations use Pi's built-in dialog.

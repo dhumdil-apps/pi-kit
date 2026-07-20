@@ -37,8 +37,9 @@ workflow questions, Flash lifecycle, and safety dialogs.
 5. Update the matching document when behavior, commands, settings, paths, or
    ownership rules change.
 6. Run focused tests/typecheck, headless load, and relevant interactive smoke.
-7. Review `git diff` before committing; never commit local secrets or runtime
-   state.
+7. Before discussing or creating a commit, run `git status --short` and inspect
+   the relevant diff. Keep pre-existing work separate, verify status afterward,
+   and never commit local secrets or runtime state.
 8. Update `UPSTREAM.md` and license material when importing a new snapshot.
 
 ## Documentation ownership
@@ -64,6 +65,6 @@ Treat an upstream update as a merge, not a blind overwrite:
 6. Update its snapshot in `UPSTREAM.md`.
 
 High-risk local behavior to preserve includes Flash cancellation, explicit plan
-approval, retrospective evidence bounds, and the Permission Gate's denylist
+approval, retrospective evidence bounds, and Minimal Action Confirmation's denylist
 scope (destructive commands, outside-project writes, per-call `curl`/web
 access, and vendored-code reads).

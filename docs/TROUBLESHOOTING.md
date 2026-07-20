@@ -15,7 +15,7 @@ Say so in chat — "we haven't agreed on an approach yet" — and the agent shou
 return to exploration. The hard gates only cover destructive commands, web
 access, and vendored-code reads.
 
-## Permission Gate did not prompt
+## Minimal Action Confirmation did not prompt
 
 It is intentionally denylist-based, not a general approval system. It prompts
 for recognized destructive commands, edit/write outside the project, `curl`

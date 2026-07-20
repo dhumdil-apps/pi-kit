@@ -12,7 +12,7 @@ emit one segment:
 | `src/powerbar-provider/` | `provider` |
 | `src/powerbar-tokens/` | `tokens` |
 | `src/powerbar-context/` | `context-usage` |
-| `src/powerbar-sub/` | `sub-hourly`, `sub-weekly` (from `pi-usage` events) |
+| `src/powerbar-sub/` | `sub-hourly`, `sub-weekly` (from Usage Monitor events) |
 | `src/powerbar-os/` | `cpu`, `ram`, `disk`/SSD, `net` |
 
 The Agent Workflow extension registers a transient `flash` segment. It renders

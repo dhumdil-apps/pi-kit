@@ -1,5 +1,5 @@
 /**
- * pi-usage — Subscription usage extension for all providers.
+ * Usage Monitor — Subscription usage extension for all providers.
  *
  * Simplified fork of @marckrenn/pi-sub-core (https://github.com/marckrenn/pi-sub).
  * Supports all providers (anthropic, copilot, gemini, antigravity, codex, kiro, zai)

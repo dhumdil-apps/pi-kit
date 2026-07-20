@@ -32,7 +32,7 @@ mode and no `/plan` command — the working flow is guidance, described in
 - Planning questions appear in the conversation and accept compact answers such
   as `1A 2C 3B`; safety confirmations continue to use Pi's built-in dialog.
 - `Ctrl+C` clears/cancels; `Ctrl+D` exits from an empty prompt.
-- Permission Gate confirmation applies to agent tool calls, not arbitrary shell
+- Minimal Action Confirmation applies to agent tool calls, not arbitrary shell
   commands you intentionally execute yourself.
-- Agent-issued `curl` calls require Permission Gate confirmation every time and
+- Agent-issued `curl` calls require Minimal Action Confirmation every time and
   are blocked in headless sessions.

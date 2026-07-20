@@ -1,5 +1,5 @@
 /**
- * Types for pi-usage.
+ * Types for Usage Monitor.
  *
  * Derived from @marckrenn/pi-sub-shared, self-contained.
  */
