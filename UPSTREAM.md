@@ -13,20 +13,16 @@ included here from that declaration.
 | Pi Usage (Powerbar dependency) | `@juanibiapina/pi-usage` | npm `0.1.0` |
 | Usage Extension | `@tmustier/pi-usage-extension` | npm `0.9.1` |
 | Manage Todo List | `tintinweb/pi-manage-todo-list` | commit `b75c449aa85ce328e9a8b632f62bf642aed40359` |
-| Web Access (search/fetch/PDF/YouTube extraction) | `pi-web-access` (Nico Bailon) | npm `0.13.0` |
 | Simplify review logic (vendored into `skills/simplify/`) | `pi-simplify` (Matt Devy) | npm `0.2.3` |
 
 `pi-simplify` declares MIT in its npm manifest but its tarball contains no
 separate license file; its MIT notice in `LICENSES/` is reconstructed from
 that declaration plus the package's stated author.
 
-`pi-web-access`'s demo video/screenshot assets were dropped from the vendored
-copy — not needed at runtime.
-
 Removed from the bundle (2026-07-18): `pi-add-dir` (unused), `pi-memory-md`
-(replaced by the bundle-local `extensions/memory` — a minimal `.pi/MEMORY.md`
-per project; this also removed the `nodejieba`/`node-pre-gyp` vulnerable `tar`
-install-time exposure), and the standalone `pi-simplify` extension (its
+(replaced briefly by a bundle-local extension, then removed in favor of an
+optional user-owned `.pi/MEMORY.md`; this also removed the `nodejieba`/
+`node-pre-gyp` vulnerable `tar` install-time exposure), and the standalone `pi-simplify` extension (its
 review logic now lives in `skills/simplify/` and runs as the `/simplify`
 skill).
 
@@ -37,6 +33,11 @@ orchestration proved unstable (dead-looped handoffs, flaky parallel/async
 runs) even after a first redesign to a serial explorer/coder pair. Plan Mode
 itself was removed on 2026-07-19; the bundle now runs single-agent with a
 guidance flow — see `docs/FLOW.md`.
+
+Removed from the bundle (2026-07-20): `pi-web-access` (Nico Bailon, npm
+`0.13.0`, MIT). The bundle now brainstorms from local reasoning and repository
+context by default; deliberate `curl` use is guarded by Permission Gate. Its
+archived license notice remains in `LICENSES/pi-web-access-MIT.txt`.
 
 ## Local compatibility changes
 

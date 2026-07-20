@@ -8,33 +8,39 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const CHUNK_SIZE = 100_000;
+// Keep the context indicator consistent across models and with the Powerbar
+// layout: four blocks, regardless of the context-window size.
+const CONTEXT_BAR_SEGMENTS = 4;
 
 function getColor(pct: number): string {
 	if (pct > 80) return "error";
 	if (pct > 60) return "warning";
-	return "muted";
+	return "accent";
 }
 
 function emitContextUsage(pi: ExtensionAPI, ctx: ExtensionContext): void {
 	const usage = ctx.getContextUsage();
-	if (usage && usage.tokens != null) {
-		const pct = Math.round((usage.tokens / usage.contextWindow) * 100);
-		pi.events.emit("powerbar:update", {
-			id: "context-usage",
-			text: "",
-			suffix: `${pct}%`,
-			bar: pct,
-			barSegments: Math.ceil(usage.contextWindow / CHUNK_SIZE),
-			color: getColor(pct),
-		});
-	}
+	const pct = usage?.tokens != null && usage.contextWindow > 0
+		? Math.round((usage.tokens / usage.contextWindow) * 100)
+		: 0;
+	pi.events.emit("powerbar:update", {
+		id: "context-usage",
+		text: "ctx",
+		suffix: `${pct}%`,
+		bar: pct,
+		barSegments: CONTEXT_BAR_SEGMENTS,
+		color: getColor(pct),
+	});
 }
 
 function resetContextUsage(pi: ExtensionAPI): void {
 	pi.events.emit("powerbar:update", {
 		id: "context-usage",
-		text: undefined,
+		text: "ctx",
+		suffix: "0%",
+		bar: 0,
+		barSegments: CONTEXT_BAR_SEGMENTS,
+		color: getColor(0),
 	});
 }
 

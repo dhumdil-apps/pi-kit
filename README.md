@@ -28,17 +28,16 @@ Start with the [documentation index](docs/README.md), then use the focused guide
   before each commit) → ④ Review (full diff at the end). See
   [docs/FLOW.md](docs/FLOW.md).
 - **permission-gate** — the enforced guardrails: destructive commands, writes
-  outside the project, web access (`web_search`, `fetch_content`,
-  `get_search_content`), reads into vendored code (`node_modules`, `vendor`,
+  outside the project, web access (`curl` plus any externally supplied web
+  tools), reads into vendored code (`node_modules`, `vendor`,
   `.venv`), and recursive search/list (`find`, `grep -r`, `rg`, `tree`,
   `ls -R`) rooted outside the project. Every gate confirms on every call —
   no session or per-kind approval. Each prompt is a single "Proceed" button;
-  typing anything else denies the call and is saved as guidance for the
-  agent (see **memory** below).
-- **memory** — minimal per-project `.pi/MEMORY.md`, injected each turn;
-  `remember` tool + `/memory`. Also written to directly by permission-gate
-  when a gate denial comes with typed guidance (category `guidance`).
-- **manage-todo-list**, **web-access**, **powerbar** (+ live quota via
+  typing anything else denies the call and supplies guidance to the agent in
+  the current turn.
+- **project memory** — optional, user-owned `.pi/MEMORY.md`. The workflow reads
+  it at task start when present; it is never injected, created, or updated automatically.
+- **manage-todo-list**, **powerbar** (+ live quota via
   **pi-usage**), **usage-extension** (`/usage` history), **ask-user** inline
   prompt + skill, **simplify** skill, **welcome** banner, bundled `dark` and
   `github-dark` themes, and `/init` prompt. Config templates for a new machine
@@ -74,6 +73,5 @@ npm test
 npm run typecheck
 ```
 
-`npm run typecheck` checks every vendored extension. It currently also reports
-upstream type/API drift in pi-web-access; do not add new errors in touched
-files while those upstream errors are retired.
+`npm run typecheck` checks every vendored extension. Do not add new errors in
+touched files when working through any remaining upstream compatibility drift.

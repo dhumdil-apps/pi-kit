@@ -15,10 +15,9 @@ npm run typecheck
 git diff --check
 ```
 
-`npm run typecheck` checks every vendored TypeScript extension. At the time this
-guide was written it still reports upstream API/type drift in `pi-web-access`
-and `manage-todo-list`; do not add new errors in touched files, and do not
-describe the whole bundle as type-clean until that command exits zero.
+`npm run typecheck` checks every vendored TypeScript extension. Do not add new
+errors in touched files, and do not describe the whole bundle as type-clean
+until that command exits zero.
 
 Headless load smoke:
 
@@ -67,5 +66,4 @@ Treat an upstream update as a merge, not a blind overwrite:
 
 High-risk local behavior to preserve includes Ask User headless handling and
 the Permission Gate's denylist scope (destructive commands, outside-project
-writes, once-per-session web search, per-call web fetch, per-package
-vendored-code reads).
+writes, per-call `curl`/web access, and vendored-code reads).

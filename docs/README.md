@@ -24,15 +24,14 @@ that loads it.
   theme, and package path on this machine.
 - `~/.pi/agent/settings-extensions.json` stores global, string-backed extension
   settings changed through `/extension-settings`.
-- `~/.pi/web-search.json` stores Web Access configuration.
-- Project-specific state belongs to the project: `.pi/MEMORY.md` and
-  `.pi/plans/*`.
+- Project-specific files belong to the project: optional user-owned
+  `.pi/MEMORY.md` and `.pi/plans/*`.
 - Sessions, authentication, caches, generated package state, and model catalogs
   are runtime data. They are not bundle configuration and must not be committed.
 
 ## Repository locations
 
-- Local working copy: `~/pi-bundle`
+- Local working copy: `~/.pi/pi-bundle`
 - GitHub remote: `git@github.com:dhumdil-apps/pi-bundle.git`
 - Active branch: `main`
 - Local Pi directory: `~/.pi`

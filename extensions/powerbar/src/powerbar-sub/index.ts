@@ -29,7 +29,7 @@ interface UsageCoreState {
 function getColor(pct: number): string {
 	if (pct > 80) return "error";
 	if (pct > 60) return "warning";
-	return "muted";
+	return "accent";
 }
 
 function emitWindow(pi: ExtensionAPI, segmentId: string, window: RateWindow | undefined, barSegments: number): void {
@@ -73,7 +73,7 @@ function emitUsage(pi: ExtensionAPI, state: UsageCoreState | undefined): void {
 		return;
 	}
 
-	emitWindow(pi, "sub-hourly", usage.windows[0], 5);
+	emitWindow(pi, "sub-hourly", usage.windows[0], 7);
 	emitWindow(pi, "sub-weekly", usage.windows[1], 7);
 }
 

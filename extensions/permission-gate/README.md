@@ -5,10 +5,9 @@ button, or type to deny) for every gated call — deliberately no session-wide
 or per-kind approval: an annoying gate is a signal to narrow what's gated, not
 to make the gate leakier.
 
-Typing anything instead of picking Proceed denies the call **and** is treated
-as guidance: it's saved to `.pi/MEMORY.md` (via memory's `rememberEntry`,
-category `guidance`) and placed in the block reason so the agent can act on it
-immediately.
+Typing anything instead of picking Proceed denies the call and is placed in
+the block reason so the agent can act on it immediately. It is not persisted
+automatically.
 
 ## What is gated
 
@@ -16,16 +15,28 @@ immediately.
   `find -delete/-exec rm|mv`, `xargs rm|mv`, recursive `chmod`/`chown`/`chgrp`,
   destructive git (`reset --hard`, `clean`, force push, `branch -D`,
   `stash drop/clear`).
-- `edit`/`write` targeting paths outside the project cwd.
-- Web access: `web_search`, `fetch_content`, `get_search_content`
+- `edit`/`write` targeting paths outside the project cwd. Paths in the
+  `SAFE_PATHS` list in `index.ts` (the user's own bundle working copy at
+  `~/.pi/pi-bundle`) count as in-project.
+- Web access: agent-issued `curl` plus any externally supplied `web_search`,
+  `fetch_content`, or `get_search_content` tools
   (fetched pages are untrusted text — prompt-injection risk).
 - Vendored/dependency code reads (`node_modules/`, `vendor/`, `.venv/`,
-  `~/.pi/agent/git|cache`).
+  `~/.pi/agent/git|cache`). Trusted packages/scopes are exempt — extend the
+  `TRUSTED_PACKAGES` list in `index.ts` (one entry per line; an entry is an
+  npm scope like `@earendil-works` or a single package like `lodash`).
 - Recursive search/list commands (`find`, `grep -r`, `rg`, `tree`, `ls -R`)
-  whose target reaches outside the project directory.
+  whose target reaches outside the project directory (`SAFE_PATHS` exempt
+  here too).
 
 Everything else runs without prompting. Deliberately NOT gated: redirects and
 `tee`, `mv`/`cp`, package managers, `kill`.
+
+Prompts represent actual access to untrusted dependency content, not its name
+appearing in a filter expression. `find` predicates and pruning patterns,
+`rg` glob filters, `grep` include/exclude filters, and `tree` ignore filters
+therefore do not prompt; using a dependency directory as a search root or file
+argument still does.
 
 ## Known limits
 

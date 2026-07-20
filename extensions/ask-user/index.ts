@@ -140,6 +140,16 @@ type AskResponse =
 
 type AskUIResult = AskResponse;
 
+/**
+ * Plan approval must always be a selectable action. Models occasionally omit
+ * `options` despite asking "Proceed?", which otherwise opens a text editor
+ * and looks like a stuck confirmation prompt.
+ */
+function addProceedOption(question: string, options: QuestionOption[]): QuestionOption[] {
+   if (options.length > 0 || !/\bproceed\?\s*$/i.test(question.trim())) return options;
+   return [{ title: "Proceed", description: "Approve and continue with the proposed work." }];
+}
+
 // Key aliases models fall back to when a schema-mangling proxy (Google
 // function calling, Codex-style backends, cmux) strips the option shape and
 // the model has to guess. See issue #22.
@@ -390,6 +400,12 @@ function resolveShortcut(
 }
 
 type AskMode = "select" | "freeform" | "comment";
+
+export type AskCancelDecision = "cancel" | "keep-answering";
+
+export function askCancelDecisionForSelection(selectedIndex: number): AskCancelDecision {
+   return selectedIndex === 0 ? "cancel" : "keep-answering";
+}
 
 const SINGLE_SELECT_SPLIT_PANE_MIN_WIDTH = 84;
 const SINGLE_SELECT_SPLIT_PANE_LEFT_MIN_WIDTH = 32;
@@ -1010,6 +1026,8 @@ class AskComponent extends Container {
    private pendingSelections: string[] = [];
    private freeformDraft = "";
    private commentDraft = "";
+   private confirmingCancel = false;
+   private cancelSelectionIndex = 0;
 
    // Static layout components
    private titleText: Text;
@@ -1115,6 +1133,8 @@ class AskComponent extends Container {
    }
 
    override render(width: number): string[] {
+      if (this.confirmingCancel) return this.renderCancelConfirmation(width);
+
       const innerWidth = Math.max(1, width - BOX_BORDER_OVERHEAD);
 
       if (this.mode === "select" && !this.allowMultiple) {
@@ -1122,6 +1142,74 @@ class AskComponent extends Container {
       }
 
       return this.frameRawLines(super.render(innerWidth), width, innerWidth);
+   }
+
+   private renderCancelConfirmation(width: number): string[] {
+      const red = (text: string) => this.theme.fg("error", text);
+      const innerWidth = Math.max(1, width - BOX_BORDER_OVERHEAD);
+      const option = (index: number, label: string, color: "error" | "success") => {
+         const selected = index === this.cancelSelectionIndex;
+         const text = selected ? `→ ${this.theme.bold(label)}` : `  ${label}`;
+         return this.theme.fg(color, text);
+      };
+      const rawLines = [
+         "",
+         "",
+         red(this.theme.bold("⚠ Cancel this question?")),
+         "",
+         this.theme.fg("text", "Your current selection or draft will be discarded."),
+         "",
+         option(0, "Confirm cancellation", "error"),
+         option(1, "Keep answering", "success"),
+         "",
+         this.theme.fg("dim", "↑↓ navigate  ·  Enter select  ·  Esc keep answering"),
+         "",
+         "",
+      ];
+      return rawLines.map((line, index) => {
+         if (index === 0 || index === rawLines.length - 1) return red("─".repeat(width));
+         const padded = truncateToWidth(line, innerWidth, "", true);
+         return `${red("│")}${padded}${red("│")}`;
+      });
+   }
+
+   private requestCancel(): void {
+      if (this.confirmingCancel) return;
+      if (this.mode === "freeform" || this.mode === "comment") this.saveEditorDraft();
+      this.confirmingCancel = true;
+      this.cancelSelectionIndex = 0;
+      this.invalidate();
+      this.tui.requestRender();
+   }
+
+   private dismissCancelConfirmation(): void {
+      this.confirmingCancel = false;
+      this.invalidate();
+      this.tui.requestRender();
+   }
+
+   private handleCancelConfirmationInput(data: string): void {
+      if (this.keybindings.matches(data, "tui.select.cancel")) {
+         this.dismissCancelConfirmation();
+         return;
+      }
+      if (matchesSelectUp(data, this.keybindings)) {
+         this.cancelSelectionIndex = Math.max(0, this.cancelSelectionIndex - 1);
+         this.invalidate();
+         this.tui.requestRender();
+         return;
+      }
+      if (matchesSelectDown(data, this.keybindings)) {
+         this.cancelSelectionIndex = Math.min(1, this.cancelSelectionIndex + 1);
+         this.invalidate();
+         this.tui.requestRender();
+         return;
+      }
+      if (this.keybindings.matches(data, "tui.select.confirm")) {
+         const decision = askCancelDecisionForSelection(this.cancelSelectionIndex);
+         if (decision === "cancel") this.onDone(null);
+         else this.dismissCancelConfirmation();
+      }
    }
 
    private renderTopBorder(width: number): string {
@@ -1233,7 +1321,7 @@ class AskComponent extends Container {
          this.shortcuts.commentToggle,
       );
       list.onSubmit = (result) => this.handleSelectionSubmit([result], list.isCommentEnabled());
-      list.onCancel = () => this.onDone(null);
+      list.onCancel = () => this.requestCancel();
       list.onEnterFreeform = () => this.showFreeformMode();
 
       this.singleSelectList = list;
@@ -1251,7 +1339,7 @@ class AskComponent extends Container {
          this.keybindings,
          this.shortcuts.commentToggle,
       );
-      list.onCancel = () => this.onDone(null);
+      list.onCancel = () => this.requestCancel();
       list.onSubmit = (result) => this.handleSelectionSubmit(result, list.isCommentEnabled());
       list.onEnterFreeform = () => this.showFreeformMode();
 
@@ -1379,6 +1467,11 @@ class AskComponent extends Container {
    }
 
    handleInput(data: string): void {
+      if (this.confirmingCancel) {
+         this.handleCancelConfirmationInput(data);
+         return;
+      }
+
       if (this.mode === "freeform" || this.mode === "comment") {
          if (matchesKey(data, Key.escape)) {
             this.showSelectMode();
@@ -1386,7 +1479,7 @@ class AskComponent extends Container {
          }
 
          if (this.keybindings.matches(data, "tui.select.cancel")) {
-            this.onDone(null);
+            this.requestCancel();
             return;
          }
 
@@ -1602,7 +1695,10 @@ export async function askUserFancy(
       ),
    };
 
-   const options = rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null);
+   const options = addProceedOption(
+      question,
+      rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null),
+   );
    const normalizedContext = params.context?.trim() || undefined;
 
    return askSingleFancyInternal(
@@ -1783,7 +1879,10 @@ export default function(pi: ExtensionAPI) {
             };
          }
 
-         const options = rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null);
+         const options = addProceedOption(
+            question,
+            rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null),
+         );
          const normalizedContext = context?.trim() || undefined;
 
          if (rawOptions.length > 0 && options.length === 0) {

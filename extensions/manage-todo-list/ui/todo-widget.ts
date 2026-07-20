@@ -5,7 +5,7 @@
  * Shows status icons, progress stats, and a flat list.
  */
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TodoStateManager } from "../state-manager.js";
 
 const WIDGET_ID = "todo-list";
@@ -13,9 +13,15 @@ const WIDGET_ID = "todo-list";
 /** Status icons for each todo state */
 export const STATUS_ICONS: Record<string, string> = {
   "completed": "✓",
-  "in-progress": "◉ ",
+  "in-progress": "›",
   "not-started": "○",
 };
+
+/** Render a compact semantic-theme progress bar. */
+export function progressBar(completed: number, total: number, theme: Theme, width = 8): string {
+  const filled = total === 0 ? 0 : Math.round((completed / total) * width);
+  return theme.fg("success", "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(width - filled));
+}
 
 /**
  * Update (or clear) the todo widget.
@@ -34,16 +40,25 @@ export function updateWidget(state: TodoStateManager, ctx: ExtensionContext): vo
   ctx.ui.setWidget(WIDGET_ID, (_tui, theme) => {
     const lines: string[] = [];
 
-    // Header with progress
+    const gutter = theme.fg("accent", "▍ ");
     const header =
-      theme.fg("accent", " Todo List ") +
-      theme.fg("muted", `— ${stats.completed}/${stats.total} completed`);
+      gutter +
+      theme.fg("accent", theme.bold("Todo List")) +
+      "  " +
+      progressBar(stats.completed, stats.total, theme, stats.total) +
+      theme.fg("muted", `  ${stats.completed}/${stats.total}`);
     lines.push(header);
+    lines.push(gutter);
 
-    // Each todo item
     for (const todo of todos) {
       const icon = STATUS_ICONS[todo.status] ?? "⏳";
       const id = theme.fg("accent", `${todo.id}.`);
+      const coloredIcon =
+        todo.status === "completed"
+          ? theme.fg("success", icon)
+          : todo.status === "in-progress"
+            ? theme.fg("warning", icon)
+            : theme.fg("dim", icon);
 
       let title: string;
       if (todo.status === "completed") {
@@ -54,7 +69,7 @@ export function updateWidget(state: TodoStateManager, ctx: ExtensionContext): vo
         title = todo.title;
       }
 
-      lines.push(`  ${icon} ${id} ${title}`);
+      lines.push(`${gutter}${coloredIcon} ${id} ${title}`);
     }
 
     return {

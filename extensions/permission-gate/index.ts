@@ -4,25 +4,25 @@
  * Prompts (askUserFancy: "Proceed" button, or type to deny) for every single
  * call — no session-wide or per-kind approval, by design: an annoying gate
  * is a signal to narrow what's gated, not to make the gate leakier. Typing
- * anything instead of picking Proceed denies the call AND is treated as
- * guidance for what the agent should do instead: it's saved to
- * `.pi/MEMORY.md` (via memory's `rememberEntry`, category "guidance") for
- * future sessions, and it's also put directly in the block reason so the
- * current agent sees it immediately and can act on it this turn. Covers:
+ * anything instead of picking Proceed denies the call and is put directly in
+ * the block reason so the current agent sees it immediately and can act on it
+ * this turn. Covers:
  * - Destructive bash commands: rm/rmdir/unlink/shred/dd/mkfs, sudo,
  *   find -delete/-exec rm|mv, xargs rm|mv, recursive chmod/chown/chgrp,
  *   and destructive git (reset --hard, clean, force push, branch -D,
  *   stash drop/clear).
  * - edit/write targeting paths OUTSIDE the project cwd.
- * - Web access: web_search, fetch_content, get_search_content (fetched
- *   pages are untrusted text — prompt-injection risk).
+ * - Web access: curl plus web_search, fetch_content, get_search_content
+ *   (fetched pages are untrusted text — prompt-injection risk).
  * - Vendored/dependency code reads (read tool or bash referencing
  *   node_modules/, vendor/, .venv/, ~/.pi/agent/git|cache): untrusted
- *   third-party text.
+ *   third-party text. Packages/scopes in TRUSTED_PACKAGES are exempt.
  * - Recursive search/list commands (find, grep -r, rg, tree, ls -R) whose
  *   target path reaches outside the project directory — avoids runaway
  *   scans of the home directory / filesystem when an agent goes looking
- *   for context files with too broad a root.
+ *   for context files with too broad a root. Paths in SAFE_PATHS (the
+ *   user's own bundle at ~/.pi/pi-bundle) count as in-project for both
+ *   this and the edit/write gate.
  *
  * Everything else runs without prompting. Deliberately NOT gated: redirects
  * and tee (can't cheaply tell truncate vs create), mv/cp (recoverable),
@@ -38,7 +38,6 @@ import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
 import { askUserFancy } from "../ask-user/index";
 import { getSetting } from "../extension-settings/index.js";
-import { rememberEntry } from "../memory/index";
 
 const EXTENSION_NAME = "permission-gate";
 
@@ -57,10 +56,26 @@ const DESTRUCTIVE_GIT = [
 ];
 
 const WEB_FETCH_TOOLS = new Set(["fetch_content", "get_search_content"]);
+const WEB_BASH_COMMANDS = new Set(["curl"]);
 
 const VENDORED_DIRS = ["node_modules", "vendor", ".venv"];
 
+// Packages/scopes whose vendored code is trusted — reads skip the gate.
+// Entries match a whole npm scope ("@earendil-works") or a single package
+// ("@scope/pkg", "lodash").
+const TRUSTED_PACKAGES = [
+	"@earendil-works",
+];
+
 const SEARCH_COMMANDS = new Set(["find", "grep", "rg", "tree", "ls"]);
+
+// Paths treated as in-project everywhere: the user's own bundle working
+// copy — searching, reading, and editing it from any cwd is routine.
+const SAFE_PATHS = [resolve(homedir(), ".pi/pi-bundle")];
+
+function pathIsSafelisted(abs: string): boolean {
+	return SAFE_PATHS.some((dir) => abs === dir || abs.startsWith(`${dir}/`));
+}
 
 const GATE_OPTIONS = ["Proceed"];
 
@@ -95,6 +110,16 @@ function bashIsDestructive(command: string): boolean {
 	return splitSegments(command).some(segmentIsDestructive);
 }
 
+/** True when a shell segment invokes a guarded network client. */
+export function bashUsesGuardedWebCommand(command: string): boolean {
+	return splitSegments(command).some((segment) => {
+		const { command: tool } = commandAndArgs(segment);
+		if (!tool) return false;
+		const executable = tool.split("/").at(-1) ?? tool;
+		return WEB_BASH_COMMANDS.has(executable);
+	});
+}
+
 /**
  * If the path (or command text) reaches into a vendored dir, return a label
  * for it: the package for node_modules ("node_modules/@scope/pkg"),
@@ -115,18 +140,56 @@ function vendoredDirForPath(path: string): string | undefined {
 		const first = segments[i + 1];
 		if (!first) return "node_modules";
 		const pkg = first.startsWith("@") && segments[i + 2] ? `${first}/${segments[i + 2]}` : first;
+		if (TRUSTED_PACKAGES.some((t) => pkg === t || pkg.startsWith(`${t}/`))) continue;
 		return `node_modules/${pkg}`;
 	}
 	return undefined;
 }
 
-function vendoredDirForBash(command: string): string | undefined {
-	// Scan word-ish tokens for anything path-like that touches a vendored dir.
-	for (const token of command.split(/\s+/)) {
-		const cleaned = token.replace(/^['"]|['"]$/g, "");
-		if (!/node_modules|vendor\/|\.venv|\.pi\/agent\/(git|cache)/.test(cleaned)) continue;
-		const key = vendoredDirForPath(cleaned);
-		if (key) return key;
+const FILTER_FLAGS: Record<string, ReadonlySet<string>> = {
+	find: new Set(["-path", "-wholename", "-ipath", "-name", "-iname", "-regex", "-iregex", "-lname"]),
+	rg: new Set(["-g", "--glob", "--iglob"]),
+	grep: new Set(["--include", "--exclude", "--exclude-dir"]),
+	tree: new Set(["-I", "--ignore"]),
+};
+
+function commandAndArgs(segment: string): { command?: string; args: string[] } {
+	const tokens = segment.split(/\s+/).filter(Boolean);
+	while (tokens.length && (WRAPPERS.has(tokens[0]) || ENV_ASSIGNMENT.test(tokens[0]))) tokens.shift();
+	const command = tokens.shift();
+	return { command, args: tokens };
+}
+
+/**
+ * Return indexes containing glob/predicate operands. These arguments describe
+ * what to exclude or match; they are not paths the command reads.
+ */
+function filterOperandIndexes(command: string | undefined, args: string[]): Set<number> {
+	const flags = command ? FILTER_FLAGS[command] : undefined;
+	if (!flags) return new Set();
+
+	const operands = new Set<number>();
+	for (let i = 0; i < args.length; i++) {
+		const token = args[i];
+		const flag = token.split("=", 1)[0];
+		if (!flags.has(flag)) continue;
+		if (token.includes("=")) operands.add(i);
+		else if (i + 1 < args.length) operands.add(++i);
+	}
+	return operands;
+}
+
+export function vendoredDirForBash(command: string): string | undefined {
+	for (const segment of splitSegments(command)) {
+		const { command: tool, args } = commandAndArgs(segment);
+		const filters = filterOperandIndexes(tool, args);
+		for (let i = 0; i < args.length; i++) {
+			if (filters.has(i)) continue;
+			const cleaned = args[i].replace(/^['"]|['"]$/g, "");
+			if (!/node_modules|vendor\/|\.venv|\.pi\/agent\/(git|cache)/.test(cleaned)) continue;
+			const key = vendoredDirForPath(cleaned);
+			if (key) return key;
+		}
 	}
 	return undefined;
 }
@@ -144,6 +207,7 @@ function pathEscapesProject(rawPath: string, cwd: string): boolean {
 	const expanded = expandTilde(cleaned);
 	const abs = isAbsolute(expanded) ? resolve(expanded) : resolve(cwd, expanded);
 	const root = resolve(cwd);
+	if (pathIsSafelisted(abs)) return false;
 	return abs !== root && !abs.startsWith(`${root}/`);
 }
 
@@ -210,6 +274,8 @@ export default function createExtension(pi: ExtensionAPI): void {
 			const command = String(input.command ?? "");
 			if (bashIsDestructive(command)) {
 				gate = { reason: `Run destructive bash command:\n\n  ${command}` };
+			} else if (bashUsesGuardedWebCommand(command)) {
+				gate = { reason: `Access the web via guarded shell command:\n\n  ${command}` };
 			} else {
 				const vendored = vendoredDirForBash(command);
 				if (vendored) {
@@ -221,8 +287,8 @@ export default function createExtension(pi: ExtensionAPI): void {
 		} else if (toolName === "edit" || toolName === "write") {
 			const rawPath = String(input.path ?? input.file_path ?? "");
 			if (rawPath) {
-				const full = isAbsolute(rawPath) ? rawPath : resolve(ctx.cwd, rawPath);
-				if (!full.startsWith(resolve(ctx.cwd))) {
+				const full = isAbsolute(rawPath) ? resolve(rawPath) : resolve(ctx.cwd, rawPath);
+				if (!full.startsWith(resolve(ctx.cwd)) && !pathIsSafelisted(full)) {
 					gate = { reason: `${toolName} outside the project directory:\n\n  ${full}` };
 				}
 			}
@@ -266,9 +332,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 		if (response?.kind === "selection" && response.selections[0] === "Proceed") return undefined;
 
 		if (response?.kind === "freeform" && response.text.trim()) {
-			const context = gate.reason.replace(/\n\n\s*/g, ": ").trim();
 			const guidance = response.text.trim();
-			await rememberEntry(ctx.cwd, `${context} — ${guidance}`, "guidance");
 			return {
 				block: true,
 				reason: `Denied by user via permission gate. User guidance for next time: ${guidance}`,

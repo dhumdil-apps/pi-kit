@@ -4,6 +4,6 @@
   "defaultThinkingLevel": "medium",
   "defaultProjectTrust": "ask",
   "packages": [
-    "/ABSOLUTE/PATH/TO/pi-bundle"
+    "~/.pi/pi-bundle"
   ]
 }

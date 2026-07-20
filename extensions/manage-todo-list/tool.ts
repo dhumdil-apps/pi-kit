@@ -18,7 +18,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type, type Static } from "@sinclair/typebox";
 import type { TodoDetails } from "./types.js";
 import type { TodoStateManager } from "./state-manager.js";
-import { STATUS_ICONS } from "./ui/todo-widget.js";
+import { progressBar, STATUS_ICONS } from "./ui/todo-widget.js";
 
 // --- Schema ---
 
@@ -193,7 +193,7 @@ export function createManageTodoListTool(state: TodoStateManager, onUpdate: () =
         return new Text(theme.fg("dim", "No todos"), 0, 0);
       }
 
-      let text = theme.fg("success", "✓ ") + theme.fg("muted", `${completed}/${total} completed`);
+      let text = progressBar(completed, total, theme, total) + theme.fg("muted", ` ${completed}/${total} completed`);
 
       if (expanded) {
         for (const todo of todos) {
@@ -210,7 +210,7 @@ export function createManageTodoListTool(state: TodoStateManager, onUpdate: () =
               : todo.status === "in-progress"
                 ? theme.fg("warning", todo.title)
                 : theme.fg("muted", todo.title);
-          text += `\n  ${icon} ${theme.fg("accent", `${todo.id}.`)} ${title}`;
+          text += `\n${theme.fg("accent", "▍ ")}${icon} ${theme.fg("accent", `${todo.id}.`)} ${title}`;
         }
       }
 

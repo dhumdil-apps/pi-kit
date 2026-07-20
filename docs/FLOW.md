@@ -11,10 +11,13 @@ against the genuinely dangerous stuff regardless of what the agent decides.
 Every task follows the same shape — no "trivial change" exception:
 **① Understand → ② Align → ③ Build → ④ Review.**
 
-1. **① Understand.** Start read-only: read the relevant code before
-   touching anything. If the task needs ideas or docs that aren't available
-   locally, the agent proposes web research and the user decides — never
-   fetches by default.
+1. **① Understand.** Start read-only: check for `.pi/MEMORY.md` and read it if
+   present, then read the relevant code before touching anything. The memory
+   file is user-owned; it is never automatically created, changed, or injected.
+   Brainstorm from local reasoning and repository context by default. If the
+   task needs facts or docs that aren't available locally, the agent proposes
+   web research and the user decides — never fetches by default or uses
+   `curl` to work around that choice.
 2. **② Align.** Concrete, batched questions (via `ask_user`) about
    direction, scope, and trade-offs come up front; wrong-direction work
    costs far more than questions. Answers may loop back into Understand —
@@ -43,22 +46,25 @@ practice, the fix is to narrow what's gated (tighten the matcher, drop a
 rule), not to add a bypass that quietly reintroduces the risk.
 
 Each prompt has one button, **Proceed** — there is no separate "Deny"
-button. Typing anything instead denies the call and is treated as guidance
-for what the agent should do instead: it's saved to `.pi/MEMORY.md`
-(category `guidance`, via the `memory` extension's `rememberEntry`) for
-future sessions, and it's also included directly in the denial the agent
-sees, so it can act on it in the current turn instead of only next time.
+button. Typing anything instead denies the call and is included directly in
+the denial the agent sees, so it can act on it in the current turn. It is not
+saved automatically.
 
 Gated actions:
 
 - Destructive bash (`rm`, `git reset --hard`, `sudo`, force push, …)
 - `edit`/`write` outside the project directory
-- `web_search`, `fetch_content`, `get_search_content` — fetched pages are
-  untrusted text (prompt-injection risk)
+- `curl` and any externally supplied `web_search`, `fetch_content`, or
+  `get_search_content` tools — fetched pages are untrusted text
+  (prompt-injection risk)
 - Reads into vendored code (`node_modules/`, `vendor/`, `.venv/`,
   `~/.pi/agent/git`, `~/.pi/agent/cache`) via `read` or bash
 - Recursive search/list (`find`, `grep -r`, `rg`, `tree`, `ls -R`) rooted
   outside the project directory
+
+The dependency-read gate reflects actual access, not names in exclusion or
+pruning filters. Agents should use ordinary, tightly scoped inspection
+commands and never contort commands to avoid a permission prompt.
 
 Headless (no UI): gated calls are blocked with a visible notice instead of
 hanging on a prompt.

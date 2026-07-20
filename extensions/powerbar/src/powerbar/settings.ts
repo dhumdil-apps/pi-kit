@@ -23,7 +23,7 @@ export function registerSettings(pi: ExtensionAPI, segmentOptions: OrderedListOp
 			id: "left",
 			label: "Left segments",
 			description: "Segments shown on the left side of the powerbar",
-			defaultValue: "git-branch,tokens,context-usage",
+			defaultValue: "git-branch,tokens,context-usage,cpu,ram,disk,net",
 			options: segmentOptions,
 		},
 		{
@@ -70,7 +70,7 @@ export function registerSettings(pi: ExtensionAPI, segmentOptions: OrderedListOp
 }
 
 export function loadSettings(): PowerbarSettings {
-	const leftStr = getSetting(EXTENSION_NAME, "left", "git-branch,tokens,context-usage") ?? "";
+	const leftStr = getSetting(EXTENSION_NAME, "left", "git-branch,tokens,context-usage,cpu,ram,disk,net") ?? "";
 	const rightStr = getSetting(EXTENSION_NAME, "right", "provider,model,sub-hourly,sub-weekly") ?? "";
 	const separator = getSetting(EXTENSION_NAME, "separator", " │ ") ?? " │ ";
 	const placement = getSetting(EXTENSION_NAME, "placement", "belowEditor") ?? "belowEditor";

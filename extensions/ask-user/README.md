@@ -10,6 +10,9 @@ TUI using pi's built-in primitives.
   present plans with a single "Proceed" option, and confirm consequential
   choices. Typing a freeform answer instead of picking an option is treated as
   feedback.
+- Cancelling an active question opens a red confirmation first. Enter confirms
+  cancellation by default; Esc or **Keep answering** returns to the question
+  without losing the current selection or draft.
 
 ## Role in the bundle
 
