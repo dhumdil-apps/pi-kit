@@ -16,6 +16,9 @@ is user-owned and ignored by this bundle's Git default.
 
 Pi explores read-only and keeps the user involved without modal pressure:
 
+- Identify the owning repository and inspect status plus relevant uncommitted
+  changes before planning edits. Preserve prior work and surface conflicts with
+  earlier decisions instead of silently absorbing or overwriting them.
 - Ask related questions in conversational batches of two or three.
 - Give lettered options and keep the recommended answer at **A**.
 - Accept compact replies such as `1A 2C 3B` or normal prose.
@@ -48,6 +51,8 @@ instead of stopping for routine input and continues through completion.
 - An ordinary user message cancels it immediately, like touching the brake.
 - The status bar shows `⚡ flash` only while active.
 - It never bypasses safety confirmations or broadens the user's authority.
+- When its recommendation supersedes an earlier or uncommitted decision, it
+  reports the conflict and chosen resolution before continuing automatically.
 - Phrases such as “proceed and don't stop” do not silently activate it; Pi
   explains `/flash` and how to opt in.
 

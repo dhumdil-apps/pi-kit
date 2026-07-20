@@ -6,6 +6,7 @@
 - There is no plan mode: the working flow is guidance in `extensions/agent-workflow/` (see `docs/FLOW.md`); enforced guardrails live in `extensions/minimal-action-confirmation/`.
 - The bundle runs single-agent (no subagent tool, no child-process delegation); the agent alone owns user decisions, todos, commits, and acceptance.
 - At the start of every task, check for `.pi/MEMORY.md` in the project and read it when present before planning or changing anything. Only explicit `/retro` and `/forensic` reflection may maintain it; keep durable lessons concise and deduplicated, replace stale contradictions, and preserve manual content.
+- At the start of repository work, identify the owning repository, run `git status --short`, and inspect relevant uncommitted diffs before planning changes. Preserve prior work and explicitly resolve conflicts with earlier decisions; Flash reports its recommended resolution and continues.
 - Ask planning questions conversationally in batches of two or three with recommended answer A. Accept compact replies such as `1A 2C`; after each batch give the big-picture summary, percent, open topics, estimated remaining batches, and next topics.
 - Start implementation only after a positive approval directly answering the presented plan. Revision language remains in planning. `/flash` is the only autonomous no-question mode and never bypasses safety or expands authority.
 - Preserve headless bypasses and Minimal Action Confirmation's denylist scope (destructive commands, outside-project writes, web access, vendored-code reads).

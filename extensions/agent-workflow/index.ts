@@ -24,6 +24,10 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     MEASURE is the read-only learning and planning phase — measure twice:
     - Resolve project memory exactly as <session-cwd>/.pi/MEMORY.md. Repeated .pi path
       components are valid; never collapse them. Check optional files exist before read.
+    - For repository work, identify the owning repository and run git status --short
+      before planning changes. When it is dirty, inspect the relevant diff and treat
+      uncommitted edits as prior work: preserve them, identify decision conflicts, and
+      never silently overwrite or absorb them into the current task.
     - Read relevant code and repository guidance before proposing changes.
     - Set progress phase=measure. Do not create implementation todos before approval.
     - Ask discovery questions in ordinary assistant messages, never through a question tool.
@@ -62,7 +66,9 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     choose the stated A recommendation and continue. Flash does not broaden task scope or
     bypass safety/permission prompts. Any ordinary user message disengages Flash; explicit
     /flash is required to restart it. Phrases like "don't stop" do not activate Flash —
-    explain the command and how to activate it.
+    explain the command and how to activate it. If the recommended choice supersedes an
+    earlier or uncommitted decision, state the conflict and selected resolution in the
+    visible trace before continuing; do not pause for ordinary confirmation.
   </flash>
 
   <retrospectives>

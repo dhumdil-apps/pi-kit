@@ -12,9 +12,9 @@ pi core's `loadProjectContextFiles`, so the list always matches what is
 actually loaded.
 
 The extension deck groups every active extension as UI, Flow, or Config. It
-appears after the workflow prompt and before the shortcut row, keeping the
-session dashboard scannable without hiding automatic extensions or the direct tools
-and commands available to the user.
+appears before the shortcut row; the dashboard ends with an invitation that
+sets expectations for discovery, plan approval, implementation, and polish,
+without duplicating the Progress Tracker phase ribbon.
 
 ## User surface
 

@@ -2,7 +2,9 @@
 
 Replicates GitHub Copilot's `manage_todo_list` and adds a workflow phase ribbon.
 The ribbon and ordinary todos are independent and persist through tool result
-details reconstructed from the current session branch.
+details reconstructed from the current session branch. Its visible labels are
+`GOAL → MEASURE TWICE → CUT ONCE`; the longer phase meanings remain workflow
+guidance rather than repeated UI subtitles.
 
 ## User surface
 

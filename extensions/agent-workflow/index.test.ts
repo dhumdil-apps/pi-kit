@@ -58,5 +58,8 @@ describe("agent workflow lifecycle", () => {
 		expect(prompt.systemPrompt).toContain("repository or package manifest that owns the command");
 		expect(prompt.systemPrompt).toContain("git status --short");
 		expect(prompt.systemPrompt).toContain("Separate pre-existing changes");
+		expect(prompt.systemPrompt).toContain("before planning changes");
+		expect(prompt.systemPrompt).toContain("never silently overwrite or absorb them");
+		expect(prompt.systemPrompt).toContain("state the conflict and selected resolution");
 	});
 });

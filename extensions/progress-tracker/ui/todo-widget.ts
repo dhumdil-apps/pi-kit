@@ -25,16 +25,15 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
 }
 
 export function phaseRibbon(phase: WorkflowPhase, theme: Theme): string {
-  const stages: Array<{ id: WorkflowPhase; label: string; detail: string }> = [
-    { id: "goal", label: "GOAL", detail: "VISION" },
-    { id: "measure", label: "MEASURE", detail: "DISCOVER" },
-    { id: "cut", label: "CUT", detail: "SHAPE → POLISH" },
+  const stages: Array<{ id: WorkflowPhase; label: string }> = [
+    { id: "goal", label: "GOAL" },
+    { id: "measure", label: "MEASURE TWICE" },
+    { id: "cut", label: "CUT ONCE" },
   ];
   return stages
-    .map((stage) => {
-      const text = `${stage.label} (${stage.detail})`;
-      return stage.id === phase ? theme.fg("warning", theme.bold(text)) : theme.fg("dim", text);
-    })
+    .map((stage) =>
+      stage.id === phase ? theme.fg("warning", theme.bold(stage.label)) : theme.fg("dim", stage.label)
+    )
     .join(theme.fg("muted", "  →  "));
 }
 

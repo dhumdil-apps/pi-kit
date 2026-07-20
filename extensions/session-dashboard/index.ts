@@ -7,6 +7,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Markdown } from "@earendil-works/pi-tui";
 import { collectUsageData } from "../usage-history/data.js";
 import { renderExtensionDeck } from "./extensions.js";
+import { renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MAX_PANEL_ROW = 60;
@@ -185,28 +186,16 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			sections.push(`⌘ **Prompts** · ${bundle.prompts.map((p) => `\`${p}\``).join(" · ")}`);
 		}
 
-		const welcomeText = `
-\`\`\`
-${renderPanel(rows)}
-\`\`\`
-
-${sections.join("\n")}
-
-## ⚡ GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH)
-
-> **Describe the outcome.**
-> I’ll measure twice with you, then shape, validate, and polish the result.
->
-
-${bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : ""}
-
-⌨️ \`! <cmd>\` bash · \`/todos\` progress · \`/flash\` cruise control · \`/retro\` reflect · \`escape\` confirm cancel
-`;
+		const welcomeText = renderWelcomeText({
+			panel: renderPanel(rows),
+			sections,
+			extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
+		});
 
 		pi.sendMessage(
 			{
 				customType: "session-dashboard",
-				content: welcomeText.trim(),
+				content: welcomeText,
 				display: true,
 			},
 			{ triggerTurn: false }
