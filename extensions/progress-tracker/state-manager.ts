@@ -6,10 +6,11 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { TodoItem, TodoDetails, ValidationResult, TodoStats } from "./types.js";
+import type { TodoItem, TodoDetails, ValidationResult, TodoStats, WorkflowPhase } from "./types.js";
 
 export class TodoStateManager {
   private todos: TodoItem[] = [];
+  private phase: WorkflowPhase = "goal";
 
   /** Return the current todo list */
   read(): TodoItem[] {
@@ -24,6 +25,14 @@ export class TodoStateManager {
   /** Clear all todos */
   clear(): void {
     this.todos = [];
+  }
+
+  getPhase(): WorkflowPhase {
+    return this.phase;
+  }
+
+  setPhase(phase: WorkflowPhase): void {
+    this.phase = phase;
   }
 
   /** Get stats about the current list */
@@ -72,6 +81,9 @@ export class TodoStateManager {
       }
     }
 
+    const inProgress = todos.filter((item) => item.status === "in-progress").length;
+    if (inProgress > 1) errors.push("Only one todo may be in progress at a time");
+
     return { valid: errors.length === 0, errors };
   }
 
@@ -81,6 +93,7 @@ export class TodoStateManager {
    */
   loadFromSession(ctx: ExtensionContext): void {
     this.todos = [];
+    this.phase = "goal";
 
     for (const entry of ctx.sessionManager.getBranch()) {
       if (entry.type !== "message") continue;
@@ -91,6 +104,7 @@ export class TodoStateManager {
       if (details?.todos) {
         this.todos = details.todos.map((t) => ({ ...t }));
       }
+      if (details?.phase) this.phase = details.phase;
     }
   }
 }

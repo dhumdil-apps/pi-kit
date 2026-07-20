@@ -1,15 +1,15 @@
 # Progress Tracker
 
-Replicates GitHub Copilot's `manage_todo_list`: a single tool with read/write
-operations, a read-only progress widget, and session persistence via tool
-result details (state is reconstructed on session load/switch/fork).
+Replicates GitHub Copilot's `manage_todo_list` and adds a workflow phase ribbon.
+The ribbon and ordinary todos are independent and persist through tool result
+details reconstructed from the current session branch.
 
 ## User surface
 
-- `manage_todo_list` tool — the agent tracks plan steps here (one in progress
-  at a time, per the agent-workflow flow).
+- `manage_todo_list` tool — `read`/`write` ordinary todos, or `phase` to select
+  `goal`, `measure`, or `cut` (one todo in progress at a time).
 - `/todos` command — toggle the progress widget.
-- `/todos clear` — clear the list.
+- `/todos clear` — clear ordinary todos without hiding or resetting the phase.
 
 ## Origin
 

@@ -1,12 +1,11 @@
 /**
  * Minimal Action Confirmation — global, mode-independent guardrails.
  *
- * Prompts (askUserFancy: "Proceed" button, or type to deny) for every single
+ * Prompts through Pi's built-in dialogs for every single
  * call — no session-wide or per-kind approval, by design: an annoying gate
- * is a signal to narrow what's gated, not to make the gate leakier. Typing
- * anything instead of picking Proceed denies the call and is put directly in
- * the block reason so the current agent sees it immediately and can act on it
- * this turn. Covers:
+ * is a signal to narrow what's gated, not to make the gate leakier. Denial
+ * guidance is put directly in the block reason so the current agent can act on
+ * it in the same turn. Covers:
  * - Destructive bash commands: rm/rmdir/unlink/shred/dd/mkfs, sudo,
  *   find -delete/-exec rm|mv, xargs rm|mv, recursive chmod/chown/chgrp,
  *   and destructive git (reset --hard, clean, force push, branch -D,
@@ -36,7 +35,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
-import { askUserFancy } from "../interactive-prompt/index";
 import { getSetting } from "../extension-preferences/index.js";
 
 const EXTENSION_NAME = "permission-gate";
@@ -77,7 +75,21 @@ function pathIsSafelisted(abs: string): boolean {
 	return SAFE_PATHS.some((dir) => abs === dir || abs.startsWith(`${dir}/`));
 }
 
-const GATE_OPTIONS = ["Proceed"];
+const GATE_OPTIONS = ["Proceed", "Deny", "Deny with guidance"];
+
+export async function confirmGatedAction(
+	ctx: { ui: { select: Function; input: Function } },
+	reason: string,
+): Promise<{ approved: boolean; guidance?: string }> {
+	const selection = await ctx.ui.select(`Permission required — ${reason}`, GATE_OPTIONS) as string | undefined;
+	if (selection === "Proceed") return { approved: true };
+	if (selection !== "Deny with guidance") return { approved: false };
+	const guidance = await ctx.ui.input(
+		"Why should this action be denied? The agent will receive this guidance in the current turn.",
+		"Optional guidance...",
+	) as string | undefined;
+	return { approved: false, guidance: guidance?.trim() || undefined };
+}
 
 function splitSegments(command: string): string[] {
 	// Good-enough split on shell connectors; quoted connectors are rare in
@@ -288,7 +300,9 @@ export default function createExtension(pi: ExtensionAPI): void {
 			const rawPath = String(input.path ?? input.file_path ?? "");
 			if (rawPath) {
 				const full = isAbsolute(rawPath) ? resolve(rawPath) : resolve(ctx.cwd, rawPath);
-				if (!full.startsWith(resolve(ctx.cwd)) && !pathIsSafelisted(full)) {
+				const root = resolve(ctx.cwd);
+				const insideProject = full === root || full.startsWith(`${root}/`);
+				if (!insideProject && !pathIsSafelisted(full)) {
 					gate = { reason: `${toolName} outside the project directory:\n\n  ${full}` };
 				}
 			}
@@ -323,19 +337,13 @@ export default function createExtension(pi: ExtensionAPI): void {
 			return { block: true, reason: "Blocked by minimal action confirmation: no UI available for confirmation." };
 		}
 
-		const response = await askUserFancy(ctx, {
-			question: `Permission required — ${gate.reason}`,
-			options: GATE_OPTIONS,
-			allowFreeform: true,
-		});
+		const decision = await confirmGatedAction(ctx, gate.reason);
+		if (decision.approved) return undefined;
 
-		if (response?.kind === "selection" && response.selections[0] === "Proceed") return undefined;
-
-		if (response?.kind === "freeform" && response.text.trim()) {
-			const guidance = response.text.trim();
+		if (decision.guidance) {
 			return {
 				block: true,
-				reason: `Denied by user via minimal action confirmation. User guidance for next time: ${guidance}`,
+				reason: `Denied by user via minimal action confirmation. User guidance for next time: ${decision.guidance}`,
 			};
 		}
 

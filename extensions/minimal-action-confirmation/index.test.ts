@@ -1,11 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { askUserFancyMock } = vi.hoisted(() => ({ askUserFancyMock: vi.fn() }));
-
 vi.mock("../extension-preferences/index.js", () => ({ getSetting: () => "on" }));
-vi.mock("../interactive-prompt/index", () => ({ askUserFancy: askUserFancyMock }));
 
-import createPermissionGate, { bashUsesGuardedWebCommand, vendoredDirForBash } from "./index.js";
+import createPermissionGate, { bashUsesGuardedWebCommand, confirmGatedAction, vendoredDirForBash } from "./index.js";
+
+describe("confirmGatedAction", () => {
+	it("approves Proceed and collects optional denial guidance", async () => {
+		const approveUi = { select: vi.fn().mockResolvedValue("Proceed"), input: vi.fn() };
+		await expect(confirmGatedAction({ ui: approveUi }, "Run it")).resolves.toEqual({ approved: true });
+
+		const denyUi = {
+			select: vi.fn().mockResolvedValue("Deny with guidance"),
+			input: vi.fn().mockResolvedValue("Use the local copy"),
+		};
+		await expect(confirmGatedAction({ ui: denyUi }, "Run it")).resolves.toEqual({
+			approved: false,
+			guidance: "Use the local copy",
+		});
+	});
+});
 
 describe("bashUsesGuardedWebCommand", () => {
 	it("recognizes curl commands, wrappers, environment prefixes, and executable paths", () => {
@@ -92,15 +105,33 @@ describe("vendoredDirForBash", () => {
 			}),
 			sendMessage: vi.fn(),
 		};
-		askUserFancyMock.mockResolvedValueOnce({ kind: "selection", selections: ["Proceed"] });
 		createPermissionGate(pi as never);
+		const ui = { select: vi.fn().mockResolvedValue("Proceed"), input: vi.fn() };
 
 		await expect(
-			toolCall?.({ toolName: "bash", input: { command: "curl https://example.com" } }, { cwd: process.cwd(), hasUI: true }),
+			toolCall?.({ toolName: "bash", input: { command: "curl https://example.com" } }, { cwd: process.cwd(), hasUI: true, ui }),
 		).resolves.toBeUndefined();
-		expect(askUserFancyMock).toHaveBeenCalledWith(
-			expect.anything(),
-			expect.objectContaining({ question: expect.stringContaining("Access the web via guarded shell command") }),
+		expect(ui.select).toHaveBeenCalledWith(
+			expect.stringContaining("Access the web via guarded shell command"),
+			expect.arrayContaining(["Proceed", "Deny"]),
 		);
+	});
+
+	it("does not mistake a sibling with the project path as a prefix for the project", async () => {
+		let toolCall: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+		const pi = {
+			events: { emit: vi.fn() },
+			on: vi.fn((event: string, handler: (toolEvent: unknown, ctx: unknown) => Promise<unknown>) => {
+				if (event === "tool_call") toolCall = handler;
+			}),
+			sendMessage: vi.fn(),
+		};
+		createPermissionGate(pi as never);
+		await expect(
+			toolCall?.(
+				{ toolName: "write", input: { path: "/tmp/project-copy/file.ts" } },
+				{ cwd: "/tmp/project", hasUI: false },
+			),
+		).resolves.toMatchObject({ block: true });
 	});
 });

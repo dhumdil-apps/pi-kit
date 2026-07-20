@@ -23,6 +23,8 @@ export interface Segment {
 	bar?: number;
 	/** Hint for how many discrete blocks to use in blocks mode. Falls back to barWidth setting. */
 	barSegments?: number;
+	/** Render on the right while active even when absent from saved settings. */
+	transient?: boolean;
 }
 
 /**
@@ -182,7 +184,11 @@ export function renderBar(
 	const separatorWidth = visibleWidth(separator);
 
 	const leftSegs = renderSideSegments(settings.left, segments, settings, theme);
-	const rightSegs = renderSideSegments(settings.right, segments, settings, theme);
+	const configured = new Set([...settings.left, ...settings.right]);
+	const transient = [...segments.values()]
+		.filter((segment) => segment.transient && !configured.has(segment.id))
+		.map((segment) => segment.id);
+	const rightSegs = renderSideSegments([...settings.right, ...transient], segments, settings, theme);
 	const allSegs = [...leftSegs, ...rightSegs];
 
 	// Calculate total content width (segments + separators within each side + 1 for minimum padding)

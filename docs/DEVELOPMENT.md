@@ -15,9 +15,8 @@ npm run typecheck
 git diff --check
 ```
 
-`npm run typecheck` checks every vendored TypeScript extension. Do not add new
-errors in touched files, and do not describe the whole bundle as type-clean
-until that command exits zero.
+`npm run typecheck` checks every vendored TypeScript extension and must exit
+zero.
 
 Headless load smoke:
 
@@ -25,8 +24,8 @@ Headless load smoke:
 pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
 ```
 
-Interactive checks still matter for modal layout, spinner/Powerbar rendering,
-Welcome, supervisor attention, and approval menus.
+Interactive checks still matter for Status Bar rendering, the dashboard,
+workflow questions, Flash lifecycle, and safety dialogs.
 
 ## Change checklist
 
@@ -64,6 +63,7 @@ Treat an upstream update as a merge, not a blind overwrite:
 5. Run the component's checks plus bundle tests and load smoke.
 6. Update its snapshot in `UPSTREAM.md`.
 
-High-risk local behavior to preserve includes Ask User headless handling and
-the Permission Gate's denylist scope (destructive commands, outside-project
-writes, per-call `curl`/web access, and vendored-code reads).
+High-risk local behavior to preserve includes Flash cancellation, explicit plan
+approval, retrospective evidence bounds, and the Permission Gate's denylist
+scope (destructive commands, outside-project writes, per-call `curl`/web
+access, and vendored-code reads).

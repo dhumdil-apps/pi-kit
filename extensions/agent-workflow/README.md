@@ -1,22 +1,28 @@
 # Agent Workflow
 
-Appends a compact behavioral prompt (`<pi_style>`) to every agent turn's
-system prompt. This is guidance, not enforcement: it describes tone, the
-① Understand → ② Align → ③ Build → ④ Review working flow, and code/engineering
-rules. It directs the agent to brainstorm from local reasoning and repository
-context by default. Hard gates (destructive commands, web access, vendored-code
-reads) live in `minimal-action-confirmation`.
+Appends the **GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH)**
+working agreement to every turn. It guides conversational question batches,
+explicit plan approval, Flash mode, retrospective learning, and engineering
+practice. Safety gates remain in `minimal-action-confirmation`.
 
 ## User surface
 
-None — fully automatic, no tools or commands. The prompt text is the
-`CLAUDE_STYLE_PROMPT` constant in [index.ts](index.ts).
+- `/flash` — autonomous recommended-choice cruise control. Any ordinary user
+  message cancels it; the status bar shows `⚡ flash` while active.
+- `/retro` — compact current-session review.
+- `/forensic [raw]` — deep reconstructed review, optionally with bounded raw
+  evidence.
+- `/improvements` — list and revalidate deferred improvement records.
+
+The extension also injects bounded current-session evidence for the reflection
+commands. The agent, not the extension, maintains `.pi/MEMORY.md` and
+`.pi/improvements/` according to the workflow protocol.
 
 ## Notes
 
-- The block is fully static, so it remains near the start of the extension
-  load order for stable provider prefix-cache hits.
-- The flow it encodes is documented in [docs/FLOW.md](../../docs/FLOW.md).
+- The stable workflow block stays near the start of extension load order for
+  provider prefix-cache reuse; only Flash state is appended dynamically.
+- The full behavior is documented in [docs/FLOW.md](../../docs/FLOW.md).
 
 ## Origin
 

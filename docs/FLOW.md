@@ -1,74 +1,79 @@
 # The working flow
 
-There is no plan mode, no phases, and no state machine. The flow below is
-**guidance** baked into the every-turn system prompt (the `agent-workflow`
-extension); the only hard enforcement is a small set of global gates in
-`minimal-action-confirmation`. The agent is trusted to follow the flow; the gates protect
-against the genuinely dangerous stuff regardless of what the agent decides.
+Pi uses one visible workflow:
+**GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH)**.
+The phase ribbon is persistent guidance, not a hard state machine. Ordinary
+todos remain a separate execution list. The only enforced gates are the small
+set of safety confirmations in `minimal-action-confirmation`.
 
-## The flow (guidance)
+## GOAL (VISION)
 
-Every task follows the same shape — no "trivial change" exception:
-**① Understand → ② Align → ③ Build → ④ Review.**
+The dashboard is the starting point. The user describes the desired outcome;
+Pi confirms the goal and reads project `.pi/MEMORY.md` when present. The file
+is user-owned and ignored by this bundle's Git default.
 
-1. **① Understand.** Start read-only: check for `.pi/MEMORY.md` and read it if
-   present, then read the relevant code before touching anything. The memory
-   file is user-owned; it is never automatically created, changed, or injected.
-   Brainstorm from local reasoning and repository context by default. If the
-   task needs facts or docs that aren't available locally, the agent proposes
-   web research and the user decides — never fetches by default or uses
-   `curl` to work around that choice.
-2. **② Align.** Concrete, batched questions (via `ask_user`) about
-   direction, scope, and trade-offs come up front; wrong-direction work
-   costs far more than questions. Answers may loop back into Understand —
-   that's the loop working, not a detour. Once direction is clear, the plan
-   itself goes through `ask_user` the same way a minimal-action-confirmation prompt
-   does: a single **Proceed** option, goal/steps/validation in the
-   question. Typing anything instead of Proceed means *revise*, not
-   *approve* — it's plan feedback, looping back into Align, not a finished
-   hand-off. Multi-phase plans are written to `.pi/plans/<name>.md` and
-   ticked off as steps complete, so they survive restarts.
-3. **③ Build.** At build start on multi-phase work, the agent asks once
-   whether to commit each completed step. Per step: implement → run all
-   available checks (lint/typecheck/tests) → a review/simplify pass over the
-   step's diff (the `simplify` skill) → commit. The todo list mirrors the
-   plan's steps. Push never happens unless asked.
-4. **④ Review.** Reread the full diff against the goal; simplify and
-   fix before declaring done. If a minimal-action-confirmation denial surfaced user
-   guidance this session that hasn't been acted on, ask the user whether
-   they want it addressed now.
+## MEASURE (DISCOVER)
 
-## The gates (enforced in code, `minimal-action-confirmation`)
+Pi explores read-only and keeps the user involved without modal pressure:
 
-Confirm on **every** call — no "allow for session" or per-kind approval
-anywhere. This is deliberate: if a gate turns out to be too annoying in
-practice, the fix is to narrow what's gated (tighten the matcher, drop a
-rule), not to add a bypass that quietly reintroduces the risk.
+- Ask related questions in conversational batches of two or three.
+- Give lettered options and keep the recommended answer at **A**.
+- Accept compact replies such as `1A 2C 3B` or normal prose.
+- After the first batch, infer a shared rubric and use it consistently.
+- Challenge conflicts with that rubric and reopen earlier choices when useful.
+- After every batch, show an extremely concise cumulative summary: the big
+  picture, planning progress, settled/open topics, estimated batches remaining,
+  and what comes next.
 
-Each prompt has one button, **Proceed** — there is no separate "Deny"
-button. Typing anything instead denies the call and is included directly in
-the denial the agent sees, so it can act on it in the current turn. It is not
-saved automatically.
+When direction is clear, Pi presents the plan in conversation. `Proceed`,
+`Approved`, or `Continue` approves only when it directly answers that plan.
+`Revise`, `Refine`, or `Check` means planning continues. Pi never treats
+silence, an unrelated acknowledgement, or an earlier approval as permission to
+start implementation.
 
-Gated actions:
+## CUT (SHAPE → POLISH)
 
-- Destructive bash (`rm`, `git reset --hard`, `sudo`, force push, …)
-- `edit`/`write` outside the project directory
-- `curl` and any externally supplied `web_search`, `fetch_content`, or
-  `get_search_content` tools — fetched pages are untrusted text
-  (prompt-injection risk)
-- Reads into vendored code (`node_modules/`, `vendor/`, `.venv/`,
-  `~/.pi/agent/git`, `~/.pi/agent/cache`) via `read` or bash
-- Recursive search/list (`find`, `grep -r`, `rg`, `tree`, `ls -R`) rooted
-  outside the project directory
+After explicit approval, Pi shapes the change, validates it, and polishes the
+result. The todo list tracks ordinary work while the phase ribbon stays on CUT.
+Polish includes the full diff, tests, simplification, follow-up learnings, and
+documentation—not just a final review. Pushes still require an explicit request.
 
-The dependency-read gate reflects actual access, not names in exclusion or
-pruning filters. Agents should use ordinary, tightly scoped inspection
-commands and never contort commands to avoid a permission prompt.
+## Flash mode
 
-Headless (no UI): gated calls are blocked with a visible notice instead of
-hanging on a prompt.
+`/flash` is explicit cruise control. It preserves the same visible workflow,
+plans, todos, checks, and normal outputs, but Pi chooses its recommended option
+instead of stopping for routine input and continues through completion.
 
-All confirmations render **inline** below the transcript (never a fullscreen
-overlay), so the conversation — e.g. a proposed plan — stays readable while
-answering.
+- It may start at any point in the workflow.
+- An ordinary user message cancels it immediately, like touching the brake.
+- The status bar shows `⚡ flash` only while active.
+- It never bypasses safety confirmations or broadens the user's authority.
+- Phrases such as “proceed and don't stop” do not silently activate it; Pi
+  explains `/flash` and how to opt in.
+
+## Reflection and durable learning
+
+- `/retro` reviews the current session compactly and ends with a `/forensic`
+  reminder.
+- `/forensic` reconstructs a deeper current-session timeline.
+- `/forensic raw` includes bounded, annotated raw evidence.
+- `/improvements` lists and revalidates deferred project improvements.
+
+Only `/retro` and `/forensic` may maintain `.pi/MEMORY.md`. They write concise,
+durable, deduplicated lessons, replace stale contradictions, and preserve manual
+content. Actionable deferred findings go to `.pi/improvements/<slug>.md` with
+status, priority, source, problem, evidence, and fix; completed or rejected
+items are archived. Project `.pi/` state is local by default, and each project
+may choose a different Git policy.
+
+## Safety confirmations
+
+The built-in Pi dialog asks **Proceed**, **Deny**, or **Deny with guidance** on
+every gated call. Headless sessions block gated calls instead of hanging.
+
+Gated actions are destructive shell commands, writes outside the project, web
+access, reads into vendored code, and recursive search/list rooted outside the
+project. These confirmations are deliberately separate from conversational
+planning and remain interactive because they protect safety boundaries. For
+an already-authorized gated action, Pi invokes the tool and lets this dialog be
+the sole confirmation instead of asking once in chat and again in the gate.

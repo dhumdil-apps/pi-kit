@@ -9,21 +9,19 @@ extension.
 | Extension | Purpose | User surface | Default decision |
 | --- | --- | --- | --- |
 | Extension Preferences | One global UI for registered extension settings | `/extension-settings` | Keep; settings are global and string-backed |
-| Interactive Prompt | Structured single/multi-select and freeform prompt, rendered inline | `ask_user` tool | Default UI for owned questions and confirmations |
 | Interrupt Confirmation | Confirms interrupt keys before stopping a running agent | Red confirmation overlay | Always on in interactive TUI sessions |
 | Status Bar | Footer/status composition | configured through `/extension-settings` | On |
 | Usage Monitor | Live provider quota data for Status Bar | Status Bar segments | On |
 | Usage History | Historical token/cost reporting | `/usage` | On |
-| Progress Tracker | Session execution progress | `manage_todo_list`, `/todos` | On |
+| Progress Tracker | Workflow phase ribbon plus ordinary todo progress | `manage_todo_list`, `/todos` | On |
 | Session Dashboard | Startup map and flow summary | Interactive startup message | Interactive parent sessions only |
-| Agent Workflow | The working flow + behavior guidance, appended to every turn's system prompt | Automatic | On; see [FLOW.md](FLOW.md) |
-| Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, and vendored-code reads | Interactive Prompt inline prompt | On; deliberately not a general approval gate |
+| Agent Workflow | Conversational workflow, Flash mode, and session learning | `/flash`, `/retro`, `/forensic`, `/improvements` | On; see [FLOW.md](FLOW.md) |
+| Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, and vendored-code reads | Built-in Pi dialog | On; deliberately not a general approval gate |
 
 ## Supporting resources
 
 | Resource | Location | Purpose |
 | --- | --- | --- |
-| Ask User skill | `skills/ask-user/` | Decision handshake for ambiguity and consequential choices |
 | Simplify skill | `skills/simplify/` | Pre-commit review/simplify pass over a step's diff |
 | Init prompt | `prompts/init.md` | Analyze a project and propose an `AGENTS.md` |
 | Bundle theme | `themes/dark.json` | Portable bundled dark theme |
@@ -68,6 +66,8 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
   gates, and `/plan` commands were replaced by the guidance flow in
   [FLOW.md](FLOW.md) plus the global Permission Gate rules — guidance over
   rules, gates only where content is genuinely dangerous.
+- `interactive-prompt` and `skills/ask-user`: removed (2026-07-20).
+  Planning is conversational; only safety confirmations use Pi's built-in dialog.
 - old Git package clones under `~/.pi/agent/git/...`: removed; Pi loads this
   local working copy directly.
 

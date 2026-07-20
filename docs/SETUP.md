@@ -56,8 +56,8 @@ Machine-local runtime data that Pi recreates or that shouldn't travel:
   `pi-simplify`, `pi-add-dir`, `pi-web-access`) are removed or superseded by
   this bundle; do not reinstall them on a new machine (they can be removed
   from old machines too).
-- Per-project `.pi/` dirs (optional user-owned memory files and plans) — they
-  belong to their projects.
+- Per-project `.pi/` dirs (memory, plans, and deferred improvements) — they
+  belong to their projects and are ignored by default.
 
 ## 6. Verify
 
@@ -65,5 +65,6 @@ Start `pi` in any project:
 
 - Session Dashboard and Status Bar appear, `github-dark` theme is active.
 - `/usage` opens the usage history.
+- `/flash`, `/retro`, `/forensic`, and `/improvements` are available.
 - A destructive command (e.g. asking it to `rm` something) triggers the
   permission gate.

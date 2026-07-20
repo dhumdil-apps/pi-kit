@@ -15,6 +15,9 @@ emit one segment:
 | `src/powerbar-sub/` | `sub-hourly`, `sub-weekly` (from `pi-usage` events) |
 | `src/powerbar-os/` | `cpu`, `ram`, `disk`/SSD, `net` |
 
+The Agent Workflow extension registers a transient `flash` segment. It renders
+`⚡ flash` only while Flash mode is active and does not need a configured slot.
+
 All Status Bar progress bars use the theme accent normally, changing to warning
 and error at their configured usage thresholds. CPU, RAM, and SSD usage render
 as one high-contrast, partial-height bar per metric and show a `0%` placeholder

@@ -42,7 +42,7 @@ interface BundleResources {
 	prompts: string[];
 }
 
-/** Name an extension entry like "./extensions/interactive-prompt/index.ts" → "interactive-prompt". */
+/** Name an extension entry like "./extensions/agent-workflow/index.ts" → "agent-workflow". */
 function extensionName(entry: string): string {
 	const parts = entry.split("/").filter((p) => p && p !== ".");
 	const idx = parts.indexOf("extensions");
@@ -192,15 +192,15 @@ ${renderPanel(rows)}
 
 ${sections.join("\n")}
 
-## 🧭 GOAL → EXPLORE → ALIGN → BUILD → REVIEW
+## ⚡ GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH)
 
 > **Describe the outcome.**
-> I’ll read first, ask before deciding, validate the work, then simplify the result.
+> I’ll measure twice with you, then shape, validate, and polish the result.
 >
 
 ${bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : ""}
 
-⌨️ \`! <cmd>\` bash · \`/todos\` progress · \`/extension-settings\` settings · \`escape\` confirm cancel
+⌨️ \`! <cmd>\` bash · \`/todos\` progress · \`/flash\` cruise control · \`/retro\` reflect · \`escape\` confirm cancel
 `;
 
 		pi.sendMessage(

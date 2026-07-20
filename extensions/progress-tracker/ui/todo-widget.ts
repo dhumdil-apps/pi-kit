@@ -7,6 +7,7 @@
 
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TodoStateManager } from "../state-manager.js";
+import type { WorkflowPhase } from "../types.js";
 
 const WIDGET_ID = "todo-list";
 
@@ -23,6 +24,20 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
   return theme.fg("success", "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(width - filled));
 }
 
+export function phaseRibbon(phase: WorkflowPhase, theme: Theme): string {
+  const stages: Array<{ id: WorkflowPhase; label: string; detail: string }> = [
+    { id: "goal", label: "GOAL", detail: "VISION" },
+    { id: "measure", label: "MEASURE", detail: "DISCOVER" },
+    { id: "cut", label: "CUT", detail: "SHAPE → POLISH" },
+  ];
+  return stages
+    .map((stage) => {
+      const text = `${stage.label} (${stage.detail})`;
+      return stage.id === phase ? theme.fg("warning", theme.bold(text)) : theme.fg("dim", text);
+    })
+    .join(theme.fg("muted", "  →  "));
+}
+
 /**
  * Update (or clear) the todo widget.
  * Call this after every state change.
@@ -30,17 +45,22 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
 export function updateWidget(state: TodoStateManager, ctx: ExtensionContext): void {
   const todos = state.read();
 
-  if (todos.length === 0) {
-    ctx.ui.setWidget(WIDGET_ID, undefined);
-    return;
-  }
-
   const stats = state.getStats();
 
   ctx.ui.setWidget(WIDGET_ID, (_tui, theme) => {
     const lines: string[] = [];
 
     const gutter = theme.fg("accent", "▍ ");
+    lines.push(gutter + phaseRibbon(state.getPhase(), theme));
+
+    if (todos.length === 0) {
+      return {
+        render: () => lines,
+        invalidate: () => {},
+      };
+    }
+
+    lines.push(gutter);
     const header =
       gutter +
       theme.fg("accent", theme.bold("Todo List")) +

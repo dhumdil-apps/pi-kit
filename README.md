@@ -19,27 +19,24 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 
 ## Features
 
-- **agent-workflow** — the working flow ("measure twice, cut once") baked into
-  every turn's system prompt as guidance, no "trivial change" shortcut:
-  ① Understand (explore read-only) → ② Align (ask early and often, then get
-  a plan go-ahead through the same Proceed/type-to-revise `ask_user` shape
-  as a minimal-action-confirmation prompt; multi-phase plans persisted to
-  `.pi/plans/<name>.md`) → ③ Build (steps with checks + a simplify pass
-  before each commit) → ④ Review (full diff at the end). See
+- **agent-workflow** — the visible **GOAL (VISION) → MEASURE (DISCOVER) →
+  CUT (SHAPE → POLISH)** flow, conversational question batches and plan
+  approval, `/flash` cruise control, and `/retro`, `/forensic`, and
+  `/improvements` learning commands. See
   [docs/FLOW.md](docs/FLOW.md).
 - **minimal-action-confirmation** — the enforced guardrails: destructive commands, writes
   outside the project, web access (`curl` plus any externally supplied web
   tools), reads into vendored code (`node_modules`, `vendor`,
   `.venv`), and recursive search/list (`find`, `grep -r`, `rg`, `tree`,
-  `ls -R`) rooted outside the project. Every gate confirms on every call —
-  no session or per-kind approval. Each prompt is a single "Proceed" button;
-  typing anything else denies the call and supplies guidance to the agent in
-  the current turn.
+  `ls -R`) rooted outside the project. Every gate confirms on every call through
+  Pi's built-in Proceed/Deny/Deny-with-guidance dialog—no session or per-kind
+  approval.
 - **project memory** — optional, user-owned `.pi/MEMORY.md`. The workflow reads
-  it at task start when present; it is never injected, created, or updated automatically.
+  it at task start; only explicit `/retro` and `/forensic` reflection may
+  maintain concise, durable, deduplicated lessons.
 - **progress-tracker**, **status-bar** (+ live quota via
-  **usage-monitor**), **usage-history** (`/usage` history), **interactive-prompt**
-  inline prompt + `ask-user` skill, **simplify** skill, **session-dashboard** banner, bundled `dark` and
+  **usage-monitor**), **usage-history** (`/usage` history), **simplify** skill,
+  **session-dashboard** banner, bundled `dark` and
   `github-dark` themes, and `/init` prompt. Config templates for a new machine
   live in [`setup/`](setup/).
 
@@ -73,5 +70,4 @@ npm test
 npm run typecheck
 ```
 
-`npm run typecheck` checks every vendored extension. Do not add new errors in
-touched files when working through any remaining upstream compatibility drift.
+`npm run typecheck` checks every vendored extension and is expected to pass.

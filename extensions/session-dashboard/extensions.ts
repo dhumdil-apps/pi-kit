@@ -29,12 +29,12 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
 		name: "usage-monitor",
 		group: "ui",
-		description: "refreshes live provider quota data for Powerbar (automatic)",
+		description: "refreshes live provider quota data for Status Bar (automatic)",
 	},
 	{
 		name: "progress-tracker",
 		group: "flow",
-		description: "plan-step progress widget; `manage_todo_list`, `/todos`",
+		description: "workflow phase ribbon and ordinary todos; `manage_todo_list`, `/todos`",
 	},
 	{
 		name: "minimal-action-confirmation",
@@ -47,14 +47,9 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 		description: "red confirmation before an interrupt stops a running agent (automatic)",
 	},
 	{
-		name: "interactive-prompt",
-		group: "flow",
-		description: "inline choice and confirmation prompts; `ask_user`",
-	},
-	{
 		name: "agent-workflow",
 		group: "flow",
-		description: "guides each turn through Explore → Align → Build → Review (automatic)",
+		description: "guides GOAL → MEASURE → CUT, Flash, and reflection (automatic)",
 	},
 	{
 		name: "extension-preferences",

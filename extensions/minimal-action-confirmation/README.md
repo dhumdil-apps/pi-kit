@@ -1,13 +1,12 @@
 # Minimal Action Confirmation
 
-Global, mode-independent guardrails. Prompts (via `ask_user`: "Proceed"
-button, or type to deny) for every gated call — deliberately no session-wide
+Global, mode-independent guardrails. Pi's built-in dialogs offer Proceed,
+Deny, or Deny with guidance for every gated call — deliberately no session-wide
 or per-kind approval: an annoying gate is a signal to narrow what's gated, not
 to make the gate leakier.
 
-Typing anything instead of picking Proceed denies the call and is placed in
-the block reason so the agent can act on it immediately. It is not persisted
-automatically.
+Optional denial guidance is placed in the block reason so the agent can act on
+it immediately. It is not persisted automatically.
 
 ## What is gated
 
@@ -45,7 +44,7 @@ commands past the matcher.
 
 ## User surface
 
-Inline interactive-prompt prompts only; toggle via `/extension-settings` →
+Built-in Pi confirmation dialogs; toggle via `/extension-settings` →
 Minimal Action Confirmation (stored as `permission-gate`) → `enabled`.
 
 ## Origin

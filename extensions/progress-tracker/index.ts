@@ -12,7 +12,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { TodoStateManager } from "./state-manager.js";
 import { createManageTodoListTool } from "./tool.js";
-import { updateWidget, clearWidget } from "./ui/todo-widget.js";
+import { updateWidget } from "./ui/todo-widget.js";
 
 export default function (pi: ExtensionAPI) {
   const state = new TodoStateManager();
@@ -35,8 +35,6 @@ export default function (pi: ExtensionAPI) {
   };
 
   pi.on("session_start", async (_event, ctx) => reconstructState(ctx));
-  pi.on("session_switch", async (_event, ctx) => reconstructState(ctx));
-  pi.on("session_fork", async (_event, ctx) => reconstructState(ctx));
   pi.on("session_tree", async (_event, ctx) => reconstructState(ctx));
 
   // Keep ctx reference fresh on every turn
@@ -64,7 +62,7 @@ export default function (pi: ExtensionAPI) {
 
       if (args?.trim().toLowerCase() === "clear") {
         state.clear();
-        clearWidget(ctx);
+        updateWidget(state, ctx);
         ctx.ui.notify("Todo list cleared.", "info");
         return;
       }

@@ -19,6 +19,7 @@ interface PowerbarUpdatePayload {
 	color?: string;
 	bar?: number;
 	barSegments?: number;
+	transient?: boolean;
 }
 
 interface SegmentRegistration {
@@ -33,7 +34,8 @@ function segmentEquals(left: Segment | undefined, right: Segment): boolean {
 		left.icon === right.icon &&
 		left.color === right.color &&
 		left.bar === right.bar &&
-		left.barSegments === right.barSegments
+		left.barSegments === right.barSegments &&
+		left.transient === right.transient
 	);
 }
 
@@ -91,6 +93,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 				color: payload.color,
 				bar: payload.bar,
 				barSegments: payload.barSegments,
+				transient: payload.transient,
 			};
 			if (segmentEquals(segments.get(payload.id), nextSegment)) return;
 			segments.set(payload.id, nextSegment);

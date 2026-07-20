@@ -6,6 +6,9 @@
 /** Status of a single todo item */
 export type TodoStatus = "not-started" | "in-progress" | "completed";
 
+/** High-level workflow phase shown independently from implementation todos. */
+export type WorkflowPhase = "goal" | "measure" | "cut";
+
 /** A single todo item — matches manage_todo_list schema exactly */
 export interface TodoItem {
   /** Sequential identifier starting from 1 */
@@ -20,8 +23,9 @@ export interface TodoItem {
 
 /** Stored in tool result details for session persistence */
 export interface TodoDetails {
-  operation: "read" | "write";
+  operation: "read" | "write" | "phase";
   todos: TodoItem[];
+  phase: WorkflowPhase;
   error?: string;
 }
 

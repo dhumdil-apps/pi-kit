@@ -8,7 +8,6 @@ included here from that declaration.
 | Component | Upstream | Snapshot |
 | --- | --- | --- |
 | Extension Settings | `@juanibiapina/pi-extension-settings` | npm `0.8.0` |
-| Ask User extension and skill | `pi-ask-user` | npm `0.13.0` |
 | Powerbar | `@juanibiapina/pi-powerbar` | npm `0.12.0` |
 | Pi Usage (Powerbar dependency) | `@juanibiapina/pi-usage` | npm `0.1.0` |
 | Usage Extension | `@tmustier/pi-usage-extension` | npm `0.9.1` |
@@ -39,9 +38,15 @@ Removed from the bundle (2026-07-20): `pi-web-access` (Nico Bailon, npm
 context by default; deliberate `curl` use is guarded by Permission Gate. Its
 archived license notice remains in `LICENSES/pi-web-access-MIT.txt`.
 
+Removed from the bundle (2026-07-20): `pi-ask-user` (npm `0.13.0`, MIT).
+Discovery and plan approval now use ordinary conversational turns; safety
+confirmation uses Pi's built-in dialogs. Its archived license notice remains
+in `LICENSES/pi-ask-user-MIT.txt`.
+
 ## Local compatibility changes
 
 - Powerbar imports the vendored Extension Settings module by relative path.
 - Manage Todo List imports the current `@earendil-works/pi-*` package scope in place of its legacy `@mariozechner/pi-*` scope.
-- Headless and RPC compatibility safeguards keep Welcome and Ask User from hijacking or blocking non-interactive and child processes.
-- `permission-gate` is scoped to destructive commands only (denylist), with an on/off toggle in extension-settings.
+- Headless safeguards keep Session Dashboard and safety confirmation from hijacking or blocking non-interactive processes.
+- Minimal Action Confirmation is denylist-scoped, uses Pi's built-in dialogs,
+  and retains its on/off toggle in Extension Settings.

@@ -12,13 +12,16 @@ mode and no `/plan` command — the working flow is guidance, described in
 | `/todos` | Show the todo widget/state |
 | `/extension-settings` | Edit registered global extension settings |
 | `/usage` | Show historical token/cost usage |
+| `/flash` | Activate autonomous recommended-choice cruise control until completion or the next ordinary user message |
+| `/retro` | Compact review and learning pass over the current session |
+| `/forensic [raw]` | Deep reconstructed session review; `raw` includes bounded annotated evidence |
+| `/improvements` | List and revalidate deferred project improvements |
 
 ## User-facing tools
 
 | Tool | Owner | Purpose |
 | --- | --- | --- |
-| `ask_user` | Ask User | Structured question, choice, refinement, or confirmation (inline) |
-| `manage_todo_list` | Todo List | Read/write todo progress |
+| `manage_todo_list` | Progress Tracker | Read/write ordinary todos or set the workflow phase |
 
 ## Shell and keyboard reminders
 
@@ -26,8 +29,8 @@ mode and no `/plan` command — the working flow is guidance, described in
 - `Esc` cancels the current tool/UI action. While the agent is running, interrupt
   keys first open a red confirmation overlay: Enter confirms cancellation, while
   Esc or **Keep running** dismisses the overlay without stopping the agent.
-- Cancelling an `ask_user` prompt uses the same pattern: Enter confirms; Esc or
-  **Keep answering** returns to the question without discarding the current input.
+- Planning questions appear in the conversation and accept compact answers such
+  as `1A 2C 3B`; safety confirmations continue to use Pi's built-in dialog.
 - `Ctrl+C` clears/cancels; `Ctrl+D` exits from an empty prompt.
 - Permission Gate confirmation applies to agent tool calls, not arbitrary shell
   commands you intentionally execute yourself.

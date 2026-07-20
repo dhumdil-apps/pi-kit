@@ -29,7 +29,6 @@
   "pi": {
     "extensions": [
       "./extensions/extension-preferences/index.ts",
-      "./extensions/interactive-prompt/index.ts",
       "./extensions/interrupt-confirmation/index.ts",
       "./extensions/agent-workflow/index.ts",
       "./extensions/status-bar/src",
