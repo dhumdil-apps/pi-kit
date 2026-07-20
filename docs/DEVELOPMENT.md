@@ -11,19 +11,14 @@ session.
 
 ```bash
 npm test
-npm run typecheck:plan
+npm run typecheck
 git diff --check
 ```
 
-Run one Plan Mode test file:
-
-```bash
-npx vitest run extensions/plan-mode/state.test.ts
-```
-
 `npm run typecheck` checks every vendored TypeScript extension. At the time this
-guide was written it still reports upstream API/type drift outside Plan Mode;
-do not describe the whole bundle as type-clean until that command exits zero.
+guide was written it still reports upstream API/type drift in `pi-web-access`
+and `manage-todo-list`; do not add new errors in touched files, and do not
+describe the whole bundle as type-clean until that command exits zero.
 
 Headless load smoke:
 
@@ -52,7 +47,7 @@ Welcome, supervisor attention, and approval menus.
 
 - Root `README.md`: landing page and fastest start.
 - `docs/EXTENSIONS.md`: what is loaded and why.
-- `docs/PLAN_MODE.md`: Plan Mode contract and invariants.
+- `docs/FLOW.md`: the working flow (guidance) and the enforced gates.
 - `docs/COMMANDS.md`: user-facing reference.
 - `docs/LOCAL_SETUP.md`: reproducible local configuration, without secrets.
 - `docs/TROUBLESHOOTING.md`: symptoms and recovery.
@@ -70,6 +65,7 @@ Treat an upstream update as a merge, not a blind overwrite:
 5. Run the component's checks plus bundle tests and load smoke.
 6. Update its snapshot in `UPSTREAM.md`.
 
-High-risk local behavior to preserve includes Ask User headless handling,
-destructive-only Permission Gate, Plan Mode parent ownership, exact ledger dirty
-exception, child-process auto-plan suppression, and scoped automatic commits.
+High-risk local behavior to preserve includes Ask User headless handling and
+the Permission Gate's denylist scope (destructive commands, outside-project
+writes, once-per-session web search, per-call web fetch, per-package
+vendored-code reads).

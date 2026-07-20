@@ -8,7 +8,7 @@ that loads it.
 | Need | Document |
 | --- | --- |
 | Understand what is installed | [Extension and resource catalog](EXTENSIONS.md) |
-| Understand the default workflow | [Orchestrated Plan Mode](PLAN_MODE.md) |
+| Understand the default workflow | [The working flow](FLOW.md) |
 | Find a command quickly | [Commands and tools](COMMANDS.md) |
 | Recreate or inspect this Mac's setup | [Local setup](LOCAL_SETUP.md) |
 | Change, test, or update the bundle | [Development and maintenance](DEVELOPMENT.md) |

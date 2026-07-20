@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "Vendored Pi extensions and skills maintained by dhumdil-apps.",
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "license": "MIT",
   "scripts": {
-    "test": "vitest run extensions/plan-mode",
-    "typecheck:plan": "tsc --noEmit --target ES2023 --module ESNext --moduleResolution Bundler --allowImportingTsExtensions --skipLibCheck --strict --types node extensions/plan-mode/index.ts",
+    "test": "vitest run extensions --passWithNoTests",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
@@ -36,14 +37,13 @@
     "extensions": [
       "./extensions/extension-settings/index.ts",
       "./extensions/ask-user/index.ts",
+      "./extensions/claude-style/index.ts",
       "./extensions/memory/index.ts",
       "./extensions/powerbar/src",
       "./extensions/pi-usage/index.ts",
       "./extensions/usage-extension/index.ts",
       "./extensions/manage-todo-list/index.ts",
-      "./extensions/plan-mode/index.ts",
       "./extensions/welcome/index.ts",
-      "./extensions/claude-style/index.ts",
       "./extensions/permission-gate/index.ts",
       "./extensions/pi-web-access/index.ts"
     ],
@@ -51,7 +51,11 @@
       "./skills",
       "./extensions/pi-web-access/skills"
     ],
-    "prompts": ["./prompts"],
-    "themes": ["./themes"]
+    "prompts": [
+      "./prompts"
+    ],
+    "themes": [
+      "./themes"
+    ]
   }
 }

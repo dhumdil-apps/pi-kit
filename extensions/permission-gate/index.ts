@@ -1,12 +1,28 @@
 /**
- * Permission Gate — destructive commands only.
+ * Permission Gate — global, mode-independent guardrails.
  *
- * Prompts (askUserFancy: Allow once / Allow for session / Deny) ONLY for:
+ * Prompts (askUserFancy: "Proceed" button, or type to deny) for every single
+ * call — no session-wide or per-kind approval, by design: an annoying gate
+ * is a signal to narrow what's gated, not to make the gate leakier. Typing
+ * anything instead of picking Proceed denies the call AND is treated as
+ * guidance for what the agent should do instead: it's saved to
+ * `.pi/MEMORY.md` (via memory's `rememberEntry`, category "guidance") for
+ * future sessions, and it's also put directly in the block reason so the
+ * current agent sees it immediately and can act on it this turn. Covers:
  * - Destructive bash commands: rm/rmdir/unlink/shred/dd/mkfs, sudo,
  *   find -delete/-exec rm|mv, xargs rm|mv, recursive chmod/chown/chgrp,
  *   and destructive git (reset --hard, clean, force push, branch -D,
  *   stash drop/clear).
  * - edit/write targeting paths OUTSIDE the project cwd.
+ * - Web access: web_search, fetch_content, get_search_content (fetched
+ *   pages are untrusted text — prompt-injection risk).
+ * - Vendored/dependency code reads (read tool or bash referencing
+ *   node_modules/, vendor/, .venv/, ~/.pi/agent/git|cache): untrusted
+ *   third-party text.
+ * - Recursive search/list commands (find, grep -r, rg, tree, ls -R) whose
+ *   target path reaches outside the project directory — avoids runaway
+ *   scans of the home directory / filesystem when an agent goes looking
+ *   for context files with too broad a root.
  *
  * Everything else runs without prompting. Deliberately NOT gated: redirects
  * and tee (can't cheaply tell truncate vs create), mv/cp (recoverable),
@@ -18,9 +34,11 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { homedir } from "os";
 import { isAbsolute, resolve } from "path";
 import { askUserFancy } from "../ask-user/index";
 import { getSetting } from "../extension-settings/index.js";
+import { rememberEntry } from "../memory/index";
 
 const EXTENSION_NAME = "permission-gate";
 
@@ -37,6 +55,14 @@ const DESTRUCTIVE_GIT = [
 	/^git\s+branch\s+(-D\b|--delete\s+--force\b)/,
 	/^git\s+stash\s+(drop|clear)\b/,
 ];
+
+const WEB_FETCH_TOOLS = new Set(["fetch_content", "get_search_content"]);
+
+const VENDORED_DIRS = ["node_modules", "vendor", ".venv"];
+
+const SEARCH_COMMANDS = new Set(["find", "grep", "rg", "tree", "ls"]);
+
+const GATE_OPTIONS = ["Proceed"];
 
 function splitSegments(command: string): string[] {
 	// Good-enough split on shell connectors; quoted connectors are rare in
@@ -69,19 +95,102 @@ function bashIsDestructive(command: string): boolean {
 	return splitSegments(command).some(segmentIsDestructive);
 }
 
-function sessionKey(toolName: string, input: Record<string, unknown>): string {
-	if (toolName === "bash") {
-		const command = String(input.command ?? "");
-		// Key on the first two tokens ("rm -rf", "git clean") so one session
-		// approval covers repeats of the same kind of command.
-		return `bash:${command.split(/\s+/).slice(0, 2).join(" ")}`;
+/**
+ * If the path (or command text) reaches into a vendored dir, return a label
+ * for it: the package for node_modules ("node_modules/@scope/pkg"),
+ * otherwise the vendored dir itself. Undefined when no vendored dir is touched.
+ */
+function vendoredDirForPath(path: string): string | undefined {
+	const agentDirs = [resolve(homedir(), ".pi/agent/git"), resolve(homedir(), ".pi/agent/cache")];
+	const abs = isAbsolute(path) ? resolve(path) : undefined;
+	if (abs) {
+		for (const dir of agentDirs) {
+			if (abs === dir || abs.startsWith(`${dir}/`)) return dir;
+		}
 	}
-	return `tool:${toolName}`;
+	const segments = path.split("/");
+	for (let i = 0; i < segments.length; i++) {
+		if (!VENDORED_DIRS.includes(segments[i])) continue;
+		if (segments[i] !== "node_modules") return segments[i];
+		const first = segments[i + 1];
+		if (!first) return "node_modules";
+		const pkg = first.startsWith("@") && segments[i + 2] ? `${first}/${segments[i + 2]}` : first;
+		return `node_modules/${pkg}`;
+	}
+	return undefined;
+}
+
+function vendoredDirForBash(command: string): string | undefined {
+	// Scan word-ish tokens for anything path-like that touches a vendored dir.
+	for (const token of command.split(/\s+/)) {
+		const cleaned = token.replace(/^['"]|['"]$/g, "");
+		if (!/node_modules|vendor\/|\.venv|\.pi\/agent\/(git|cache)/.test(cleaned)) continue;
+		const key = vendoredDirForPath(cleaned);
+		if (key) return key;
+	}
+	return undefined;
+}
+
+function expandTilde(path: string): string {
+	if (path === "~") return homedir();
+	if (path.startsWith("~/")) return resolve(homedir(), path.slice(2));
+	return path;
+}
+
+/** True if a resolved path arg reaches outside cwd. Unresolvable ($VAR) tokens are skipped. */
+function pathEscapesProject(rawPath: string, cwd: string): boolean {
+	const cleaned = rawPath.replace(/^['"]|['"]$/g, "");
+	if (!cleaned || cleaned.startsWith("$")) return false;
+	const expanded = expandTilde(cleaned);
+	const abs = isAbsolute(expanded) ? resolve(expanded) : resolve(cwd, expanded);
+	const root = resolve(cwd);
+	return abs !== root && !abs.startsWith(`${root}/`);
+}
+
+const RECURSIVE_FLAG = /^-\w*[rR]\w*$|^--recursive$/;
+
+/** Path-like args for a search command, per its grammar. Empty when the command isn't recursive/isn't gated. */
+function searchPathArgsForCommand(cmd: string, args: string[]): string[] {
+	const nonFlag = args.filter((a) => !a.startsWith("-"));
+	if (cmd === "find" || cmd === "tree") {
+		// find/tree: leading (or all, for tree) non-flag tokens are paths.
+		return nonFlag;
+	}
+	if (cmd === "ls") {
+		if (!args.some((a) => RECURSIVE_FLAG.test(a))) return [];
+		return nonFlag;
+	}
+	if (cmd === "rg") {
+		// rg <pattern> [path...]; single non-flag token is just the pattern.
+		return nonFlag.length > 1 ? nonFlag.slice(1) : [];
+	}
+	if (cmd === "grep") {
+		if (!args.some((a) => RECURSIVE_FLAG.test(a))) return [];
+		return nonFlag.length > 1 ? nonFlag.slice(1) : [];
+	}
+	return [];
+}
+
+function segmentSearchEscapesProject(segment: string, cwd: string): boolean {
+	const tokens = segment.split(/\s+/);
+	while (tokens.length && (WRAPPERS.has(tokens[0]) || ENV_ASSIGNMENT.test(tokens[0]))) {
+		tokens.shift();
+	}
+	const cmd = tokens[0];
+	if (!cmd || !SEARCH_COMMANDS.has(cmd)) return false;
+	const paths = searchPathArgsForCommand(cmd, tokens.slice(1));
+	return paths.some((p) => pathEscapesProject(p, cwd));
+}
+
+function bashSearchEscapesProject(command: string, cwd: string): boolean {
+	return splitSegments(command).some((segment) => segmentSearchEscapesProject(segment, cwd));
+}
+
+interface Gate {
+	reason: string;
 }
 
 export default function createExtension(pi: ExtensionAPI): void {
-	const sessionAllowed = new Set<string>();
-
 	pi.events.emit("pi-extension-settings:register", {
 		name: EXTENSION_NAME,
 		settings: [
@@ -95,34 +204,52 @@ export default function createExtension(pi: ExtensionAPI): void {
 		const toolName = event.toolName;
 		const input = (event.input ?? {}) as Record<string, unknown>;
 
-		let gateReason: string | undefined;
+		let gate: Gate | undefined;
 
 		if (toolName === "bash") {
 			const command = String(input.command ?? "");
 			if (bashIsDestructive(command)) {
-				gateReason = `Run destructive bash command:\n\n  ${command}`;
+				gate = { reason: `Run destructive bash command:\n\n  ${command}` };
+			} else {
+				const vendored = vendoredDirForBash(command);
+				if (vendored) {
+					gate = { reason: `Read vendored/dependency code (untrusted third-party text) via bash:\n\n  ${command}` };
+				} else if (bashSearchEscapesProject(command, ctx.cwd)) {
+					gate = { reason: `Search/list outside the project directory:\n\n  ${command}` };
+				}
 			}
 		} else if (toolName === "edit" || toolName === "write") {
 			const rawPath = String(input.path ?? input.file_path ?? "");
 			if (rawPath) {
 				const full = isAbsolute(rawPath) ? rawPath : resolve(ctx.cwd, rawPath);
 				if (!full.startsWith(resolve(ctx.cwd))) {
-					gateReason = `${toolName} outside the project directory:\n\n  ${full}`;
+					gate = { reason: `${toolName} outside the project directory:\n\n  ${full}` };
 				}
 			}
+		} else if (toolName === "read") {
+			const rawPath = String(input.path ?? input.file_path ?? "");
+			const vendored = rawPath ? vendoredDirForPath(rawPath) : undefined;
+			if (vendored) {
+				gate = { reason: `Read vendored/dependency code (untrusted third-party text):\n\n  ${rawPath}` };
+			}
+		} else if (toolName === "web_search") {
+			const queries = Array.isArray(input.queries) ? input.queries : [input.query].filter(Boolean);
+			gate = { reason: `Search the web:\n\n  ${queries.map(String).join("\n  ")}` };
+		} else if (WEB_FETCH_TOOLS.has(toolName)) {
+			const targets = Array.isArray(input.urls)
+				? input.urls
+				: [input.url ?? input.query ?? input.responseId].filter(Boolean);
+			gate = { reason: `Load web content into context (untrusted text) via ${toolName}:\n\n  ${targets.map(String).join("\n  ")}` };
 		}
 
-		if (!gateReason) return undefined;
-
-		const key = sessionKey(toolName, input);
-		if (sessionAllowed.has(key)) return undefined;
+		if (!gate) return undefined;
 
 		if (!ctx.hasUI) {
 			// Headless/RPC: never hang on a modal — block with a visible notice.
 			pi.sendMessage(
 				{
 					customType: "permission-gate",
-					content: `⚠️ **Permission Gate**: blocked (no UI to confirm): ${gateReason.split("\n")[0]}`,
+					content: `⚠️ **Permission Gate**: blocked (no UI to confirm): ${gate.reason.split("\n")[0]}`,
 					display: true,
 				},
 				{ triggerTurn: false },
@@ -131,19 +258,23 @@ export default function createExtension(pi: ExtensionAPI): void {
 		}
 
 		const response = await askUserFancy(ctx, {
-			question: `Permission required — ${gateReason}`,
-			options: ["Allow once", "Allow for session", "Deny"],
-			allowFreeform: false,
+			question: `Permission required — ${gate.reason}`,
+			options: GATE_OPTIONS,
+			allowFreeform: true,
 		});
 
-		if (response?.kind === "selection") {
-			const choice = response.selections[0];
-			if (choice === "Allow once") return undefined;
-			if (choice === "Allow for session") {
-				sessionAllowed.add(key);
-				return undefined;
-			}
+		if (response?.kind === "selection" && response.selections[0] === "Proceed") return undefined;
+
+		if (response?.kind === "freeform" && response.text.trim()) {
+			const context = gate.reason.replace(/\n\n\s*/g, ": ").trim();
+			const guidance = response.text.trim();
+			await rememberEntry(ctx.cwd, `${context} — ${guidance}`, "guidance");
+			return {
+				block: true,
+				reason: `Denied by user via permission gate. User guidance for next time: ${guidance}`,
+			};
 		}
+
 		return { block: true, reason: "Denied by user via permission gate." };
 	});
 }

@@ -46,13 +46,6 @@ Role thinking overrides are documented in
     "placement": "belowEditor",
     "bar-style": "blocks",
     "bar-width": "6"
-  },
-  "plan-mode": {
-    "orchestration": "on",
-    "quick-triage": "on",
-    "max-discovery-agents": "3",
-    "parallel-workers": "on",
-    "review-fix-rounds": "1"
   }
 }
 ```
@@ -82,7 +75,7 @@ pi list
 pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
 cd /Users/martin-peter.lakatos/pi-bundle
 npm test
-npm run typecheck:plan
+npm run typecheck
 ```
 
 The GitHub remote is a backup and collaboration surface, not the runtime load
@@ -97,9 +90,10 @@ source. Committing/pushing does not refresh a running Pi process; restart Pi.
    `~/.pi/agent/settings.json`.
 4. Restore or recreate the custom `github-dark` theme and select it.
 5. Add the role thinking overrides from [EXTENSIONS.md](EXTENSIONS.md).
-6. Configure Plan Mode and Powerbar through `/extension-settings`.
+6. Configure Powerbar through `/extension-settings`.
 7. Set `~/.pi/web-search.json` to `{"workflow":"auto-summary"}`.
-8. Start a new interactive Pi session and verify Welcome and Plan Mode.
+8. Start a new interactive Pi session and verify Welcome and the flow
+   described in [FLOW.md](FLOW.md).
 
 Do not restore stale Git-package clones or old settings backups; the absolute
 local package path is the intended setup.

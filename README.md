@@ -1,15 +1,15 @@
 # pi-bundle
 
 A single, vendored [Pi](https://pi.dev) package maintained by `dhumdil-apps`.
-It includes the active extensions and the Ask User skill previously installed as
-separate packages.
+It includes the active extensions and skills previously installed as separate
+packages.
 
 ## Documentation
 
 Start with the [documentation index](docs/README.md), then use the focused guide:
 
 - [Extension and resource catalog](docs/EXTENSIONS.md)
-- [Orchestrated Plan Mode](docs/PLAN_MODE.md)
+- [The working flow](docs/FLOW.md)
 - [Commands and tools](docs/COMMANDS.md)
 - [Local Pi setup](docs/LOCAL_SETUP.md)
 - [Development and maintenance](docs/DEVELOPMENT.md)
@@ -18,10 +18,30 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 
 ## Features
 
-- **plan-mode** — auto-starts a persistent, auditable, single-agent workflow in every interactive session. Quick mode triages truly trivial changes to an inline plan; standard and deep work read the code inline, then the agent writes the plan draft itself before approval. Execution implements each step inline, checkpoints accepted todos, validates the project, and ends with an inline review plus at most one corrective pass. `/plan deep|off|execute|resume|status`.
-- **permission-gate** — ask-user confirmation only for destructive commands (`rm -rf`, `git reset --hard`, `sudo`, …) and writes outside the project.
-- **memory** — minimal per-project `.pi/MEMORY.md`, injected each turn; `remember` tool + `/memory`.
-- **manage-todo-list**, **web-access**, **powerbar** (+ live quota via **pi-usage**), **usage-extension** (`/usage` history), **ask-user** modal + skill, **claude-style** prompt, **welcome** banner, bundled `dark` theme, and `/init` prompt. This machine selects its separate local `github-dark` theme.
+- **claude-style** — the working flow ("measure twice, cut once") baked into
+  every turn's system prompt as guidance, no "trivial change" shortcut:
+  ① Understand (explore read-only) → ② Align (ask early and often, then get
+  a plan go-ahead through the same Proceed/type-to-revise `ask_user` shape
+  as a permission-gate prompt; multi-phase plans persisted to
+  `.pi/plans/<name>.md`) → ③ Build (steps with checks + a simplify pass
+  before each commit) → ④ Review (full diff at the end). See
+  [docs/FLOW.md](docs/FLOW.md).
+- **permission-gate** — the enforced guardrails: destructive commands, writes
+  outside the project, web access (`web_search`, `fetch_content`,
+  `get_search_content`), reads into vendored code (`node_modules`, `vendor`,
+  `.venv`), and recursive search/list (`find`, `grep -r`, `rg`, `tree`,
+  `ls -R`) rooted outside the project. Every gate confirms on every call —
+  no session or per-kind approval. Each prompt is a single "Proceed" button;
+  typing anything else denies the call and is saved as guidance for the
+  agent (see **memory** below).
+- **memory** — minimal per-project `.pi/MEMORY.md`, injected each turn;
+  `remember` tool + `/memory`. Also written to directly by permission-gate
+  when a gate denial comes with typed guidance (category `guidance`).
+- **manage-todo-list**, **web-access**, **powerbar** (+ live quota via
+  **pi-usage**), **usage-extension** (`/usage` history), **ask-user** inline
+  prompt + skill, **simplify** skill, **welcome** banner, bundled `dark` theme,
+  and `/init` prompt. This machine selects its separate local `github-dark`
+  theme.
 
 ## Install (local path)
 
@@ -46,37 +66,11 @@ pi -ne -e /absolute/path/to/pi-bundle
 Edit the source under `extensions/` or `skills/`. Keep upstream provenance in
 [`UPSTREAM.md`](UPSTREAM.md) when importing updates.
 
-Focused Plan Mode tests and typecheck:
-
 ```bash
 npm test
-npm run typecheck:plan
+npm run typecheck
 ```
 
 `npm run typecheck` checks every vendored extension. It currently also reports
-upstream type/API drift in pi-web-access; keep the focused gate green while
-those upstream errors are retired.
-
-## Plan lifecycle
-
-Plan files are timestamped under `.pi/plans/` as a readable Markdown ledger and
-a version-2 JSON state file. The current ledger is linked to the Pi session, so
-startup/reload/resume restores it and a fork creates a child ledger with a
-`parentPlan` link. Extension Settings are global per-user and string-backed.
-
-The phases are `triage → discovering → deciding → planning → ready → executing
-→ reviewing → complete`, with `blocked` preserving recoverable state. Plan Mode
-runs single-agent throughout — there is no subagent handoff. Standard/Deep work
-cannot become ready until the agent's own response contains a plan draft with
-a Goal section, a numbered task list, and a Validation section.
-
-Execution requires a clean Git tree except for the active ledger/state pair. In
-a non-Git directory, plans, todos, and review continue while automatic commits
-are disabled and the degraded mode is recorded.
-
-Useful settings in `/extension-settings`: `plan-mode.orchestration` and
-`plan-mode.quick-triage`. Web Access defaults to `auto-summary` in
-`~/.pi/web-search.json`.
-
-For the authoritative workflow contract, including the ready gate, review, and
-persistence/recovery, see [docs/PLAN_MODE.md](docs/PLAN_MODE.md).
+upstream type/API drift in pi-web-access; do not add new errors in touched
+files while those upstream errors are retired.
