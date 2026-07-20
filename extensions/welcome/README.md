@@ -11,10 +11,10 @@ requires an exact one-to-one match with that manifest. Context files come from
 pi core's `loadProjectContextFiles`, so the list always matches what is
 actually loaded.
 
-The extension deck groups every active extension as Session, Progress & usage,
-Safety, or Workflow & setup. It appears after the workflow prompt and before
-the shortcut row, keeping the welcome screen scannable without hiding automatic
-extensions or the direct tools and commands available to the user.
+The extension deck groups every active extension as UI, Flow, or Config. It
+appears after the workflow prompt and before the shortcut row, keeping the
+welcome screen scannable without hiding automatic extensions or the direct tools
+and commands available to the user.
 
 ## User surface
 

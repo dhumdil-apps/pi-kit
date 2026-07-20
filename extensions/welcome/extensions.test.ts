@@ -30,8 +30,7 @@ describe("welcome extension deck", () => {
 		for (const presentation of EXTENSION_PRESENTATIONS) {
 			expect(deck).toContain(`**${presentation.name}** — ${presentation.description}`);
 		}
-		expect(deck.indexOf("**Session**")).toBeLessThan(deck.indexOf("**Progress & usage**"));
-		expect(deck.indexOf("**Progress & usage**")).toBeLessThan(deck.indexOf("**Safety**"));
-		expect(deck.indexOf("**Safety**")).toBeLessThan(deck.indexOf("**Workflow & setup**"));
+		expect(deck.indexOf("**UI**")).toBeLessThan(deck.indexOf("**Flow**"));
+		expect(deck.indexOf("**Flow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 });

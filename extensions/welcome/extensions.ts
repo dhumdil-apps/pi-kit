@@ -1,14 +1,13 @@
 export interface ExtensionPresentation {
 	name: string;
-	group: "workflow" | "progress" | "safety" | "session";
+	group: "ui" | "flow" | "config";
 	description: string;
 }
 
 export const EXTENSION_GROUPS = [
-	{ id: "session", title: "Session" },
-	{ id: "progress", title: "Progress & usage" },
-	{ id: "safety", title: "Safety" },
-	{ id: "workflow", title: "Workflow & setup" },
+	{ id: "ui", title: "UI" },
+	{ id: "flow", title: "Flow" },
+	{ id: "config", title: "Config" },
 ] as const;
 
 /**
@@ -18,54 +17,54 @@ export const EXTENSION_GROUPS = [
  */
 export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
-		name: "extension-settings",
-		group: "workflow",
-		description: "shared extension settings; `/extension-settings`",
-	},
-	{
-		name: "ask-user",
-		group: "workflow",
-		description: "inline choice and confirmation prompts; `ask_user`",
-	},
-	{
-		name: "claude-style",
-		group: "workflow",
-		description: "guides each turn through Explore → Align → Build → Review (automatic)",
-	},
-	{
-		name: "manage-todo-list",
-		group: "progress",
-		description: "plan-step progress widget; `manage_todo_list`, `/todos`",
+		name: "welcome",
+		group: "ui",
+		description: "interactive startup map with project, spend, and bundle resources (automatic)",
 	},
 	{
 		name: "powerbar",
-		group: "progress",
+		group: "ui",
 		description: "status footer for git, tokens, context, model, and quota; `/extension-settings`",
 	},
 	{
 		name: "pi-usage",
-		group: "progress",
+		group: "ui",
 		description: "refreshes live provider quota data for Powerbar (automatic)",
 	},
 	{
-		name: "usage-extension",
-		group: "progress",
-		description: "historical token and spend dashboard; `/usage`",
+		name: "manage-todo-list",
+		group: "flow",
+		description: "plan-step progress widget; `manage_todo_list`, `/todos`",
 	},
 	{
 		name: "permission-gate",
-		group: "safety",
+		group: "flow",
 		description: "per-call confirmation for destructive commands, external writes, curl/web access, and vendored-code reads",
 	},
 	{
 		name: "cancel-guard",
-		group: "safety",
+		group: "flow",
 		description: "red confirmation before an interrupt stops a running agent (automatic)",
 	},
 	{
-		name: "welcome",
-		group: "session",
-		description: "interactive startup map with project, spend, and bundle resources (automatic)",
+		name: "ask-user",
+		group: "flow",
+		description: "inline choice and confirmation prompts; `ask_user`",
+	},
+	{
+		name: "claude-style",
+		group: "flow",
+		description: "guides each turn through Explore → Align → Build → Review (automatic)",
+	},
+	{
+		name: "extension-settings",
+		group: "config",
+		description: "shared extension settings; `/extension-settings`",
+	},
+	{
+		name: "usage-extension",
+		group: "config",
+		description: "historical token and spend dashboard; `/usage`",
 	},
 ];
 
