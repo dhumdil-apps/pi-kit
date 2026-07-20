@@ -7,6 +7,7 @@ that loads it.
 
 | Need | Document |
 | --- | --- |
+| Set up a fresh machine | [Clean-machine setup](SETUP.md) |
 | Understand what is installed | [Extension and resource catalog](EXTENSIONS.md) |
 | Understand the default workflow | [The working flow](FLOW.md) |
 | Find a command quickly | [Commands and tools](COMMANDS.md) |
@@ -31,10 +32,10 @@ that loads it.
 
 ## Repository locations
 
-- Local working copy: `/Users/martin-peter.lakatos/pi-bundle`
+- Local working copy: `~/pi-bundle`
 - GitHub remote: `git@github.com:dhumdil-apps/pi-bundle.git`
 - Active branch: `main`
-- Local Pi directory: `/Users/martin-peter.lakatos/.pi`
+- Local Pi directory: `~/.pi`
 
 Changes to the local working copy are picked up on the next Pi start because
 Pi loads the package by absolute path.

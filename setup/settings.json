@@ -1,0 +1,9 @@
+{
+  "quietStartup": true,
+  "theme": "github-dark",
+  "defaultThinkingLevel": "medium",
+  "defaultProjectTrust": "ask",
+  "packages": [
+    "/ABSOLUTE/PATH/TO/pi-bundle"
+  ]
+}

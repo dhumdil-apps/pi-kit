@@ -11,7 +11,7 @@ separate from portable bundle code.
 | `~/.pi/agent/settings.json` | Core Pi settings, local package path, role overrides | Private machine config; document values, do not blindly publish |
 | `~/.pi/agent/settings-extensions.json` | Extension UI values | Private machine config; safe to reconstruct from this guide |
 | `~/.pi/web-search.json` | Web Access workflow/provider settings | Private machine config |
-| `~/.pi/agent/themes/github-dark.json` | Selected custom local theme | Back up privately if customized |
+| `~/.pi/agent/themes/` | Optional machine-local theme overrides | The active `github-dark` theme now ships in the bundle (`themes/github-dark.json`); a local copy here is redundant |
 | `~/.pi/agent/auth.json` | Authentication credentials/tokens | Secret; never print, copy into docs, or commit |
 | `~/.pi/agent/sessions/` | Session history | Generated/private |
 | `~/.pi/agent/usage-extension-cache.json` | Usage cache | Generated |
@@ -28,7 +28,7 @@ The important values in `~/.pi/agent/settings.json` are:
   "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "medium",
   "theme": "github-dark",
-  "packages": ["/Users/martin-peter.lakatos/pi-bundle"]
+  "packages": ["/absolute/path/to/pi-bundle"]
 }
 ```
 
@@ -64,7 +64,7 @@ their own synthesis.
 
 ## Load and update behavior
 
-Pi loads `/Users/martin-peter.lakatos/pi-bundle` directly. Source edits apply
+Pi loads the `~/pi-bundle` working copy directly. Source edits apply
 on the next Pi process; there is no install/update step between editing and
 testing.
 
@@ -73,7 +73,7 @@ Useful checks:
 ```bash
 pi list
 pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
-cd /Users/martin-peter.lakatos/pi-bundle
+cd ~/pi-bundle
 npm test
 npm run typecheck
 ```
@@ -83,17 +83,10 @@ source. Committing/pushing does not refresh a running Pi process; restart Pi.
 
 ## Recreate the setup
 
-1. Clone `git@github.com:dhumdil-apps/pi-bundle.git` to
-   `/Users/martin-peter.lakatos/pi-bundle`.
-2. Run `npm install --ignore-scripts` in the bundle.
-3. Add the absolute bundle path to `packages` in
-   `~/.pi/agent/settings.json`.
-4. Restore or recreate the custom `github-dark` theme and select it.
-5. Add the role thinking overrides from [EXTENSIONS.md](EXTENSIONS.md).
-6. Configure Powerbar through `/extension-settings`.
-7. Set `~/.pi/web-search.json` to `{"workflow":"auto-summary"}`.
-8. Start a new interactive Pi session and verify Welcome and the flow
-   described in [FLOW.md](FLOW.md).
+Follow [SETUP.md](SETUP.md) — it covers cloning, the config templates in
+`setup/`, authentication, and verification. Machine-specific extras for this
+Mac: the role thinking overrides from [EXTENSIONS.md](EXTENSIONS.md) and the
+`defaultProvider`/`defaultModel` values shown above.
 
 Do not restore stale Git-package clones or old settings backups; the absolute
 local package path is the intended setup.

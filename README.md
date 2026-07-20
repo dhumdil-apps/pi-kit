@@ -8,6 +8,7 @@ packages.
 
 Start with the [documentation index](docs/README.md), then use the focused guide:
 
+- [Clean-machine setup](docs/SETUP.md)
 - [Extension and resource catalog](docs/EXTENSIONS.md)
 - [The working flow](docs/FLOW.md)
 - [Commands and tools](docs/COMMANDS.md)
@@ -39,21 +40,23 @@ Start with the [documentation index](docs/README.md), then use the focused guide
   when a gate denial comes with typed guidance (category `guidance`).
 - **manage-todo-list**, **web-access**, **powerbar** (+ live quota via
   **pi-usage**), **usage-extension** (`/usage` history), **ask-user** inline
-  prompt + skill, **simplify** skill, **welcome** banner, bundled `dark` theme,
-  and `/init` prompt. This machine selects its separate local `github-dark`
-  theme.
+  prompt + skill, **simplify** skill, **welcome** banner, bundled `dark` and
+  `github-dark` themes, and `/init` prompt. Config templates for a new machine
+  live in [`setup/`](setup/).
 
 ## Install (local path)
 
-This is a working copy loaded directly by Pi. In `~/.pi/agent/settings.json`:
+This is a working copy loaded directly by Pi. In `~/.pi/agent/settings.json`,
+point `packages` at your clone (absolute path):
 
 ```json
-"packages": ["/Users/martin-peter.lakatos/pi-bundle"]
+"packages": ["/absolute/path/to/pi-bundle"]
 ```
 
 Edits apply on the next Pi start — no `pi install`/`pi update` needed. GitHub
 (`git@github.com:dhumdil-apps/pi-bundle.git`) is the backup remote; push after
-meaningful changes.
+meaningful changes. For a fresh machine, follow
+[docs/SETUP.md](docs/SETUP.md).
 
 For a one-off test without changing settings:
 

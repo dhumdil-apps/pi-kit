@@ -1,0 +1,8 @@
+{
+	"powerbar": {
+		"separator": " · ",
+		"placement": "belowEditor",
+		"bar-style": "blocks",
+		"bar-width": "6"
+	}
+}
