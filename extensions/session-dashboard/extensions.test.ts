@@ -8,11 +8,7 @@ import {
 	presentationCoverageErrors,
 	renderExtensionDeck,
 } from "./extensions.js";
-import {
-	QUICK_REF_END,
-	QUICK_REF_START,
-	renderWelcomeText,
-} from "./welcome.js";
+import { renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -41,17 +37,17 @@ describe("session dashboard extension deck", () => {
 		expect(deck.indexOf("**Flow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 
-	it("renders extensions, then context info, then the quick-reference marker in order", () => {
+	it("renders the extension deck, then the context info, in order", () => {
 		const welcome = renderWelcomeText({
 			extensionDeck: "EXTENSIONS",
-			contextInfo: "~/work\n📜 AGENTS.md",
+			contextInfo: "~/work\n📜 AGENTS.md\n⚡ /flash",
 		});
 		expect(welcome.startsWith("EXTENSIONS")).toBe(true);
 		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("~/work"));
-		expect(welcome.indexOf("~/work")).toBeLessThan(welcome.indexOf(QUICK_REF_START));
-		expect(welcome).toContain(`${QUICK_REF_START}\n${QUICK_REF_END}`);
+		expect(welcome.trimEnd().endsWith("⚡ /flash")).toBe(true);
 		expect(welcome).not.toContain("Measure twice");
 		expect(welcome).not.toContain("Session context");
+		expect(welcome).not.toContain("Quick reference");
 	});
 
 	it("places the usage chart between the extensions and the context info", () => {
@@ -62,6 +58,5 @@ describe("session dashboard extension deck", () => {
 		});
 		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf('{"model":true}'));
 		expect(welcome.indexOf('{"model":true}')).toBeLessThan(welcome.indexOf("~/work"));
-		expect(welcome.indexOf("~/work")).toBeLessThan(welcome.indexOf(QUICK_REF_START));
 	});
 });

@@ -3,7 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphModel } from "../usage-history/graph.js";
 import { TOTAL_SERIES_KEY } from "../usage-history/graph.js";
-import sessionDashboardExtension, { QuickReferenceCard, tildify, UsageChartCard } from "./index.js";
+import sessionDashboardExtension, { tildify, UsageChartCard } from "./index.js";
 
 describe("tildify", () => {
 	it("tildifies a path under the home directory", () => {
@@ -23,49 +23,6 @@ describe("tildify", () => {
 
 	it("leaves paths outside the home directory untouched", () => {
 		expect(tildify("/var/log/foo")).toBe("/var/log/foo");
-	});
-});
-
-describe("QuickReferenceCard", () => {
-	const groups = [
-		{ title: "Shortcuts", items: [
-			{ cmd: "! cmd", desc: "run a shell command" },
-			{ cmd: "escape", desc: "cancel the current turn" },
-		] },
-		{ title: "Workflow", items: [
-			{ cmd: "/flash", desc: "finish the task autonomously" },
-			{ cmd: "/init", desc: "create or improve AGENTS.md" },
-		] },
-	];
-	const card = (g = groups) => new QuickReferenceCard(g, (s) => s, (s) => s, (s) => s, (s) => s, (s) => s);
-
-	it("renders the title, group headers, and aligned command/description rows", () => {
-		const rendered = card().render(72);
-		expect(rendered[0]).toContain("Quick reference");
-		expect(rendered.some((line) => line.includes("Shortcuts"))).toBe(true);
-		expect(rendered.some((line) => line.includes("Workflow"))).toBe(true);
-		expect(rendered.some((line) => line.includes("! cmd") && line.includes("run a shell command"))).toBe(true);
-		expect(rendered.some((line) => line.includes("/flash") && line.includes("finish the task autonomously"))).toBe(true);
-	});
-
-	it("aligns the command column so descriptions start at the same offset", () => {
-		const rendered = card().render(72);
-		const cmdLines = rendered.filter((line) => /\/flash|\/init/.test(line));
-		const offsets = cmdLines.map((line) => line.indexOf("finish") >= 0 ? line.indexOf("finish") : line.indexOf("create"));
-		expect(new Set(offsets).size).toBe(1);
-	});
-
-	it("keeps every line within the container width, even when narrow", () => {
-		for (const width of [12, 20, 30, 40, 72]) {
-			const rendered = card().render(width);
-			expect(rendered.every((line) => visibleWidth(line) <= width)).toBe(true);
-			expect(rendered.some((line) => line.includes("flash"))).toBe(true);
-		}
-	});
-
-	it("renders nothing when there are no groups or width is non-positive", () => {
-		expect(card([]).render(80)).toEqual([]);
-		expect(card().render(0)).toEqual([]);
 	});
 });
 

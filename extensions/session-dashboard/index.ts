@@ -4,127 +4,21 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Box, type Component, Container, Markdown, Spacer, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { Box, type Component, Container, Markdown, Spacer, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { collectUsageData } from "../usage-history/data.js";
 import { buildGraphModel, type GraphModel, renderChart, TOTAL_SERIES_KEY } from "../usage-history/graph.js";
 import { COLOR_RESET, formatAxisCost, seriesColor } from "../usage-history/index.js";
 import { renderExtensionDeck } from "./extensions.js";
-import {
-	QUICK_REF_START,
-	USAGE_CHART_END,
-	USAGE_CHART_START,
-	renderWelcomeText,
-} from "./welcome.js";
+import { USAGE_CHART_END, USAGE_CHART_START, renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const QUICK_REF_MAX_WIDTH = 72;
-const QUICK_REF_TITLE = " Quick reference ";
-
-interface QuickRefItem {
-	cmd: string;
-	desc: string;
-}
-
-interface QuickRefGroup {
-	title: string;
-	items: QuickRefItem[];
-}
-
 /**
- * Curated reminder of the handy commands the Extensions deck does not already
- * spell out (the deck covers /usage, /todos, /extension-settings, …). Static:
- * the list never changes at runtime, so the card carries no serialized payload.
+ * Handy workflow commands the Extensions deck does not already spell out,
+ * surfaced as a slim inline line (emoji + command) to match the "📜 …" context
+ * line. The deck already covers /usage, /todos, /extension-settings, etc.
  */
-const QUICK_REFERENCE: QuickRefGroup[] = [
-	{
-		title: "Shortcuts",
-		items: [
-			{ cmd: "! cmd", desc: "run a shell command" },
-			{ cmd: "escape", desc: "cancel the current turn" },
-		],
-	},
-	{
-		title: "Workflow",
-		items: [
-			{ cmd: "/flash", desc: "finish the task autonomously" },
-			{ cmd: "/retro", desc: "reflect on this session" },
-			{ cmd: "/forensic", desc: "deep session retrospective" },
-			{ cmd: "/init", desc: "create or improve AGENTS.md" },
-		],
-	},
-];
-
-/**
- * Static "Quick reference" card: a bordered, width-aware box (rounded borders +
- * centered title) listing grouped command/description pairs. Reuses the border
- * chrome shape of the former Session context card; commands share one aligned
- * column, descriptions wrap under the command when the pane is too narrow.
- */
-export class QuickReferenceCard implements Component {
-	constructor(
-		private readonly groups: QuickRefGroup[],
-		private readonly borderFn: (text: string) => string,
-		private readonly titleFn: (text: string) => string,
-		private readonly groupFn: (text: string) => string,
-		private readonly cmdFn: (text: string) => string,
-		private readonly descFn: (text: string) => string,
-	) {}
-
-	render(width: number): string[] {
-		if (width <= 0 || this.groups.length === 0) return [];
-		const items = this.groups.flatMap((group) => group.items);
-		const cmdWidth = Math.max(0, ...items.map((item) => visibleWidth(item.cmd)));
-		const desiredWidth = Math.max(
-			visibleWidth(QUICK_REF_TITLE) + 3,
-			...this.groups.map((group) => visibleWidth(group.title) + 4),
-			...items.map((item) => 2 + cmdWidth + 2 + visibleWidth(item.desc) + 4),
-		);
-		const cardWidth = Math.min(width, QUICK_REF_MAX_WIDTH, desiredWidth);
-		if (cardWidth < 4) return [this.borderFn("─".repeat(Math.max(cardWidth, 0)))];
-
-		const titleFits = cardWidth >= visibleWidth(QUICK_REF_TITLE) + 3;
-		const top = titleFits
-			? this.borderFn("╭─") + this.titleFn(QUICK_REF_TITLE) + this.borderFn(`${"─".repeat(cardWidth - visibleWidth(QUICK_REF_TITLE) - 3)}╮`)
-			: this.borderFn(`╭${"─".repeat(cardWidth - 2)}╮`);
-		const innerWidth = cardWidth - 4;
-		if (innerWidth <= 0) return [top, this.borderFn(`╰${"─".repeat(cardWidth - 2)}╯`)];
-
-		// Build styled inner lines: a group header, then one line per item with the
-		// command in an aligned column. When the command column plus a little room
-		// for the description no longer fits, stack the description on its own line.
-		const stacked = innerWidth <= cmdWidth + 6;
-		const lines: string[] = [];
-		for (const group of this.groups) {
-			lines.push(this.groupFn(truncateToWidth(group.title, innerWidth, "…")));
-			for (const item of group.items) {
-				if (stacked) {
-					lines.push(truncateToWidth("  " + this.cmdFn(item.cmd), innerWidth, ""));
-					for (const line of wrapTextWithAnsi(item.desc, Math.max(innerWidth - 4, 1))) {
-						lines.push(truncateToWidth("    " + this.descFn(line), innerWidth, ""));
-					}
-				} else {
-					const descWidth = innerWidth - 2 - cmdWidth - 2;
-					const wrapped = wrapTextWithAnsi(item.desc, descWidth);
-					wrapped.forEach((line, i) => {
-						const cmdCell = i === 0 ? this.cmdFn(padRightVis(item.cmd, cmdWidth)) : " ".repeat(cmdWidth);
-						lines.push(truncateToWidth("  " + cmdCell + "  " + this.descFn(line), innerWidth, ""));
-					});
-				}
-			}
-		}
-
-		const body = lines.map((line) => {
-			const padding = " ".repeat(Math.max(0, innerWidth - visibleWidth(line)));
-			return this.borderFn("│ ") + line + padding + this.borderFn(" │");
-		});
-		return [top, ...body, this.borderFn(`╰${"─".repeat(cardWidth - 2)}╯`)];
-	}
-
-	invalidate(): void {
-		// Stateless: theme callbacks are evaluated on every render.
-	}
-}
+const WORKFLOW_COMMANDS = "⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init";
 
 const USAGE_CHART_MAX_WIDTH = 72;
 const USAGE_CHART_HEIGHT = 8;
@@ -339,24 +233,9 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			if (afterChart) contentBox.addChild(markdown(afterChart));
 		};
 
-		// The quick-reference card is static, so its markers just mark where to
-		// insert the component; everything before them (deck, usage chart, context
-		// lines) flows through addSegment.
-		const quickRefStart = content.indexOf(QUICK_REF_START);
-		if (quickRefStart >= 0) {
-			addSegment(content.slice(0, quickRefStart));
-			contentBox.addChild(new Spacer(1));
-			contentBox.addChild(new QuickReferenceCard(
-				QUICK_REFERENCE,
-				(line) => theme.fg("borderMuted", line),
-				(line) => theme.fg("mdHeading", theme.bold(line)),
-				(line) => theme.fg("mdHeading", theme.bold(line)),
-				(line) => theme.fg("accent", line),
-				(line) => theme.fg("muted", line),
-			));
-		} else {
-			addSegment(content);
-		}
+		// The whole banner is markdown plus the usage-chart marker block, which
+		// addSegment swaps for the live UsageChartCard.
+		addSegment(content);
 		box.addChild(contentBox);
 		return box;
 	});
@@ -387,11 +266,12 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// Slim context lines rendered as plain markdown above the quick-reference
-			// card: the working directory and whatever context files pi loaded.
+			// Slim context lines rendered as plain markdown: working directory, the
+			// context files pi loaded, and a reminder of the workflow commands.
 			const contextLines = [truncateLeft(tildify(cwd), 60)];
 			const contextFiles = contextFileList(cwd);
 			if (contextFiles.length > 0) contextLines.push(`📜 ${contextFiles.join(" · ")}`);
+			contextLines.push(WORKFLOW_COMMANDS);
 
 			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
