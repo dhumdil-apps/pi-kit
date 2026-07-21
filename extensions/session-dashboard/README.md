@@ -15,19 +15,19 @@ and `renderChart`, showing this week's spend by provider (with a "No usage yet
 this week" fallback). Its x-axis uses weekday + time labels so the ticks stay
 distinct across a short week. It is omitted when usage data is unavailable.
 
-A single slim, plain-markdown line closes the dashboard, every chip separated by
-the same ` · `: the working directory and loaded context files (`📜 …`, italic /
-de-emphasised, from pi core's `loadProjectContextFiles`) then the workflow
-commands the deck does not spell out, rendered as code so they pop
+Two slim, plain-markdown lines close the dashboard, chips separated by ` · `.
+The first is context — the working directory and loaded context files (`📜 …`,
+italic / de-emphasised, from pi core's `loadProjectContextFiles`). The second is
+commands on their own line for readability, rendered as code so they pop:
+`❓ /help` plus the workflow commands the deck does not spell out
 (`⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init`, a static constant). Git
 branch/status are intentionally not repeated here — the status bar already shows
 them persistently.
 
-The context line also surfaces `❓ /help`, which prints a full reference —
-commands, shortcuts, and every active extension with its complete description
-(the compact deck lists names only). The help document is built by `help.ts`
-from the same `EXTENSION_PRESENTATIONS` manifest and rendered in the banner's
-themed box.
+`❓ /help` prints a full reference — commands, shortcuts, and every active
+extension with its complete description (the compact deck lists names only). The
+help document is built by `help.ts` from the same `EXTENSION_PRESENTATIONS`
+manifest and rendered in the banner's themed box.
 
 The dashboard does not duplicate the Progress Tracker phase ribbon.
 

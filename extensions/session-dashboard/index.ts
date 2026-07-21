@@ -311,20 +311,20 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// A single slim markdown line: the working directory and loaded context
-			// files (italic, de-emphasised) then the workflow commands (as code so
-			// they pop), every chip separated by the same CONTEXT_SEP.
-			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
+			// Two slim markdown lines: context (working directory + loaded files,
+			// italic/de-emphasised) on the first, the commands (as code so they pop)
+			// on their own line for readability. Chips share one CONTEXT_SEP.
+			const contextChips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
-			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
-			chips.push("❓ `/help`");
-			for (const { emoji, cmd } of WORKFLOW_COMMANDS) chips.push(`${emoji} \`${cmd}\``);
+			if (contextFiles.length > 0) contextChips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
+			const commandChips = ["❓ `/help`", ...WORKFLOW_COMMANDS.map(({ emoji, cmd }) => `${emoji} \`${cmd}\``)];
+			const contextInfo = `${contextChips.join(CONTEXT_SEP)}\n${commandChips.join(CONTEXT_SEP)}`;
 
 			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
 				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
 				usageChart,
-				contextInfo: chips.join(CONTEXT_SEP),
+				contextInfo,
 			});
 
 			pi.sendMessage(
