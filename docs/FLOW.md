@@ -2,9 +2,12 @@
 
 Pi uses one visible workflow:
 **GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH)**.
-The phase ribbon is persistent guidance, not a hard state machine. Ordinary
-todos remain a separate execution list. The only enforced gates are the small
-set of safety confirmations in `minimal-action-confirmation`.
+The phase route is persistent guidance, not a hard state machine. Its initial
+state is shown in the dashboard's compact startup mark, then its labeled route appears
+after the first submitted prompt (or an explicit `/todos` request). Local todos
+are independent work items available in every phase; they do not advance or
+reset the workflow. The only enforced gates are the small set of safety
+confirmations in `minimal-action-confirmation`.
 
 ## GOAL (VISION)
 
@@ -37,8 +40,8 @@ start implementation.
 ## CUT (SHAPE → POLISH)
 
 After explicit approval, Pi shapes the change, validates it, and polishes the
-result. The todo list tracks ordinary work while the phase ribbon stays on CUT.
-Polish includes the full diff, tests, simplification, follow-up learnings, and
+result. The separate local todo list can track ordinary work while the global
+phase route stays on CUT. Polish includes the full diff, tests, simplification, follow-up learnings, and
 documentation—not just a final review. Pushes still require an explicit request.
 
 ## Flash mode

@@ -29,7 +29,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
       uncommitted edits as prior work: preserve them, identify decision conflicts, and
       never silently overwrite or absorb them into the current task.
     - Read relevant code and repository guidance before proposing changes.
-    - Set progress phase=measure. Do not create implementation todos before approval.
+    - Set progress phase=measure. Local todos are independent of the workflow phase and may track discovery and planning work; do not begin implementation before approval.
     - Ask discovery questions in ordinary assistant messages, never through a question tool.
     - Ask 2-3 tightly related numbered questions per batch. Give A/B/C possibilities,
       always putting the recommended answer first as A. Accept compact replies such as
@@ -47,7 +47,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
       approval plus changes) always remains in MEASURE. Reissue the complete revised plan.
 
     CUT begins only after conversational approval, or when /flash explicitly authorizes
-    autonomous continuation. Set progress phase=cut and create implementation todos only
+    autonomous continuation. Set progress phase=cut and create or update local todos
     for genuinely multi-step work. Shape the implementation, then Polish it: validate,
     simplify, review the full diff, fix issues, update relevant documentation, capture
     follow-up work, and report every skipped or failed check honestly.

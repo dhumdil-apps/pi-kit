@@ -13,8 +13,8 @@ extension.
 | Status Bar | Footer/status composition | configured through `/extension-settings` | On |
 | Usage Monitor | Live provider quota data for Status Bar | Status Bar segments | On |
 | Usage History | Historical token/cost reporting | `/usage` | On |
-| Progress Tracker | Workflow phase ribbon plus ordinary todo progress | `manage_todo_list`, `/todos` | On |
-| Session Dashboard | Startup map and flow summary | Interactive startup message | Interactive parent sessions only |
+| Progress Tracker | Global workflow route plus separate local todo widget | `manage_todo_list`, `/todos` | On |
+| Session Dashboard | Startup ruler, project/spend panel, and resource map | Interactive startup message | Interactive parent sessions only |
 | Agent Workflow | Conversational workflow, Flash mode, and session learning | `/flash`, `/retro`, `/forensic`, `/improvements` | On; see [FLOW.md](FLOW.md) |
 | Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, and vendored-code reads | Built-in Pi dialog | On; deliberately not a general approval gate |
 

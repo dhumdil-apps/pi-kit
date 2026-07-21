@@ -54,7 +54,7 @@ export type ManageTodoListInput = Static<typeof ManageTodoListParams>;
 
 // --- Tool Description ---
 
-export const TOOL_DESCRIPTION = `Track the high-level workflow phase and a structured implementation todo list.
+export const TOOL_DESCRIPTION = `Track the high-level workflow phase and a structured local todo list.
 
 Workflow phases:
 - goal: session starting point and project overview
@@ -62,6 +62,7 @@ Workflow phases:
 - cut: implementation, validation, review, documentation, and follow-up learning
 
 Use operation=phase at each transition. Phase updates never create or replace todos.
+The local todo list is independent of the workflow phase and may track discovery, planning, implementation, and validation work.
 
 When to use this tool:
 - Complex multi-step work requiring planning and tracking
@@ -93,7 +94,10 @@ IMPORTANT: Mark todos completed as soon as they are done. Do not batch completio
 
 // --- Tool Factory ---
 
-export function createManageTodoListTool(state: TodoStateManager, onUpdate: () => void) {
+export function createManageTodoListTool(
+  state: TodoStateManager,
+  onUpdate: (operation: Extract<ManageTodoListInput["operation"], "phase" | "write">) => void
+) {
   return {
     name: "manage_todo_list",
     label: "Todo List",
@@ -129,7 +133,7 @@ export function createManageTodoListTool(state: TodoStateManager, onUpdate: () =
           };
         }
         state.setPhase(params.phase);
-        onUpdate();
+        onUpdate("phase");
         return {
           content: [{ type: "text" as const, text: `Workflow phase changed to ${params.phase.toUpperCase()}.` }],
           details: { operation: "phase", todos: state.read(), phase: state.getPhase() } as TodoDetails,
@@ -161,7 +165,7 @@ export function createManageTodoListTool(state: TodoStateManager, onUpdate: () =
       }
 
       state.write(todoList);
-      onUpdate();
+      onUpdate("write");
 
       const stats = state.getStats();
       const todos = state.read();
@@ -212,6 +216,10 @@ export function createManageTodoListTool(state: TodoStateManager, onUpdate: () =
 
       if (details.error) {
         return new Text(theme.fg("error", `✗ ${details.error}`), 0, 0);
+      }
+
+      if (details.operation === "phase") {
+        return new Text(theme.fg("success", `Phase set to ${details.phase.toUpperCase()}`), 0, 0);
       }
 
       const todos = details.todos;

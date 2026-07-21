@@ -9,7 +9,8 @@ import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TodoStateManager } from "../state-manager.js";
 import type { WorkflowPhase } from "../types.js";
 
-const WIDGET_ID = "todo-list";
+const WORKFLOW_WIDGET_ID = "workflow-phase";
+const TODO_WIDGET_ID = "todo-list";
 
 /** Status icons for each todo state */
 export const STATUS_ICONS: Record<string, string> = {
@@ -30,34 +31,49 @@ export function phaseRibbon(phase: WorkflowPhase, theme: Theme): string {
     { id: "measure", label: "MEASURE TWICE" },
     { id: "cut", label: "CUT ONCE" },
   ];
+  const activeIndex = stages.findIndex((stage) => stage.id === phase);
+
   return stages
-    .map((stage) =>
-      stage.id === phase ? theme.fg("warning", theme.bold(stage.label)) : theme.fg("dim", stage.label)
-    )
-    .join(theme.fg("muted", "  →  "));
+    .map((stage, index) => {
+      const branch = index === 0 ? "╭─" : index === stages.length - 1 ? "╰─" : "├─";
+      const state = index < activeIndex ? "completed" : index === activeIndex ? "current" : "upcoming";
+      const marker = state === "completed" ? "✓" : state === "current" ? "◉" : "○";
+      const text = `${marker} ${stage.label}`;
+      const styled =
+        state === "completed"
+          ? theme.fg("success", text)
+          : state === "current"
+            ? theme.fg("warning", theme.bold(text))
+            : theme.fg("dim", text);
+      return `${theme.fg("accent", "▍ ")}${theme.fg("muted", `${branch} `)}${styled}`;
+    })
+    .join("\n");
 }
 
-/**
- * Update (or clear) the todo widget.
- * Call this after every state change.
- */
-export function updateWidget(state: TodoStateManager, ctx: ExtensionContext): void {
+/** Show the global workflow route independently from local todos. */
+export function updateWorkflowWidget(state: TodoStateManager, ctx: ExtensionContext): void {
+  ctx.ui.setWidget(WORKFLOW_WIDGET_ID, (_tui, theme) => ({
+    render: () => phaseRibbon(state.getPhase(), theme).split("\n"),
+    invalidate: () => {},
+  }));
+}
+
+export function clearWorkflowWidget(ctx: ExtensionContext): void {
+  ctx.ui.setWidget(WORKFLOW_WIDGET_ID, undefined);
+}
+
+/** Show local todos only when explicitly visible and non-empty. */
+export function updateTodoWidget(state: TodoStateManager, ctx: ExtensionContext, visible: boolean): void {
   const todos = state.read();
+  if (!visible || todos.length === 0) {
+    ctx.ui.setWidget(TODO_WIDGET_ID, undefined);
+    return;
+  }
 
   const stats = state.getStats();
-
-  ctx.ui.setWidget(WIDGET_ID, (_tui, theme) => {
+  ctx.ui.setWidget(TODO_WIDGET_ID, (_tui, theme) => {
     const lines: string[] = [];
-
     const gutter = theme.fg("accent", "▍ ");
-    lines.push(gutter + phaseRibbon(state.getPhase(), theme));
-
-    if (todos.length === 0) {
-      return {
-        render: () => lines,
-        invalidate: () => {},
-      };
-    }
 
     lines.push(gutter);
     const header =
@@ -96,9 +112,4 @@ export function updateWidget(state: TodoStateManager, ctx: ExtensionContext): vo
       invalidate: () => {},
     };
   });
-}
-
-/** Clear the widget */
-export function clearWidget(ctx: ExtensionContext): void {
-  ctx.ui.setWidget(WIDGET_ID, undefined);
 }

@@ -8,7 +8,7 @@ import {
 	presentationCoverageErrors,
 	renderExtensionDeck,
 } from "./extensions.js";
-import { DASHBOARD_INVITATION, renderWelcomeText } from "./welcome.js";
+import { DASHBOARD_INVITATION, RULER_END, RULER_START, renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -37,13 +37,17 @@ describe("session dashboard extension deck", () => {
 
 	it("renders the dashboard in reference-to-invitation order without a duplicate phase ribbon", () => {
 		const welcome = renderWelcomeText({
-			panel: "PROJECT PANEL",
+			rulerPanel: "RULER PANEL",
+			infoPanel: "PROJECT PANEL",
 			sections: ["CONTEXT", "SKILLS"],
 			extensionDeck: "EXTENSIONS",
 		});
+		expect(welcome).toContain(`${RULER_START}\nRULER PANEL\n${RULER_END}`);
+		expect(welcome).not.toContain("```\nRULER PANEL\n```");
 		expect(welcome).toContain("```\nPROJECT PANEL\n```");
 		expect(welcome.indexOf("CONTEXT")).toBeLessThan(welcome.indexOf("EXTENSIONS"));
-		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("⌨️"));
+		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("PROJECT PANEL"));
+		expect(welcome.indexOf("PROJECT PANEL")).toBeLessThan(welcome.indexOf("⌨️"));
 		expect(welcome.indexOf("⌨️")).toBeLessThan(welcome.indexOf(DASHBOARD_INVITATION));
 		expect(welcome.endsWith(DASHBOARD_INVITATION)).toBe(true);
 		expect(welcome).not.toContain("GOAL (VISION)");

@@ -1,5 +1,11 @@
 # pi-bundle
 
+       _________________________________________________
+      |"""""""""|"""""""""|"""""""""|"|"""""""|"""""""""|
+      |         1         2         3 π       4         |
+      '-------------------------------------------------'
+      Measure twice, cut once
+
 A single, vendored [Pi](https://pi.dev) package maintained by `dhumdil-apps`.
 It includes the active extensions and skills previously installed as separate
 packages.
@@ -34,11 +40,15 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 - **project memory** — optional, user-owned `.pi/MEMORY.md`. The workflow reads
   it at task start; only explicit `/retro` and `/forensic` reflection may
   maintain concise, durable, deduplicated lessons.
-- **progress-tracker**, **status-bar** (+ live quota via
-  **usage-monitor**), **usage-history** (`/usage` history), **simplify** skill,
-  **session-dashboard** banner, bundled `dark` and
-  `github-dark` themes, and `/init` prompt. Config templates for a new machine
-  live in [`setup/`](setup/).
+- **progress-tracker** — a global GOAL → MEASURE TWICE → CUT ONCE route,
+  shown after the first prompt or `/todos`; local todos remain independent and
+  `/todos` toggles their separate widget.
+- **session-dashboard** — the interactive startup ruler, project/spend panel,
+  and loaded-resource map.
+- **status-bar** (+ live quota via **usage-monitor**), **usage-history**
+  (`/usage` history), **simplify** skill, bundled `dark` and `github-dark`
+  themes, and `/init` prompt. Config templates for a new machine live in
+  [`setup/`](setup/).
 
 ## Install (local path)
 

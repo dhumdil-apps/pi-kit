@@ -9,7 +9,7 @@ mode and no `/plan` command — the working flow is guidance, described in
 
 | Command | Effect |
 | --- | --- |
-| `/todos` | Show the todo widget/state |
+| `/todos` | Reveal workflow progress and toggle the independent local todo widget |
 | `/extension-settings` | Edit registered global extension settings |
 | `/usage` | Show historical token/cost usage |
 | `/flash` | Activate autonomous recommended-choice cruise control until completion or the next ordinary user message |
@@ -21,7 +21,7 @@ mode and no `/plan` command — the working flow is guidance, described in
 
 | Tool | Owner | Purpose |
 | --- | --- | --- |
-| `manage_todo_list` | Progress Tracker | Read/write ordinary todos or set the workflow phase |
+| `manage_todo_list` | Progress Tracker | Read/write local todos independently of the workflow phase |
 
 ## Shell and keyboard reminders
 

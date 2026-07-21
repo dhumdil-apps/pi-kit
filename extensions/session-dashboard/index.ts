@@ -4,13 +4,19 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Box, Markdown } from "@earendil-works/pi-tui";
+import { Box, Container, Markdown, Text } from "@earendil-works/pi-tui";
 import { collectUsageData } from "../usage-history/data.js";
 import { renderExtensionDeck } from "./extensions.js";
-import { renderWelcomeText } from "./welcome.js";
+import { RULER_END, RULER_START, renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MAX_PANEL_ROW = 60;
+const DASHBOARD_RULER = [
+	"  _________________________________________________",
+	"|\"\"\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|\"|\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|",
+	"|         1         2         3 π       4         |",
+	"'-------------------------------------------------'",
+];
 
 async function git(pi: ExtensionAPI, cwd: string, args: string[]) {
 	try {
@@ -121,26 +127,39 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			.filter((item) => item.type === "text")
 			.map((item) => item.text)
 			.join("\n");
+		const markdown = (text: string) => new Markdown(text, 0, 0, {
+			heading: (value) => theme.fg("mdHeading", value),
+			link: (value) => theme.fg("mdLink", value),
+			linkUrl: (value) => theme.fg("mdLinkUrl", value),
+			code: (value) => theme.fg("mdCode", value),
+			codeBlock: (value) => theme.fg("mdCodeBlock", value),
+			codeBlockBorder: (value) => theme.fg("mdCodeBlockBorder", value),
+			quote: (value) => theme.fg("mdQuote", value),
+			quoteBorder: (value) => theme.fg("mdQuoteBorder", value),
+			hr: (value) => theme.fg("mdHr", value),
+			listBullet: (value) => theme.fg("mdListBullet", value),
+			bold: (value) => theme.bold(value),
+			italic: (value) => theme.italic(value),
+			strikethrough: (value) => value,
+			underline: (value) => theme.underline(value),
+			highlightCode: (code) => code.split("\n").map((line) => theme.fg("mdCodeBlock", line)),
+		}, { color: (value) => theme.fg("customMessageText", value) });
 		const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
-		box.addChild(
-			new Markdown(content, 0, 0, {
-				heading: (text) => theme.fg("mdHeading", text),
-				link: (text) => theme.fg("mdLink", text),
-				linkUrl: (text) => theme.fg("mdLinkUrl", text),
-				code: (text) => theme.fg("mdCode", text),
-				codeBlock: (text) => theme.fg("mdCodeBlock", text),
-				codeBlockBorder: (text) => theme.fg("mdCodeBlockBorder", text),
-				quote: (text) => theme.fg("mdQuote", text),
-				quoteBorder: (text) => theme.fg("mdQuoteBorder", text),
-				hr: (text) => theme.fg("mdHr", text),
-				listBullet: (text) => theme.fg("mdListBullet", text),
-				bold: (text) => theme.bold(text),
-				italic: (text) => theme.italic(text),
-				strikethrough: (text) => text,
-				underline: (text) => theme.underline(text),
-				highlightCode: (code) => code.split("\n").map((line) => theme.fg("mdCodeBlock", line)),
-			}, { color: (text) => theme.fg("customMessageText", text) })
-		);
+		const rulerStart = content.indexOf(RULER_START);
+		const rulerEnd = content.indexOf(RULER_END);
+		if (rulerStart < 0 || rulerEnd < rulerStart) {
+			box.addChild(markdown(content));
+			return box;
+		}
+
+		const contentBox = new Container();
+		const before = content.slice(0, rulerStart).trim();
+		const ruler = content.slice(rulerStart + RULER_START.length, rulerEnd).trim();
+		const after = content.slice(rulerEnd + RULER_END.length).trim();
+		if (before) contentBox.addChild(markdown(before));
+		contentBox.addChild(new Text(theme.fg("mdLink", ruler), 0, 0));
+		if (after) contentBox.addChild(markdown(after));
+		box.addChild(contentBox);
 		return box;
 	});
 
@@ -157,20 +176,15 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		const projectRow = `${truncateLeft(tildify(cwd), 34)}  ${branch} · ${
 			dirtyCount === 0 ? "clean" : `${dirtyCount} modified`
 		}`;
-		const rows = [
-			"▛▀▀▜ ▐▌",
-			"▌  ▐ ▐▌   measure twice, cut once",
-			"▘  ▝ ▝▘",
-			"",
-			`project  ${truncateLeft(projectRow, MAX_PANEL_ROW - 9)}`,
-		];
+		const rulerPanel = [...DASHBOARD_RULER, "Measure twice, cut once"].join("\n");
+		const infoRows = [`project  ${truncateLeft(projectRow, MAX_PANEL_ROW - 9)}`];
 		if (usage) {
 			const spend = [
 				`${formatUsdSpend(usage.today.totals.cost)} today`,
 				`${formatUsdSpend(usage.last30Days.totals.cost)} 30d`,
 				`${formatUsdSpend(usage.allTime.totals.cost)} all`,
 			].join(" · ");
-			rows.push(`spend    ${spend}`);
+			infoRows.push(`spend    ${spend}`);
 		}
 
 		const bundle = loadBundleResources();
@@ -187,7 +201,8 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		}
 
 		const welcomeText = renderWelcomeText({
-			panel: renderPanel(rows),
+			rulerPanel,
+			infoPanel: renderPanel(infoRows),
 			sections,
 			extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
 		});

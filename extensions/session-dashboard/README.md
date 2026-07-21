@@ -1,7 +1,9 @@
 # Session Dashboard
 
 Startup banner for interactive parent sessions: a box-drawn "command deck"
-panel with git context (branch, status) and a spend summary (reusing
+standalone blue ASCII ruler that marks π between 3 and 4, with “Measure twice,
+cut once” below. Context and bundle resources follow, then a separate panel shows git context
+(branch, status) and a spend summary (reusing
 `usage-history`'s `collectUsageData`), followed by the info pi's default
 (non-quiet) startup listing would show — grouped, descriptive loaded
 extensions, context files, skills, and prompts. Extension names are read live
