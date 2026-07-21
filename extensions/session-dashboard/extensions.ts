@@ -2,7 +2,6 @@ export interface ExtensionPresentation {
 	name: string;
 	group: "ui" | "flow" | "config";
 	description: string;
-	readme: string;
 }
 
 export const EXTENSION_GROUPS = [
@@ -21,55 +20,46 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 		name: "session-dashboard",
 		group: "ui",
 		description: "Renders the startup map after session start; reads Git and local usage history.",
-		readme: "extensions/session-dashboard/README.md",
 	},
 	{
 		name: "status-bar",
 		group: "ui",
 		description: "Renders git, tokens, context, model, system, and quota state; `/extension-settings`.",
-		readme: "extensions/status-bar/README.md",
 	},
 	{
 		name: "usage-monitor",
 		group: "ui",
 		description: "Uses cached quota at startup, then calls provider quota APIs every 60s and on model/session changes; `/usage-refresh`.",
-		readme: "extensions/usage-monitor/README.md",
 	},
 	{
 		name: "progress-tracker",
 		group: "flow",
 		description: "Persists workflow phase and todos in sessions; provides `manage_todo_list` and `/todos`.",
-		readme: "extensions/progress-tracker/README.md",
 	},
 	{
 		name: "minimal-action-confirmation",
 		group: "flow",
 		description: "Intercepts guarded tool calls and confirms destructive commands, external writes, web access, and vendored reads.",
-		readme: "extensions/minimal-action-confirmation/README.md",
 	},
 	{
 		name: "interrupt-confirmation",
 		group: "flow",
 		description: "Confirms an interrupt before it stops a running agent.",
-		readme: "extensions/interrupt-confirmation/README.md",
 	},
 	{
 		name: "agent-workflow",
 		group: "flow",
 		description: "Guides GOAL → PLANNING → IMPLEMENTATION, plan persistence, Flash, retrospectives, and improvements.",
-		readme: "extensions/agent-workflow/README.md",
 	},
 	{
 		name: "extension-preferences",
 		group: "config",
 		description: "Stores shared extension settings locally and provides `/extension-settings`.",
-		readme: "extensions/extension-preferences/README.md",
 	},
 	{
 		name: "usage-history",
 		group: "config",
 		description: "Reads local session records to render historical token and spend data with `/usage`.",
-		readme: "extensions/usage-history/README.md",
 	},
 ];
 
@@ -90,7 +80,7 @@ export function renderExtensionDeck(extensionNames: readonly string[]): string {
 	const groups = EXTENSION_GROUPS.flatMap((group) => {
 		const entries = EXTENSION_PRESENTATIONS
 			.filter((presentation) => presentation.group === group.id && active.has(presentation.name))
-			.map((presentation) => `- **${presentation.name}** — ${presentation.description}\n  README: \`${presentation.readme}\``);
+			.map((presentation) => `- **${presentation.name}** — ${presentation.description}`);
 		return entries.length > 0 ? [`**${group.title}**`, ...entries].join("\n") : [];
 	});
 	const presented = new Set(EXTENSION_PRESENTATIONS.map((presentation) => presentation.name));
@@ -98,5 +88,5 @@ export function renderExtensionDeck(extensionNames: readonly string[]): string {
 	if (unknown.length > 0) {
 		groups.push(["**Other extensions**", ...unknown.map((name) => `- **${name}** — active extension`)].join("\n"));
 	}
-	return `🧩 **Extensions** (${extensionNames.length})\n\n${groups.join("\n\n")}\n\nREADME paths are relative to the bundle root.`;
+	return `🧩 **Extensions** (${extensionNames.length})\n\n${groups.join("\n\n")}`;
 }

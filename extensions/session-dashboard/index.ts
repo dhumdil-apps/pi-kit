@@ -11,8 +11,6 @@ import { COLOR_RESET, formatAxisCost, seriesColor } from "../usage-history/index
 import { renderExtensionDeck } from "./extensions.js";
 import {
 	parseSessionContext,
-	RULER_END,
-	RULER_START,
 	SESSION_CONTEXT_END,
 	SESSION_CONTEXT_START,
 	USAGE_CHART_END,
@@ -23,35 +21,6 @@ import {
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MAX_PANEL_ROW = 60;
-const DASHBOARD_RULER = [
-	"._________________________________________________",
-	"|\"\"\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|\"|\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|",
-	"|         1         2         3 π       4         |",
-	"'-------------------------------------------------'",
-];
-
-/**
- * Renders fixed-width ASCII art (the ruler) verbatim: clipped, never
- * word-wrapped. pi-tui's Text component word-wraps each line independently
- * once the container is narrower than that line, which breaks a line with
- * spaces (e.g. "1  2  3 π  4") at a different column than a line with none
- * (e.g. the border rows) — the ruler comes out visibly misaligned. Clipping
- * keeps every row's left edge aligned even on a narrow pane.
- */
-export class RulerText implements Component {
-	constructor(
-		private readonly lines: string[],
-		private readonly colorFn: (text: string) => string,
-	) {}
-
-	render(width: number): string[] {
-		return this.lines.map((line) => this.colorFn(width > 0 && line.length > width ? line.slice(0, width) : line));
-	}
-
-	invalidate(): void {
-		// Stateless: render() has no cache to invalidate.
-	}
-}
 
 const SESSION_CONTEXT_MAX_WIDTH = 72;
 const SESSION_CONTEXT_TITLE = " Session context ";
@@ -130,7 +99,7 @@ function padLeftVis(text: string, len: number): string {
  * (serialized into the banner text, rebuilt here) and renders the same braille
  * chart via the shared renderChart(), plus a static legend. Width-responsive:
  * the chart is generated at the pane width (capped) and every line is clipped so
- * a narrow pane degrades gracefully, like RulerText.
+ * a narrow pane degrades gracefully instead of word-wrapping the braille rows.
  */
 export class UsageChartCard implements Component {
 	constructor(
@@ -308,19 +277,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			highlightCode: (code) => code.split("\n").map((line) => theme.fg("mdCodeBlock", line)),
 		}, { color: (value) => theme.fg("customMessageText", value) });
 		const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
-		const rulerStart = content.indexOf(RULER_START);
-		const rulerEnd = content.indexOf(RULER_END);
-		if (rulerStart < 0 || rulerEnd < rulerStart) {
-			box.addChild(markdown(content));
-			return box;
-		}
-
 		const contentBox = new Container();
-		const before = content.slice(0, rulerStart).trim();
-		const ruler = content.slice(rulerStart + RULER_START.length, rulerEnd).trim();
-		const after = content.slice(rulerEnd + RULER_END.length).trim();
-		if (before) contentBox.addChild(markdown(before));
-		contentBox.addChild(new RulerText(ruler.split("\n"), (line) => theme.fg("mdLink", line)));
 
 		// Render a text segment, swapping any usage-chart marker block for a live
 		// UsageChartCard and rendering the surrounding text as markdown.
@@ -352,12 +309,12 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			if (afterChart) contentBox.addChild(markdown(afterChart));
 		};
 
-		const contextStart = after.indexOf(SESSION_CONTEXT_START);
-		const contextEnd = after.indexOf(SESSION_CONTEXT_END);
+		const contextStart = content.indexOf(SESSION_CONTEXT_START);
+		const contextEnd = content.indexOf(SESSION_CONTEXT_END);
 		if (contextStart >= 0 && contextEnd > contextStart) {
-			const beforeContext = after.slice(0, contextStart).trim();
-			const context = after.slice(contextStart + SESSION_CONTEXT_START.length, contextEnd).trim();
-			const afterContext = after.slice(contextEnd + SESSION_CONTEXT_END.length).trim();
+			const beforeContext = content.slice(0, contextStart).trim();
+			const context = content.slice(contextStart + SESSION_CONTEXT_START.length, contextEnd).trim();
+			const afterContext = content.slice(contextEnd + SESSION_CONTEXT_END.length).trim();
 			addSegment(beforeContext);
 			if (context) {
 				contentBox.addChild(new Spacer(1));
@@ -370,8 +327,8 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				));
 			}
 			if (afterContext) contentBox.addChild(markdown(afterContext));
-		} else if (after) {
-			addSegment(after);
+		} else {
+			addSegment(content);
 		}
 		box.addChild(contentBox);
 		return box;
@@ -441,7 +398,6 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			});
 
 			const welcomeText = renderWelcomeText({
-				rulerPanel: DASHBOARD_RULER.join("\n"),
 				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
 				sessionContext,
 				usageChart,

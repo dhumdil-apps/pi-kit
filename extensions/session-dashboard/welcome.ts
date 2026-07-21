@@ -1,8 +1,3 @@
-export const HERO_QUOTE = "**Measure twice, cut once**";
-export const DASHBOARD_INVITATION =
-	"> **Describe your goal.** I’ll enter discovery, ask focused questions until we’re aligned, propose a plan, then shape it after approval. Finally, we’ll validate and polish it.";
-export const RULER_START = "<!-- session-dashboard-ruler -->";
-export const RULER_END = "<!-- /session-dashboard-ruler -->";
 export const SESSION_CONTEXT_START = "<!-- session-dashboard-context -->";
 export const SESSION_CONTEXT_END = "<!-- /session-dashboard-context -->";
 export const USAGE_CHART_START = "<!-- session-dashboard-usage-chart -->";
@@ -14,7 +9,6 @@ export interface SessionContextSection {
 }
 
 export interface WelcomeParts {
-	rulerPanel: string;
 	extensionDeck: string;
 	sessionContext: SessionContextSection[];
 	/** Serialized GraphModel (JSON) for the "This Week" cost chart, or "" to omit. */
@@ -41,20 +35,9 @@ function renderSessionContext(sections: SessionContextSection[]): string {
 }
 
 /** Assemble the interactive welcome message without coupling layout tests to Pi. */
-export function renderWelcomeText({ rulerPanel, extensionDeck, sessionContext, usageChart }: WelcomeParts): string {
-	const usageBlock = usageChart ? `\n${USAGE_CHART_START}\n${usageChart}\n${USAGE_CHART_END}\n` : "";
-	return `
-${HERO_QUOTE}
-${RULER_START}
-${rulerPanel}
-${RULER_END}
-
-${DASHBOARD_INVITATION}
-
-${extensionDeck}
-${usageBlock}
-${SESSION_CONTEXT_START}
-${renderSessionContext(sessionContext)}
-${SESSION_CONTEXT_END}
-`.trim();
+export function renderWelcomeText({ extensionDeck, sessionContext, usageChart }: WelcomeParts): string {
+	const sections = [extensionDeck];
+	if (usageChart) sections.push(`${USAGE_CHART_START}\n${usageChart}\n${USAGE_CHART_END}`);
+	sections.push(`${SESSION_CONTEXT_START}\n${renderSessionContext(sessionContext)}\n${SESSION_CONTEXT_END}`);
+	return sections.filter(Boolean).join("\n\n").trim();
 }
