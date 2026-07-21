@@ -1,12 +1,14 @@
 export interface ExtensionPresentation {
 	name: string;
-	group: "ui" | "flow" | "config";
+	group: "display" | "usage" | "workflow" | "guardrails" | "config";
 	description: string;
 }
 
 export const EXTENSION_GROUPS = [
-	{ id: "ui", title: "UI" },
-	{ id: "flow", title: "Flow" },
+	{ id: "display", title: "Display" },
+	{ id: "usage", title: "Usage" },
+	{ id: "workflow", title: "Workflow" },
+	{ id: "guardrails", title: "Guardrails" },
 	{ id: "config", title: "Config" },
 ] as const;
 
@@ -18,48 +20,48 @@ export const EXTENSION_GROUPS = [
 export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
 		name: "session-dashboard",
-		group: "ui",
+		group: "display",
 		description: "Renders this startup banner: extensions, a This-Week cost chart, and quick command links; reads local usage history.",
 	},
 	{
 		name: "status-bar",
-		group: "ui",
+		group: "display",
 		description: "Persistent status line: git, tokens, context, model, system, and quota segments.",
 	},
 	{
 		name: "usage-monitor",
-		group: "ui",
+		group: "usage",
 		description: "Tracks subscription quota — cached at startup, refreshed every 60s and on model/session change; `/usage-refresh`.",
 	},
 	{
+		name: "usage-history",
+		group: "usage",
+		description: "Reads local session records to render historical token and spend data with `/usage`.",
+	},
+	{
+		name: "agent-workflow",
+		group: "workflow",
+		description: "Guides the planning workflow with plan persistence; Flash, retrospectives, and improvements.",
+	},
+	{
 		name: "progress-tracker",
-		group: "flow",
+		group: "workflow",
 		description: "Persists workflow phase and todos in sessions; provides `manage_todo_list` and `/todos`.",
 	},
 	{
 		name: "minimal-action-confirmation",
-		group: "flow",
+		group: "guardrails",
 		description: "Intercepts guarded tool calls and confirms destructive commands, external writes, web access, and vendored reads.",
 	},
 	{
 		name: "interrupt-confirmation",
-		group: "flow",
+		group: "guardrails",
 		description: "Confirms an interrupt before it stops a running agent.",
-	},
-	{
-		name: "agent-workflow",
-		group: "flow",
-		description: "Guides GOAL → PLANNING → IMPLEMENTATION, plan persistence, Flash, retrospectives, and improvements.",
 	},
 	{
 		name: "extension-preferences",
 		group: "config",
 		description: "Stores shared extension settings locally and provides `/extension-settings`.",
-	},
-	{
-		name: "usage-history",
-		group: "config",
-		description: "Reads local session records to render historical token and spend data with `/usage`.",
 	},
 ];
 
@@ -74,19 +76,24 @@ export function presentationCoverageErrors(extensionNames: readonly string[]): s
 	];
 }
 
-/** Render the manifest's active extensions in stable, user-oriented groups. */
+/**
+ * Render the manifest's active extensions as one aligned line per group
+ * (`Group  name · name`) — compact, so the banner stays short. Per-extension
+ * descriptions live in each extension's README, not here.
+ */
 export function renderExtensionDeck(extensionNames: readonly string[]): string {
 	const active = new Set(extensionNames);
+	const labelWidth = Math.max(...EXTENSION_GROUPS.map((group) => group.title.length), "Other".length);
+	const line = (title: string, names: readonly string[]) =>
+		`**${title}**${" ".repeat(labelWidth - title.length + 2)}${names.join(" · ")}`;
 	const groups = EXTENSION_GROUPS.flatMap((group) => {
-		const entries = EXTENSION_PRESENTATIONS
+		const names = EXTENSION_PRESENTATIONS
 			.filter((presentation) => presentation.group === group.id && active.has(presentation.name))
-			.map((presentation) => `- **${presentation.name}** — ${presentation.description}`);
-		return entries.length > 0 ? [`**${group.title}**`, ...entries].join("\n") : [];
+			.map((presentation) => presentation.name);
+		return names.length > 0 ? [line(group.title, names)] : [];
 	});
 	const presented = new Set(EXTENSION_PRESENTATIONS.map((presentation) => presentation.name));
 	const unknown = extensionNames.filter((name) => !presented.has(name));
-	if (unknown.length > 0) {
-		groups.push(["**Other extensions**", ...unknown.map((name) => `- **${name}** — active extension`)].join("\n"));
-	}
-	return `🧩 **Extensions** (${extensionNames.length})\n\n${groups.join("\n\n")}`;
+	if (unknown.length > 0) groups.push(line("Other", unknown));
+	return `🧩 **Extensions** (${extensionNames.length})\n\n${groups.join("\n")}`;
 }

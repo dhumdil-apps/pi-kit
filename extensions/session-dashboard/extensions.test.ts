@@ -24,17 +24,20 @@ describe("session dashboard extension deck", () => {
 		expect(EXTENSION_PRESENTATIONS.map((presentation) => presentation.name).sort()).toEqual([...names].sort());
 	});
 
-	it("renders every extension in its configured group and order", () => {
+	it("renders each active extension under its group, in group order, without prose", () => {
 		const names = activeExtensionNames();
 		const deck = renderExtensionDeck(names);
 		for (const group of EXTENSION_GROUPS) expect(deck).toContain(`**${group.title}**`);
 		for (const presentation of EXTENSION_PRESENTATIONS) {
 			expect(presentation.description).not.toBe("");
-			expect(deck).toContain(`**${presentation.name}** — ${presentation.description}`);
+			expect(deck).toContain(presentation.name);
 		}
 		expect(deck).not.toContain("README");
-		expect(deck.indexOf("**UI**")).toBeLessThan(deck.indexOf("**Flow**"));
-		expect(deck.indexOf("**Flow**")).toBeLessThan(deck.indexOf("**Config**"));
+		// Compact deck: names only, no per-extension prose descriptions.
+		expect(deck).not.toContain(" — ");
+		expect(deck.indexOf("**Display**")).toBeLessThan(deck.indexOf("**Usage**"));
+		expect(deck.indexOf("**Usage**")).toBeLessThan(deck.indexOf("**Workflow**"));
+		expect(deck.indexOf("**Workflow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 
 	it("renders the extension deck, then the context info, in order", () => {

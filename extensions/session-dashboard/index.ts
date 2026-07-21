@@ -15,13 +15,18 @@ const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
 /**
  * Handy workflow commands the Extensions deck does not already spell out,
- * surfaced as a slim inline line (emoji + command) to match the "📜 …" context
- * line. The deck already covers /usage, /todos, /extension-settings, etc.
+ * surfaced on the slim context line (emoji + command). The deck already covers
+ * /usage, /todos, /extension-settings, etc.
  */
-const WORKFLOW_COMMANDS = "⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init";
+const WORKFLOW_COMMANDS: { emoji: string; cmd: string }[] = [
+	{ emoji: "⚡", cmd: "/flash" },
+	{ emoji: "🪞", cmd: "/retro" },
+	{ emoji: "🔬", cmd: "/forensic" },
+	{ emoji: "🌱", cmd: "/init" },
+];
 
-/** Wider gap between the dir / context-files / commands groups on the one-liner. */
-const CONTEXT_GROUP_SEP = "   ·   ";
+/** One consistent separator across the whole context line. */
+const CONTEXT_SEP = " · ";
 
 const USAGE_CHART_MAX_WIDTH = 72;
 const USAGE_CHART_HEIGHT = 8;
@@ -64,9 +69,12 @@ export class UsageChartCard implements Component {
 		const spanMs = this.model.domainEndMs - this.model.domainStartMs;
 		const formatTime = (ms: number): string => {
 			const d = new Date(ms);
-			if (spanMs <= 26 * 3_600_000) {
-				return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-			}
+			const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+			// Within a day: just the time. Within a week (This Week is hourly-bucketed):
+			// weekday + time, so the three ticks stay distinct instead of repeating a
+			// bare date. Longer spans fall back to a date.
+			if (spanMs <= 26 * 3_600_000) return hm;
+			if (spanMs <= 8 * 24 * 3_600_000) return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${hm}`;
 			return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 		};
 
@@ -275,19 +283,19 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// A single slim markdown line (preceded by a blank line via the section
-			// join): working directory · loaded context files · workflow commands,
-			// with wider gaps between the three groups than within them.
-			const contextGroups = [truncateLeft(tildify(cwd), 60)];
+			// A single slim markdown line: the working directory and loaded context
+			// files (italic, de-emphasised) then the workflow commands (as code so
+			// they pop), every chip separated by the same CONTEXT_SEP.
+			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
-			if (contextFiles.length > 0) contextGroups.push(`📜 ${contextFiles.join(" · ")}`);
-			contextGroups.push(WORKFLOW_COMMANDS);
+			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
+			for (const { emoji, cmd } of WORKFLOW_COMMANDS) chips.push(`${emoji} \`${cmd}\``);
 
 			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
 				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
 				usageChart,
-				contextInfo: contextGroups.join(CONTEXT_GROUP_SEP),
+				contextInfo: chips.join(CONTEXT_SEP),
 			});
 
 			pi.sendMessage(
