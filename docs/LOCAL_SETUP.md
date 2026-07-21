@@ -7,7 +7,7 @@ separate from portable bundle code.
 
 | Path | Purpose | Backup/commit policy |
 | --- | --- | --- |
-| `~/.pi/pi-bundle` | Git working copy loaded by Pi | Commit and push intentional changes |
+| `~/.pi/pi-kit` | Git working copy loaded by Pi | Commit and push intentional changes |
 | `~/.pi/agent/settings.json` | Core Pi settings, local package path, role overrides | Private machine config; document values, do not blindly publish |
 | `~/.pi/agent/settings-extensions.json` | Extension UI values | Private machine config; safe to reconstruct from this guide |
 | `~/.pi/agent/themes/` | Optional machine-local theme overrides | The active `github-dark` theme now ships in the bundle (`themes/github-dark.json`); a local copy here is redundant |
@@ -27,7 +27,7 @@ The important values in `~/.pi/agent/settings.json` are:
   "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "medium",
   "theme": "github-dark",
-  "packages": ["~/.pi/pi-bundle"]
+  "packages": ["~/.pi/pi-kit"]
 }
 ```
 
@@ -54,7 +54,7 @@ registered by the extension.
 
 ## Load and update behavior
 
-Pi loads the `~/.pi/pi-bundle` working copy directly. Source edits apply
+Pi loads the `~/.pi/pi-kit` working copy directly. Source edits apply
 on the next Pi process; there is no install/update step between editing and
 testing.
 
@@ -63,7 +63,7 @@ Useful checks:
 ```bash
 pi list
 pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
-cd ~/.pi/pi-bundle
+cd ~/.pi/pi-kit
 npm test
 npm run typecheck
 ```
@@ -79,4 +79,4 @@ Mac: the role thinking overrides from [EXTENSIONS.md](EXTENSIONS.md) and the
 `defaultProvider`/`defaultModel` values shown above.
 
 Do not restore stale Git-package clones or old settings backups; the
-`~/.pi/pi-bundle` local package path is the intended setup.
+`~/.pi/pi-kit` local package path is the intended setup.

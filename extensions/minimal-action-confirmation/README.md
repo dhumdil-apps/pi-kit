@@ -16,7 +16,7 @@ it immediately. It is not persisted automatically.
   `stash drop/clear`).
 - `edit`/`write` targeting paths outside the project cwd. Paths in the
   `SAFE_PATHS` list in `index.ts` (the user's own bundle working copy at
-  `~/.pi/pi-bundle`) count as in-project.
+  `~/.pi/pi-kit`) count as in-project.
 - Web access: agent-issued `curl` plus any externally supplied `web_search`,
   `fetch_content`, or `get_search_content` tools
   (fetched pages are untrusted text — prompt-injection risk).

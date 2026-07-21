@@ -20,7 +20,7 @@
  *   target path reaches outside the project directory — avoids runaway
  *   scans of the home directory / filesystem when an agent goes looking
  *   for context files with too broad a root. Paths in SAFE_PATHS (the
- *   user's own bundle at ~/.pi/pi-bundle) count as in-project for both
+ *   user's own bundle at ~/.pi/pi-kit) count as in-project for both
  *   this and the edit/write gate.
  *
  * Everything else runs without prompting. Deliberately NOT gated: redirects
@@ -72,7 +72,7 @@ const SEARCH_COMMANDS = new Set(["find", "grep", "rg", "tree", "ls"]);
 
 // Paths treated as in-project everywhere: the user's own bundle working
 // copy — searching, reading, and editing it from any cwd is routine.
-const SAFE_PATHS = [resolve(homedir(), ".pi/pi-bundle")];
+const SAFE_PATHS = [resolve(homedir(), ".pi/pi-kit")];
 
 function pathIsSafelisted(abs: string): boolean {
 	return SAFE_PATHS.some((dir) => abs === dir || abs.startsWith(`${dir}/`));

@@ -31,8 +31,8 @@ that loads it.
 
 ## Repository locations
 
-- Local working copy: `~/.pi/pi-bundle`
-- GitHub remote: `git@github.com:dhumdil-apps/pi-bundle.git`
+- Local working copy: `~/.pi/pi-kit`
+- GitHub remote: `git@github.com:dhumdil-apps/pi-kit.git`
 - Active branch: `main`
 - Local Pi directory: `~/.pi`
 

@@ -53,7 +53,7 @@ describe("bashUsesGuardedWebCommand", () => {
 
 describe("vendoredDirForBash", () => {
 	it("does not treat find filter operands as vendored reads", () => {
-		expect(vendoredDirForBash("find pi-bundle/extensions/session-dashboard -maxdepth 2 -type f -not -path '*/node_modules/*' -print")).toBeUndefined();
+		expect(vendoredDirForBash("find pi-kit/extensions/session-dashboard -maxdepth 2 -type f -not -path '*/node_modules/*' -print")).toBeUndefined();
 		expect(vendoredDirForBash("find . -path '*/node_modules/*' -prune -o -type f -print")).toBeUndefined();
 	});
 

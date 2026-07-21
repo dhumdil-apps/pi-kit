@@ -3,7 +3,7 @@
 ## Pi does not show the bundle
 
 1. Check `packages` in `~/.pi/agent/settings.json` contains the absolute
-   path of your `pi-bundle` clone.
+   path of your `pi-kit` clone.
 2. Run `pi list`.
 3. Restart Pi; a running process does not reload edited extensions.
 4. Run the headless smoke from [DEVELOPMENT.md](DEVELOPMENT.md).

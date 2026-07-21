@@ -1,4 +1,4 @@
-# pi-bundle
+# pi-kit
 
 Measure twice, cut once
 
@@ -52,18 +52,18 @@ This is a working copy loaded directly by Pi. In `~/.pi/agent/settings.json`,
 point `packages` at your clone (absolute path):
 
 ```json
-"packages": ["/absolute/path/to/pi-bundle"]
+"packages": ["/absolute/path/to/pi-kit"]
 ```
 
 Edits apply on the next Pi start — no `pi install`/`pi update` needed. GitHub
-(`git@github.com:dhumdil-apps/pi-bundle.git`) is the backup remote; push after
+(`git@github.com:dhumdil-apps/pi-kit.git`) is the backup remote; push after
 meaningful changes. For a fresh machine, follow
 [docs/SETUP.md](docs/SETUP.md).
 
 For a one-off test without changing settings:
 
 ```bash
-pi -ne -e /absolute/path/to/pi-bundle
+pi -ne -e /absolute/path/to/pi-kit
 ```
 
 ## Development

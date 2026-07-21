@@ -11,11 +11,11 @@ How to get a fully working Pi setup from this repo on a fresh machine.
 ## 2. Clone the bundle
 
 ```bash
-git clone git@github.com:dhumdil-apps/pi-bundle.git ~/.pi/pi-bundle
-cd ~/.pi/pi-bundle && npm install
+git clone git@github.com:dhumdil-apps/pi-kit.git ~/.pi/pi-kit
+cd ~/.pi/pi-kit && npm install
 ```
 
-`~/.pi/pi-bundle` is the canonical location on every machine — the config
+`~/.pi/pi-kit` is the canonical location on every machine — the config
 template's `packages` entry already points there (Pi expands `~`). A different
 clone location works too; it just has to match the `packages` path below.
 
@@ -24,12 +24,12 @@ clone location works too; it just has to match the `packages` path below.
 Run Pi once (`pi`, then quit) so `~/.pi/agent/` exists, then:
 
 ```bash
-cp ~/.pi/pi-bundle/setup/settings.json            ~/.pi/agent/settings.json
-cp ~/.pi/pi-bundle/setup/AGENTS.md                ~/.pi/agent/AGENTS.md
-cp ~/.pi/pi-bundle/setup/settings-extensions.json ~/.pi/agent/settings-extensions.json
+cp ~/.pi/pi-kit/setup/settings.json            ~/.pi/agent/settings.json
+cp ~/.pi/pi-kit/setup/AGENTS.md                ~/.pi/agent/AGENTS.md
+cp ~/.pi/pi-kit/setup/settings-extensions.json ~/.pi/agent/settings-extensions.json
 ```
 
-The template's `packages` entry is `~/.pi/pi-bundle`; if you cloned elsewhere,
+The template's `packages` entry is `~/.pi/pi-kit`; if you cloned elsewhere,
 edit `~/.pi/agent/settings.json` to point at your clone path. If Pi already
 wrote defaults you want to keep (e.g. `lastChangelogVersion`), merge instead
 of overwriting.
