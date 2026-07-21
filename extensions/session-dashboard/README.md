@@ -13,13 +13,13 @@ non-interactive braille line chart built from `usage-history`'s `buildGraphModel
 and `renderChart`, showing this week's spend by provider (with a "No usage yet
 this week" fallback). It is omitted when usage data is unavailable.
 
-A few slim, plain-markdown lines close the dashboard: the working directory
-(tildified), the loaded context files (`📜 …`, from pi core's
-`loadProjectContextFiles` so the list always matches what is actually loaded),
-and a reminder of the workflow commands the extension deck does not already spell
-out (`⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init`, a static constant). Git
-branch/status are intentionally not repeated here — the status bar already shows
-them persistently.
+A single slim, plain-markdown line closes the dashboard, joining three groups with
+wider gaps between them: the working directory (tildified), the loaded context
+files (`📜 …`, from pi core's `loadProjectContextFiles` so the list always matches
+what is actually loaded), and a reminder of the workflow commands the extension
+deck does not already spell out (`⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init`,
+a static constant). Git branch/status are intentionally not repeated here — the
+status bar already shows them persistently.
 
 The dashboard does not duplicate the Progress Tracker phase ribbon.
 

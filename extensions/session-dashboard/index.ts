@@ -20,6 +20,9 @@ const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
  */
 const WORKFLOW_COMMANDS = "⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init";
 
+/** Wider gap between the dir / context-files / commands groups on the one-liner. */
+const CONTEXT_GROUP_SEP = "   ·   ";
+
 const USAGE_CHART_MAX_WIDTH = 72;
 const USAGE_CHART_HEIGHT = 8;
 
@@ -266,18 +269,19 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// Slim context lines rendered as plain markdown: working directory, the
-			// context files pi loaded, and a reminder of the workflow commands.
-			const contextLines = [truncateLeft(tildify(cwd), 60)];
+			// A single slim markdown line (preceded by a blank line via the section
+			// join): working directory · loaded context files · workflow commands,
+			// with wider gaps between the three groups than within them.
+			const contextGroups = [truncateLeft(tildify(cwd), 60)];
 			const contextFiles = contextFileList(cwd);
-			if (contextFiles.length > 0) contextLines.push(`📜 ${contextFiles.join(" · ")}`);
-			contextLines.push(WORKFLOW_COMMANDS);
+			if (contextFiles.length > 0) contextGroups.push(`📜 ${contextFiles.join(" · ")}`);
+			contextGroups.push(WORKFLOW_COMMANDS);
 
 			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
 				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
 				usageChart,
-				contextInfo: contextLines.join("\n"),
+				contextInfo: contextGroups.join(CONTEXT_GROUP_SEP),
 			});
 
 			pi.sendMessage(
