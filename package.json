@@ -12,9 +12,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.41",
-    "jiti": "2.7.0",
-    "yaml": "2.8.3"
+    "@sinclair/typebox": "^0.34.41"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
