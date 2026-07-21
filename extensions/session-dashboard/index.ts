@@ -233,7 +233,13 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			} catch {
 				// Malformed model: skip the panel rather than dumping raw JSON.
 			}
-			if (afterChart) contentBox.addChild(markdown(afterChart));
+			if (afterChart) {
+				// The chart is a component, so the blank line the source text puts
+				// before the context tail gets trimmed — re-add it as a Spacer so the
+				// tail is not jammed against the chart legend.
+				contentBox.addChild(new Spacer(1));
+				contentBox.addChild(markdown(afterChart));
+			}
 		};
 
 		// The whole banner is markdown plus the usage-chart marker block, which

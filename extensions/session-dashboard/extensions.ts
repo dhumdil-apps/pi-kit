@@ -19,17 +19,17 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
 		name: "session-dashboard",
 		group: "ui",
-		description: "Renders the startup map after session start; reads Git and local usage history.",
+		description: "Renders this startup banner: extensions, a This-Week cost chart, and quick command links; reads local usage history.",
 	},
 	{
 		name: "status-bar",
 		group: "ui",
-		description: "Renders git, tokens, context, model, system, and quota state; `/extension-settings`.",
+		description: "Persistent status line: git, tokens, context, model, system, and quota segments.",
 	},
 	{
 		name: "usage-monitor",
 		group: "ui",
-		description: "Uses cached quota at startup, then calls provider quota APIs every 60s and on model/session changes; `/usage-refresh`.",
+		description: "Tracks subscription quota — cached at startup, refreshed every 60s and on model/session change; `/usage-refresh`.",
 	},
 	{
 		name: "progress-tracker",
