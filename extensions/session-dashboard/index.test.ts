@@ -82,6 +82,7 @@ describe("session dashboard startup", () => {
 		const sendMessage = vi.fn();
 		const pi = {
 			registerMessageRenderer: vi.fn(),
+			registerCommand: vi.fn(),
 			on: (event: string, handler: (event: unknown, ctx: unknown) => Promise<void>) => handlers.set(event, handler),
 			sendMessage,
 		};

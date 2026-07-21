@@ -23,11 +23,18 @@ commands the deck does not spell out, rendered as code so they pop
 branch/status are intentionally not repeated here — the status bar already shows
 them persistently.
 
+The context line also surfaces `❓ /help`, which prints a full reference —
+commands, shortcuts, and every active extension with its complete description
+(the compact deck lists names only). The help document is built by `help.ts`
+from the same `EXTENSION_PRESENTATIONS` manifest and rendered in the banner's
+themed box.
+
 The dashboard does not duplicate the Progress Tracker phase ribbon.
 
 ## User surface
 
-Automatic on interactive session start; no tools or commands.
+Automatic on interactive session start. Provides `/help` — a reference of the
+bundle's commands, shortcuts, and extensions.
 
 ## Origin
 

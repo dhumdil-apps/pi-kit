@@ -21,7 +21,7 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
 		name: "session-dashboard",
 		group: "display",
-		description: "Renders this startup banner: extensions, a This-Week cost chart, and quick command links; reads local usage history.",
+		description: "Renders this startup banner (extensions, a This-Week cost chart, quick command links) and provides `/help`; reads local usage history.",
 	},
 	{
 		name: "status-bar",

@@ -3,8 +3,9 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Box, type Component, Container, Markdown, Spacer, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { renderHelp } from "./help.js";
 import { collectUsageData } from "../usage-history/data.js";
 import { buildGraphModel, type GraphModel, renderChart, TOTAL_SERIES_KEY } from "../usage-history/graph.js";
 import { COLOR_RESET, formatAxisCost, seriesColor } from "../usage-history/index.js";
@@ -188,29 +189,38 @@ function contextFileList(cwd: string): string[] {
 	}
 }
 
+/** Flatten a custom message's content (string or content-item array) to text. */
+function messageText(content: string | { type: string; text?: string }[]): string {
+	return typeof content === "string"
+		? content
+		: content.filter((item) => item.type === "text").map((item) => item.text ?? "").join("\n");
+}
+
+/** Markdown component wired to the interactive theme, shared by the banner and /help. */
+function themedMarkdown(theme: Theme, text: string): Markdown {
+	return new Markdown(text, 0, 0, {
+		heading: (value) => theme.fg("mdHeading", value),
+		link: (value) => theme.fg("mdLink", value),
+		linkUrl: (value) => theme.fg("mdLinkUrl", value),
+		code: (value) => theme.fg("mdCode", value),
+		codeBlock: (value) => theme.fg("mdCodeBlock", value),
+		codeBlockBorder: (value) => theme.fg("mdCodeBlockBorder", value),
+		quote: (value) => theme.fg("mdQuote", value),
+		quoteBorder: (value) => theme.fg("mdQuoteBorder", value),
+		hr: (value) => theme.fg("mdHr", value),
+		listBullet: (value) => theme.fg("mdListBullet", value),
+		bold: (value) => theme.bold(value),
+		italic: (value) => theme.italic(value),
+		strikethrough: (value) => value,
+		underline: (value) => theme.underline(value),
+		highlightCode: (code) => code.split("\n").map((line) => theme.fg("mdCodeBlock", line)),
+	}, { color: (value) => theme.fg("customMessageText", value) });
+}
+
 export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 	pi.registerMessageRenderer("session-dashboard", (message, _options, theme) => {
-		const content = typeof message.content === "string" ? message.content : message.content
-			.filter((item) => item.type === "text")
-			.map((item) => item.text)
-			.join("\n");
-		const markdown = (text: string) => new Markdown(text, 0, 0, {
-			heading: (value) => theme.fg("mdHeading", value),
-			link: (value) => theme.fg("mdLink", value),
-			linkUrl: (value) => theme.fg("mdLinkUrl", value),
-			code: (value) => theme.fg("mdCode", value),
-			codeBlock: (value) => theme.fg("mdCodeBlock", value),
-			codeBlockBorder: (value) => theme.fg("mdCodeBlockBorder", value),
-			quote: (value) => theme.fg("mdQuote", value),
-			quoteBorder: (value) => theme.fg("mdQuoteBorder", value),
-			hr: (value) => theme.fg("mdHr", value),
-			listBullet: (value) => theme.fg("mdListBullet", value),
-			bold: (value) => theme.bold(value),
-			italic: (value) => theme.italic(value),
-			strikethrough: (value) => value,
-			underline: (value) => theme.underline(value),
-			highlightCode: (code) => code.split("\n").map((line) => theme.fg("mdCodeBlock", line)),
-		}, { color: (value) => theme.fg("customMessageText", value) });
+		const content = messageText(message.content);
+		const markdown = (text: string) => themedMarkdown(theme, text);
 		const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
 		const contentBox = new Container();
 
@@ -257,6 +267,24 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		return box;
 	});
 
+	// /help renders as markdown inside the same themed box as the banner.
+	pi.registerMessageRenderer("session-dashboard-help", (message, _options, theme) => {
+		const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
+		box.addChild(themedMarkdown(theme, messageText(message.content)));
+		return box;
+	});
+
+	pi.registerCommand("help", {
+		description: "List the bundle's extensions, commands, and shortcuts",
+		handler: async () => {
+			const bundle = loadBundleResources();
+			pi.sendMessage(
+				{ customType: "session-dashboard-help", content: renderHelp(bundle.extensions), display: true },
+				{ triggerTurn: false },
+			);
+		},
+	});
+
 	pi.on("session_start", async (_event, ctx) => {
 		// Purely decorative banner: in headless/print mode it would land after the
 		// prompt and trigger a spurious extra turn, so interactive sessions only.
@@ -289,6 +317,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
 			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
+			chips.push("❓ `/help`");
 			for (const { emoji, cmd } of WORKFLOW_COMMANDS) chips.push(`${emoji} \`${cmd}\``);
 
 			const bundle = loadBundleResources();
