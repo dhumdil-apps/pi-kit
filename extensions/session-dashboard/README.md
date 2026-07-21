@@ -13,14 +13,17 @@ non-interactive braille line chart built from `usage-history`'s `buildGraphModel
 and `renderChart`, showing this week's spend by provider (with a "No usage yet
 this week" fallback). It is omitted when usage data is unavailable.
 
-A compact, responsive “Session context” card closes the dashboard. It combines
-git context (branch and status), the spend summary from `usage-history`'s
-`collectUsageData`, loaded context files, skills and prompts, and shortcut help.
-Context files come from pi core's `loadProjectContextFiles`, so the list always
-matches what is actually loaded. Labels align across sections, additional
-resource values use indented continuation rows, and long values wrap within the
-available terminal width. Terminal-visible widths keep emoji and ANSI styling
-inside the border; unavailable spend and resource sections are omitted.
+Two slim lines follow: the working directory (tildified) and the loaded context
+files (`📜 …`), the latter from pi core's `loadProjectContextFiles` so the list
+always matches what is actually loaded. Git branch/status are intentionally not
+repeated here — the status bar already shows them persistently.
+
+A compact, responsive “Quick reference” card closes the dashboard: a bordered box
+grouping the handy commands the extension deck does not already spell out
+(Shortcuts: `! cmd`, `escape`; Workflow: `/flash`, `/retro`, `/forensic`,
+`/init`). The command list is a static constant; commands share one aligned
+column and descriptions wrap under them on narrow panes, staying inside the
+border.
 
 The dashboard does not duplicate the Progress Tracker phase ribbon.
 

@@ -10,67 +10,113 @@ import { buildGraphModel, type GraphModel, renderChart, TOTAL_SERIES_KEY } from 
 import { COLOR_RESET, formatAxisCost, seriesColor } from "../usage-history/index.js";
 import { renderExtensionDeck } from "./extensions.js";
 import {
-	parseSessionContext,
-	SESSION_CONTEXT_END,
-	SESSION_CONTEXT_START,
+	QUICK_REF_START,
 	USAGE_CHART_END,
 	USAGE_CHART_START,
 	renderWelcomeText,
-	type SessionContextSection,
 } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const MAX_PANEL_ROW = 60;
 
-const SESSION_CONTEXT_MAX_WIDTH = 72;
-const SESSION_CONTEXT_TITLE = " Session context ";
+const QUICK_REF_MAX_WIDTH = 72;
+const QUICK_REF_TITLE = " Quick reference ";
 
-export class SessionContextCard implements Component {
+interface QuickRefItem {
+	cmd: string;
+	desc: string;
+}
+
+interface QuickRefGroup {
+	title: string;
+	items: QuickRefItem[];
+}
+
+/**
+ * Curated reminder of the handy commands the Extensions deck does not already
+ * spell out (the deck covers /usage, /todos, /extension-settings, …). Static:
+ * the list never changes at runtime, so the card carries no serialized payload.
+ */
+const QUICK_REFERENCE: QuickRefGroup[] = [
+	{
+		title: "Shortcuts",
+		items: [
+			{ cmd: "! cmd", desc: "run a shell command" },
+			{ cmd: "escape", desc: "cancel the current turn" },
+		],
+	},
+	{
+		title: "Workflow",
+		items: [
+			{ cmd: "/flash", desc: "finish the task autonomously" },
+			{ cmd: "/retro", desc: "reflect on this session" },
+			{ cmd: "/forensic", desc: "deep session retrospective" },
+			{ cmd: "/init", desc: "create or improve AGENTS.md" },
+		],
+	},
+];
+
+/**
+ * Static "Quick reference" card: a bordered, width-aware box (rounded borders +
+ * centered title) listing grouped command/description pairs. Reuses the border
+ * chrome shape of the former Session context card; commands share one aligned
+ * column, descriptions wrap under the command when the pane is too narrow.
+ */
+export class QuickReferenceCard implements Component {
 	constructor(
-		private readonly sections: SessionContextSection[],
+		private readonly groups: QuickRefGroup[],
 		private readonly borderFn: (text: string) => string,
 		private readonly titleFn: (text: string) => string,
-		private readonly labelFn: (text: string) => string,
-		private readonly contentFn: (text: string) => string,
+		private readonly groupFn: (text: string) => string,
+		private readonly cmdFn: (text: string) => string,
+		private readonly descFn: (text: string) => string,
 	) {}
 
 	render(width: number): string[] {
-		if (width <= 0 || this.sections.length === 0) return [];
-		const labelWidth = Math.max(...this.sections.map(({ label }) => visibleWidth(label)));
+		if (width <= 0 || this.groups.length === 0) return [];
+		const items = this.groups.flatMap((group) => group.items);
+		const cmdWidth = Math.max(0, ...items.map((item) => visibleWidth(item.cmd)));
 		const desiredWidth = Math.max(
-			visibleWidth(SESSION_CONTEXT_TITLE) + 3,
-			...this.sections.flatMap(({ values }) => values.map((value) => labelWidth + 2 + visibleWidth(value) + 4)),
+			visibleWidth(QUICK_REF_TITLE) + 3,
+			...this.groups.map((group) => visibleWidth(group.title) + 4),
+			...items.map((item) => 2 + cmdWidth + 2 + visibleWidth(item.desc) + 4),
 		);
-		const cardWidth = Math.min(width, SESSION_CONTEXT_MAX_WIDTH, desiredWidth);
-		if (cardWidth < 4) return [this.borderFn("─".repeat(cardWidth))];
+		const cardWidth = Math.min(width, QUICK_REF_MAX_WIDTH, desiredWidth);
+		if (cardWidth < 4) return [this.borderFn("─".repeat(Math.max(cardWidth, 0)))];
 
-		const titleFits = cardWidth >= visibleWidth(SESSION_CONTEXT_TITLE) + 3;
+		const titleFits = cardWidth >= visibleWidth(QUICK_REF_TITLE) + 3;
 		const top = titleFits
-			? this.borderFn("╭─") + this.titleFn(SESSION_CONTEXT_TITLE) + this.borderFn(`${"─".repeat(cardWidth - visibleWidth(SESSION_CONTEXT_TITLE) - 3)}╮`)
+			? this.borderFn("╭─") + this.titleFn(QUICK_REF_TITLE) + this.borderFn(`${"─".repeat(cardWidth - visibleWidth(QUICK_REF_TITLE) - 3)}╮`)
 			: this.borderFn(`╭${"─".repeat(cardWidth - 2)}╮`);
 		const innerWidth = cardWidth - 4;
 		if (innerWidth <= 0) return [top, this.borderFn(`╰${"─".repeat(cardWidth - 2)}╯`)];
-		const rows = this.sections.flatMap(({ label, values }) => {
-			if (innerWidth <= labelWidth + 3) {
-				return [
-					{ label: truncateToWidth(label, innerWidth, "…"), content: "", stacked: true },
-					...values.flatMap((value) => wrapTextWithAnsi(value, innerWidth).map((line) => ({ label: "", content: line, stacked: true }))),
-				];
-			}
 
-			const contentWidth = innerWidth - labelWidth - 2;
-			return values.flatMap((value, valueIndex) => wrapTextWithAnsi(value, contentWidth).map((line, lineIndex) => ({
-				label: valueIndex === 0 && lineIndex === 0 ? label : "",
-				content: line,
-				stacked: false,
-			})));
-		});
-		const body = rows.map(({ label, content, stacked }) => {
-			const labelText = label ? truncateToWidth(label, labelWidth, "…") : "";
-			const prefix = stacked ? this.labelFn(labelText) : this.labelFn(labelText.padEnd(labelWidth)) + "  ";
-			const rendered = truncateToWidth(prefix + this.contentFn(content), innerWidth, "");
-			const padding = " ".repeat(Math.max(0, innerWidth - visibleWidth(rendered)));
-			return this.borderFn("│ ") + rendered + padding + this.borderFn(" │");
+		// Build styled inner lines: a group header, then one line per item with the
+		// command in an aligned column. When the command column plus a little room
+		// for the description no longer fits, stack the description on its own line.
+		const stacked = innerWidth <= cmdWidth + 6;
+		const lines: string[] = [];
+		for (const group of this.groups) {
+			lines.push(this.groupFn(truncateToWidth(group.title, innerWidth, "…")));
+			for (const item of group.items) {
+				if (stacked) {
+					lines.push(truncateToWidth("  " + this.cmdFn(item.cmd), innerWidth, ""));
+					for (const line of wrapTextWithAnsi(item.desc, Math.max(innerWidth - 4, 1))) {
+						lines.push(truncateToWidth("    " + this.descFn(line), innerWidth, ""));
+					}
+				} else {
+					const descWidth = innerWidth - 2 - cmdWidth - 2;
+					const wrapped = wrapTextWithAnsi(item.desc, descWidth);
+					wrapped.forEach((line, i) => {
+						const cmdCell = i === 0 ? this.cmdFn(padRightVis(item.cmd, cmdWidth)) : " ".repeat(cmdWidth);
+						lines.push(truncateToWidth("  " + cmdCell + "  " + this.descFn(line), innerWidth, ""));
+					});
+				}
+			}
+		}
+
+		const body = lines.map((line) => {
+			const padding = " ".repeat(Math.max(0, innerWidth - visibleWidth(line)));
+			return this.borderFn("│ ") + line + padding + this.borderFn(" │");
 		});
 		return [top, ...body, this.borderFn(`╰${"─".repeat(cardWidth - 2)}╯`)];
 	}
@@ -153,22 +199,6 @@ export class UsageChartCard implements Component {
 	invalidate(): void {
 		// Stateless: theme callbacks and renderChart run on every render.
 	}
-}
-
-async function git(pi: ExtensionAPI, cwd: string, args: string[]) {
-	try {
-		const res = await pi.exec("git", args, { cwd, timeout: 5000 });
-		return res.code === 0 ? res.stdout.trim() : "";
-	} catch {
-		return "";
-	}
-}
-
-function formatUsdSpend(cost: number): string {
-	if (cost < 0.01) return `$${cost.toFixed(4)}`;
-	if (cost < 1) return `$${cost.toFixed(2)}`;
-	if (cost < 100) return `$${cost.toFixed(1)}`;
-	return `$${Math.round(cost)}`;
 }
 
 export function tildify(path: string): string {
@@ -309,24 +339,21 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			if (afterChart) contentBox.addChild(markdown(afterChart));
 		};
 
-		const contextStart = content.indexOf(SESSION_CONTEXT_START);
-		const contextEnd = content.indexOf(SESSION_CONTEXT_END);
-		if (contextStart >= 0 && contextEnd > contextStart) {
-			const beforeContext = content.slice(0, contextStart).trim();
-			const context = content.slice(contextStart + SESSION_CONTEXT_START.length, contextEnd).trim();
-			const afterContext = content.slice(contextEnd + SESSION_CONTEXT_END.length).trim();
-			addSegment(beforeContext);
-			if (context) {
-				contentBox.addChild(new Spacer(1));
-				contentBox.addChild(new SessionContextCard(
-					parseSessionContext(context),
-					(line) => theme.fg("borderMuted", line),
-					(line) => theme.fg("mdHeading", theme.bold(line)),
-					(line) => theme.fg("muted", line),
-					(line) => theme.fg("customMessageText", line),
-				));
-			}
-			if (afterContext) contentBox.addChild(markdown(afterContext));
+		// The quick-reference card is static, so its markers just mark where to
+		// insert the component; everything before them (deck, usage chart, context
+		// lines) flows through addSegment.
+		const quickRefStart = content.indexOf(QUICK_REF_START);
+		if (quickRefStart >= 0) {
+			addSegment(content.slice(0, quickRefStart));
+			contentBox.addChild(new Spacer(1));
+			contentBox.addChild(new QuickReferenceCard(
+				QUICK_REFERENCE,
+				(line) => theme.fg("borderMuted", line),
+				(line) => theme.fg("mdHeading", theme.bold(line)),
+				(line) => theme.fg("mdHeading", theme.bold(line)),
+				(line) => theme.fg("accent", line),
+				(line) => theme.fg("muted", line),
+			));
 		} else {
 			addSegment(content);
 		}
@@ -341,33 +368,12 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		ctx.ui.setWidget("session-dashboard-loading", ["Preparing session dashboard…"]);
 		try {
 			const cwd = ctx.cwd;
-			// Independent lookups — run concurrently so a cold usage-cache build
-			// doesn't add its full duration on top of the two git calls before this
-			// purely decorative banner can render.
-			const [branchResult, dirtyOutput, usage] = await Promise.all([
-				git(pi, cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
-				git(pi, cwd, ["status", "--porcelain"]),
-				collectUsageData().catch(() => null),
-			]);
-			const branch = branchResult || "no git";
-			const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
+			// Only the usage cache is needed now (branch/status live in the status
+			// bar). collectUsageData may do a cold build, so keep it off the hot path.
+			const usage = await collectUsageData().catch(() => null);
 
-			const projectRow = `${truncateLeft(tildify(cwd), 34)}  ${branch} · ${
-				dirtyCount === 0 ? "clean" : `${dirtyCount} modified`
-			}`;
-			const sessionContext: SessionContextSection[] = [{
-				label: "project",
-				values: [truncateLeft(projectRow, MAX_PANEL_ROW)],
-			}];
 			let usageChart: string | undefined;
 			if (usage) {
-				const spend = [
-					`${formatUsdSpend(usage.today.totals.cost)} today`,
-					`${formatUsdSpend(usage.last30Days.totals.cost)} 30d`,
-					`${formatUsdSpend(usage.allTime.totals.cost)} all`,
-				].join(" · ");
-				sessionContext.push({ label: "spend", values: [spend] });
-
 				// Same model the /usage Graphs view builds for This Week · Per bucket
 				// cost · by provider. GraphModel is plain arrays/objects, so it serializes
 				// cleanly into the banner text and is rebuilt by the message renderer.
@@ -381,26 +387,17 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			const bundle = loadBundleResources();
+			// Slim context lines rendered as plain markdown above the quick-reference
+			// card: the working directory and whatever context files pi loaded.
+			const contextLines = [truncateLeft(tildify(cwd), 60)];
 			const contextFiles = contextFileList(cwd);
-			const resources: string[] = [];
-			if (contextFiles.length > 0) resources.push(`📜 ${contextFiles.join(" · ")}`);
-			if (bundle.skills.length > 0) resources.push(`🎓 ${bundle.skills.join(" · ")}`);
-			if (bundle.prompts.length > 0) resources.push(`⌘ ${bundle.prompts.join(" · ")}`);
-			if (resources.length > 0) sessionContext.push({ label: "resources", values: resources });
-			sessionContext.push({
-				label: "commands",
-				values: ["⌨️ ! <cmd> bash · /todos progress · /flash cruise control · /retro reflect · escape confirm cancel"],
-			});
-			sessionContext.push({
-				label: "updates",
-				values: ["automatic checks off · run pi update periodically"],
-			});
+			if (contextFiles.length > 0) contextLines.push(`📜 ${contextFiles.join(" · ")}`);
 
+			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
 				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
-				sessionContext,
 				usageChart,
+				contextInfo: contextLines.join("\n"),
 			});
 
 			pi.sendMessage(

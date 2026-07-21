@@ -9,9 +9,8 @@ import {
 	renderExtensionDeck,
 } from "./extensions.js";
 import {
-	SESSION_CONTEXT_END,
-	SESSION_CONTEXT_START,
-	parseSessionContext,
+	QUICK_REF_END,
+	QUICK_REF_START,
 	renderWelcomeText,
 } from "./welcome.js";
 
@@ -42,37 +41,27 @@ describe("session dashboard extension deck", () => {
 		expect(deck.indexOf("**Flow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 
-	it("renders extensions, then session context, with no hero quote, ruler, or invitation", () => {
+	it("renders extensions, then context info, then the quick-reference marker in order", () => {
 		const welcome = renderWelcomeText({
 			extensionDeck: "EXTENSIONS",
-			sessionContext: [
-				{ label: "project", values: ["PROJECT"] },
-				{ label: "resources", values: ["📜 CONTEXT", "🎓 SKILLS"] },
-				{ label: "commands", values: ["⌨️ COMMANDS"] },
-			],
+			contextInfo: "~/work\n📜 AGENTS.md",
 		});
 		expect(welcome.startsWith("EXTENSIONS")).toBe(true);
-		expect(welcome).toContain(`${SESSION_CONTEXT_START}\nproject\tPROJECT\nresources\t📜 CONTEXT\n\t🎓 SKILLS\ncommands\t⌨️ COMMANDS\n${SESSION_CONTEXT_END}`);
-		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("PROJECT"));
+		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("~/work"));
+		expect(welcome.indexOf("~/work")).toBeLessThan(welcome.indexOf(QUICK_REF_START));
+		expect(welcome).toContain(`${QUICK_REF_START}\n${QUICK_REF_END}`);
 		expect(welcome).not.toContain("Measure twice");
-		expect(welcome).not.toContain("Describe your goal");
-		expect(welcome).not.toContain("π");
+		expect(welcome).not.toContain("Session context");
 	});
 
-	it("places the usage chart between the extensions and the session context", () => {
+	it("places the usage chart between the extensions and the context info", () => {
 		const welcome = renderWelcomeText({
 			extensionDeck: "EXTENSIONS",
-			sessionContext: [{ label: "project", values: ["PROJECT"] }],
+			contextInfo: "~/work",
 			usageChart: '{"model":true}',
 		});
 		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf('{"model":true}'));
-		expect(welcome.indexOf('{"model":true}')).toBeLessThan(welcome.indexOf("PROJECT"));
-	});
-
-	it("round-trips context sections with continuation values", () => {
-		expect(parseSessionContext("project\t~/work main · clean\nresources\t📜 AGENTS.md\n\t🎓 simplify")).toEqual([
-			{ label: "project", values: ["~/work main · clean"] },
-			{ label: "resources", values: ["📜 AGENTS.md", "🎓 simplify"] },
-		]);
+		expect(welcome.indexOf('{"model":true}')).toBeLessThan(welcome.indexOf("~/work"));
+		expect(welcome.indexOf("~/work")).toBeLessThan(welcome.indexOf(QUICK_REF_START));
 	});
 });

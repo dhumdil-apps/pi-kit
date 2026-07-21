@@ -3,7 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphModel } from "../usage-history/graph.js";
 import { TOTAL_SERIES_KEY } from "../usage-history/graph.js";
-import sessionDashboardExtension, { SessionContextCard, tildify, UsageChartCard } from "./index.js";
+import sessionDashboardExtension, { QuickReferenceCard, tildify, UsageChartCard } from "./index.js";
 
 describe("tildify", () => {
 	it("tildifies a path under the home directory", () => {
@@ -26,46 +26,46 @@ describe("tildify", () => {
 	});
 });
 
-describe("SessionContextCard", () => {
-	const card = () => new SessionContextCard(
-		[
-			{ label: "project", values: ["~/.pi  main · clean"] },
-			{ label: "resources", values: ["📜 ./agent/AGENTS.md", "🎓 simplify"] },
-			{ label: "commands", values: ["⌨️ ! <cmd> bash · /todos progress · /flash cruise control"] },
-		],
-		(s) => s,
-		(s) => s,
-		(s) => s,
-		(s) => s,
-	);
+describe("QuickReferenceCard", () => {
+	const groups = [
+		{ title: "Shortcuts", items: [
+			{ cmd: "! cmd", desc: "run a shell command" },
+			{ cmd: "escape", desc: "cancel the current turn" },
+		] },
+		{ title: "Workflow", items: [
+			{ cmd: "/flash", desc: "finish the task autonomously" },
+			{ cmd: "/init", desc: "create or improve AGENTS.md" },
+		] },
+	];
+	const card = (g = groups) => new QuickReferenceCard(g, (s) => s, (s) => s, (s) => s, (s) => s, (s) => s);
 
-	it("renders aligned labels and indented continuation values", () => {
+	it("renders the title, group headers, and aligned command/description rows", () => {
 		const rendered = card().render(72);
-		expect(rendered[0]).toContain("Session context");
-		expect(rendered.some((line) => line.includes("project    ~/.pi  main · clean"))).toBe(true);
-		expect(rendered.some((line) => line.includes("resources  📜 ./agent/AGENTS.md"))).toBe(true);
-		expect(rendered.some((line) => line.includes("           🎓 simplify"))).toBe(true);
-		expect(rendered.filter((line) => line.includes("resources"))).toHaveLength(1);
+		expect(rendered[0]).toContain("Quick reference");
+		expect(rendered.some((line) => line.includes("Shortcuts"))).toBe(true);
+		expect(rendered.some((line) => line.includes("Workflow"))).toBe(true);
+		expect(rendered.some((line) => line.includes("! cmd") && line.includes("run a shell command"))).toBe(true);
+		expect(rendered.some((line) => line.includes("/flash") && line.includes("finish the task autonomously"))).toBe(true);
 	});
 
-	it("wraps long commands without losing content", () => {
-		const rendered = card().render(40);
-		expect(rendered.every((line) => visibleWidth(line) <= 40)).toBe(true);
-		expect(rendered.filter((line) => line.includes("commands"))).toHaveLength(1);
-		expect(rendered.some((line) => line.includes("/flash"))).toBe(true);
-		expect(rendered.join("\n")).not.toContain("…");
+	it("aligns the command column so descriptions start at the same offset", () => {
+		const rendered = card().render(72);
+		const cmdLines = rendered.filter((line) => /\/flash|\/init/.test(line));
+		const offsets = cmdLines.map((line) => line.indexOf("finish") >= 0 ? line.indexOf("finish") : line.indexOf("create"));
+		expect(new Set(offsets).size).toBe(1);
 	});
 
-	it("keeps every line within very narrow widths", () => {
-		for (const width of [1, 2, 3, 4, 5, 16]) {
+	it("keeps every line within the container width, even when narrow", () => {
+		for (const width of [12, 20, 30, 40, 72]) {
 			const rendered = card().render(width);
 			expect(rendered.every((line) => visibleWidth(line) <= width)).toBe(true);
+			expect(rendered.some((line) => line.includes("flash"))).toBe(true);
 		}
 	});
 
-	it("renders nothing when there are no sections", () => {
-		const empty = new SessionContextCard([], (s) => s, (s) => s, (s) => s, (s) => s);
-		expect(empty.render(80)).toEqual([]);
+	it("renders nothing when there are no groups or width is non-positive", () => {
+		expect(card([]).render(80)).toEqual([]);
+		expect(card().render(0)).toEqual([]);
 	});
 });
 
@@ -121,13 +121,11 @@ describe("UsageChartCard", () => {
 describe("session dashboard startup", () => {
 	it("shows a loading widget until the welcome message is ready", async () => {
 		const handlers = new Map<string, (event: unknown, ctx: unknown) => Promise<void>>();
-		const pendingGitCommands: Array<(value: { code: number; stdout: string }) => void> = [];
 		const setWidget = vi.fn();
 		const sendMessage = vi.fn();
 		const pi = {
 			registerMessageRenderer: vi.fn(),
 			on: (event: string, handler: (event: unknown, ctx: unknown) => Promise<void>) => handlers.set(event, handler),
-			exec: vi.fn(() => new Promise<{ code: number; stdout: string }>((resolve) => pendingGitCommands.push(resolve))),
 			sendMessage,
 		};
 		const ctx = { hasUI: true, cwd: process.cwd(), ui: { setWidget } };
@@ -135,9 +133,7 @@ describe("session dashboard startup", () => {
 
 		const startup = handlers.get("session_start")?.({}, ctx);
 		expect(setWidget).toHaveBeenCalledWith("session-dashboard-loading", ["Preparing session dashboard…"]);
-		expect(sendMessage).not.toHaveBeenCalled();
 
-		for (const resolve of pendingGitCommands) resolve({ code: 0, stdout: "" });
 		await startup;
 
 		expect(sendMessage).toHaveBeenCalledOnce();
