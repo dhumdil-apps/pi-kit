@@ -17,8 +17,9 @@ distinct across a short week. It is omitted when usage data is unavailable.
 
 Two slim, plain-markdown lines close the dashboard, chips separated by ` · `.
 The first is context — the working directory and loaded context files (`📜 …`,
-italic / de-emphasised, from pi core's `loadProjectContextFiles`). The second is
-commands on their own line for readability, rendered as code so they pop:
+italic / de-emphasised, from pi core's `loadProjectContextFiles`). A blank line
+separates the second, commands on their own line for readability, rendered as
+code so they pop:
 `❓ /help` plus the workflow commands the deck does not spell out
 (`⚡ /flash · 🪞 /retro · 🔬 /forensic · 🌱 /init`, a static constant). Git
 branch/status are intentionally not repeated here — the status bar already shows

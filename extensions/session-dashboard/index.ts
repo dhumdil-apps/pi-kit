@@ -311,14 +311,14 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// Two slim markdown lines: context (working directory + loaded files,
-			// italic/de-emphasised) on the first, the commands (as code so they pop)
-			// on their own line for readability. Chips share one CONTEXT_SEP.
+			// Two slim markdown lines with a blank line between: context (working
+			// directory + loaded files, italic/de-emphasised) first, then the commands
+			// (as code so they pop) on their own line. Chips share one CONTEXT_SEP.
 			const contextChips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
 			if (contextFiles.length > 0) contextChips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
 			const commandChips = ["❓ `/help`", ...WORKFLOW_COMMANDS.map(({ emoji, cmd }) => `${emoji} \`${cmd}\``)];
-			const contextInfo = `${contextChips.join(CONTEXT_SEP)}\n${commandChips.join(CONTEXT_SEP)}`;
+			const contextInfo = `${contextChips.join(CONTEXT_SEP)}\n\n${commandChips.join(CONTEXT_SEP)}`;
 
 			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
