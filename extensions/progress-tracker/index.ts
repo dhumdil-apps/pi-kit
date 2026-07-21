@@ -10,7 +10,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { TodoStateManager } from "./state-manager.js";
+import { CLEAR_ENTRY_TYPE, TodoStateManager } from "./state-manager.js";
 import { createManageTodoListTool } from "./tool.js";
 import {
   clearWorkflowWidget,
@@ -85,6 +85,10 @@ export default function (pi: ExtensionAPI) {
 
       if (args?.trim().toLowerCase() === "clear") {
         state.clear();
+        // Persist the clear as a hidden marker so a later reload/`/tree`
+        // navigation (which replays manage_todo_list results from the
+        // branch) doesn't resurrect the list that preceded this clear.
+        pi.sendMessage({ customType: CLEAR_ENTRY_TYPE, content: "", display: false }, { triggerTurn: false });
         todosVisible = false;
         refreshWidgets();
         ctx.ui.notify("Todo list cleared.", "info");

@@ -944,9 +944,17 @@ export async function collectUsageData(options: CollectUsageOptions = {}): Promi
 		const meta: MessageMeta[] = [];
 		for (let i = 0; i < rawMsgs.length; i++) {
 			const m = rawMsgs[i]!;
-			const hash = `${m.timestamp}:${m.input + m.output + m.cacheRead + m.cacheWrite}`;
-			if (seenHashes.has(hash)) continue;
-			seenHashes.add(hash);
+			// Messages with no real timestamp and no token usage (malformed/imported
+			// files with unparseable fields) all degrade to the same hash ("0:0").
+			// Only dedupe when the hash actually identifies something — otherwise
+			// every subsequent degenerate message across every file would be
+			// silently dropped as a "duplicate" of the first one seen.
+			const hasIdentifyingData = m.timestamp > 0 || m.input + m.output + m.cacheRead + m.cacheWrite > 0;
+			if (hasIdentifyingData) {
+				const hash = `${m.timestamp}:${m.input + m.output + m.cacheRead + m.cacheWrite}`;
+				if (seenHashes.has(hash)) continue;
+				seenHashes.add(hash);
+			}
 			const prev = i > 0 ? rawMsgs[i - 1]! : null;
 			deduped.push(m);
 			meta.push({

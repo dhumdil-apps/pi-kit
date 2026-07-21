@@ -21,7 +21,11 @@ export default function piLibExtension(pi: ExtensionAPI) {
 
 	// Listen for registration events from other extensions
 	pi.events.on("pi-extension-settings:register", (data) => {
-		const { name, settings } = data as RegistrationPayload;
+		const { name, settings } = (data ?? {}) as Partial<RegistrationPayload>;
+		if (typeof name !== "string" || !name || !Array.isArray(settings)) {
+			console.error("[extension-preferences] ignoring malformed registration event", data);
+			return;
+		}
 		registry.set(name, settings);
 	});
 
@@ -60,7 +64,7 @@ export default function piLibExtension(pi: ExtensionAPI) {
 
 					// Add each setting
 					for (const setting of settings) {
-						const currentValue = getSetting(extName, setting.id, setting.defaultValue) ?? setting.defaultValue;
+						const currentValue = getSetting(extName, setting.id, setting.defaultValue);
 
 						if (setting.options && setting.options.length > 0) {
 							// Ordered multi-select: opens a submenu

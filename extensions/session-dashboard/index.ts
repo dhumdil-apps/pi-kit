@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Box, Container, Markdown, Text } from "@earendil-works/pi-tui";
+import { Box, type Component, Container, Markdown } from "@earendil-works/pi-tui";
 import { collectUsageData } from "../usage-history/data.js";
 import { renderExtensionDeck } from "./extensions.js";
 import { RULER_END, RULER_START, renderWelcomeText } from "./welcome.js";
@@ -12,11 +12,34 @@ import { RULER_END, RULER_START, renderWelcomeText } from "./welcome.js";
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MAX_PANEL_ROW = 60;
 const DASHBOARD_RULER = [
-	"  _________________________________________________",
+	"._________________________________________________",
 	"|\"\"\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|\"|\"\"\"\"\"\"\"|\"\"\"\"\"\"\"\"\"|",
 	"|         1         2         3 π       4         |",
 	"'-------------------------------------------------'",
 ];
+
+/**
+ * Renders fixed-width ASCII art (the ruler) verbatim: clipped, never
+ * word-wrapped. pi-tui's Text component word-wraps each line independently
+ * once the container is narrower than that line, which breaks a line with
+ * spaces (e.g. "1  2  3 π  4") at a different column than a line with none
+ * (e.g. the border rows) — the ruler comes out visibly misaligned. Clipping
+ * keeps every row's left edge aligned even on a narrow pane.
+ */
+export class RulerText implements Component {
+	constructor(
+		private readonly lines: string[],
+		private readonly colorFn: (text: string) => string,
+	) {}
+
+	render(width: number): string[] {
+		return this.lines.map((line) => this.colorFn(width > 0 && line.length > width ? line.slice(0, width) : line));
+	}
+
+	invalidate(): void {
+		// Stateless: render() has no cache to invalidate.
+	}
+}
 
 async function git(pi: ExtensionAPI, cwd: string, args: string[]) {
 	try {
@@ -34,9 +57,11 @@ function formatUsdSpend(cost: number): string {
 	return `$${Math.round(cost)}`;
 }
 
-function tildify(path: string): string {
+export function tildify(path: string): string {
 	const home = homedir();
-	return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+	// A boundary check, not a bare prefix check: "/Users/alice-backup" is a
+	// sibling of "/Users/alice", not a path under it.
+	return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
 }
 
 function truncateLeft(text: string, max: number): string {
@@ -157,7 +182,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		const ruler = content.slice(rulerStart + RULER_START.length, rulerEnd).trim();
 		const after = content.slice(rulerEnd + RULER_END.length).trim();
 		if (before) contentBox.addChild(markdown(before));
-		contentBox.addChild(new Text(theme.fg("mdLink", ruler), 0, 0));
+		contentBox.addChild(new RulerText(ruler.split("\n"), (line) => theme.fg("mdLink", line)));
 		if (after) contentBox.addChild(markdown(after));
 		box.addChild(contentBox);
 		return box;
@@ -168,10 +193,16 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		// prompt and trigger a spurious extra turn, so interactive sessions only.
 		if (!ctx.hasUI) return;
 		const cwd = ctx.cwd;
-		const branch = (await git(pi, cwd, ["rev-parse", "--abbrev-ref", "HEAD"])) || "no git";
-		const dirtyOutput = await git(pi, cwd, ["status", "--porcelain"]);
+		// Independent lookups — run concurrently so a cold usage-cache build
+		// doesn't add its full duration on top of the two git calls before this
+		// purely decorative banner can render.
+		const [branchResult, dirtyOutput, usage] = await Promise.all([
+			git(pi, cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
+			git(pi, cwd, ["status", "--porcelain"]),
+			collectUsageData().catch(() => null),
+		]);
+		const branch = branchResult || "no git";
 		const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
-		const usage = await collectUsageData().catch(() => null);
 
 		const projectRow = `${truncateLeft(tildify(cwd), 34)}  ${branch} · ${
 			dirtyCount === 0 ? "clean" : `${dirtyCount} modified`

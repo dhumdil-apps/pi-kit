@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TodoStateManager } from "./state-manager.js";
+import { CLEAR_ENTRY_TYPE, TodoStateManager } from "./state-manager.js";
 
 describe("TodoStateManager workflow phase", () => {
   it("starts at goal and changes independently from todos", () => {
@@ -54,5 +54,65 @@ describe("TodoStateManager workflow phase", () => {
     ]);
     expect(result.valid).toBe(false);
     expect(result.errors).toContain("Only one todo may be in progress at a time");
+  });
+
+  it("replays a clear marker (as sent by index.ts's /todos clear) so the cleared list is not resurrected", () => {
+    const fresh = new TodoStateManager();
+    fresh.loadFromSession({
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "message",
+            message: {
+              role: "toolResult",
+              toolName: "manage_todo_list",
+              details: {
+                operation: "write",
+                phase: "cut",
+                todos: [{ id: 1, title: "Do thing", description: "Do the thing", status: "in-progress" }],
+              },
+            },
+          },
+          {
+            type: "message",
+            message: { role: "custom", customType: CLEAR_ENTRY_TYPE, content: "", display: false, timestamp: 0 },
+          },
+        ],
+      },
+    } as any);
+
+    expect(fresh.read()).toHaveLength(0);
+  });
+
+  it("a write after a clear marker still wins on replay", () => {
+    const fresh = new TodoStateManager();
+    fresh.loadFromSession({
+      sessionManager: {
+        getBranch: () => [
+          {
+            type: "message",
+            message: {
+              role: "toolResult",
+              toolName: "manage_todo_list",
+              details: { operation: "write", todos: [{ id: 1, title: "Old", description: "d", status: "completed" }] },
+            },
+          },
+          {
+            type: "message",
+            message: { role: "custom", customType: CLEAR_ENTRY_TYPE, content: "", display: false, timestamp: 0 },
+          },
+          {
+            type: "message",
+            message: {
+              role: "toolResult",
+              toolName: "manage_todo_list",
+              details: { operation: "write", todos: [{ id: 2, title: "New", description: "d", status: "not-started" }] },
+            },
+          },
+        ],
+      },
+    } as any);
+
+    expect(fresh.read()).toEqual([{ id: 2, title: "New", description: "d", status: "not-started" }]);
   });
 });

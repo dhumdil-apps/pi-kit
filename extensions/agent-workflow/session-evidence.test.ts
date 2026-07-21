@@ -28,6 +28,23 @@ describe("buildSessionEvidence", () => {
 		const evidence = buildSessionEvidence([
 			{ type: "message", message: { role: "user", content: "x".repeat(500) } },
 		] as any, { raw: true, maxCharacters: 100 });
-		expect(evidence).toContain("Evidence truncated");
+		expect(evidence).toContain("omitted");
+	});
+
+	it("keeps the newest entries and drops the oldest when truncating, not the reverse", () => {
+		// This evidence exists to answer "what just happened" for /retro and
+		// /forensic — dropping the most recent activity to keep ancient history
+		// would defeat the point.
+		const evidence = buildSessionEvidence(
+			[
+				{ type: "message", timestamp: "2026-01-01", message: { role: "user", content: "OLDEST-MARKER".repeat(20) } },
+				{ type: "message", timestamp: "2026-01-02", message: { role: "user", content: "middle ".repeat(20) } },
+				{ type: "message", timestamp: "2026-01-03", message: { role: "user", content: "NEWEST-MARKER".repeat(20) } },
+			] as any,
+			{ raw: true, maxCharacters: 200 },
+		);
+
+		expect(evidence).toContain("NEWEST-MARKER");
+		expect(evidence).not.toContain("OLDEST-MARKER");
 	});
 });

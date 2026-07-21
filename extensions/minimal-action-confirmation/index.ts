@@ -33,8 +33,10 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { existsSync, realpathSync } from "fs";
 import { homedir } from "os";
-import { isAbsolute, resolve } from "path";
+import { dirname, isAbsolute, resolve } from "path";
+import { fileURLToPath } from "url";
 import { getSetting } from "../extension-preferences/index.js";
 
 const EXTENSION_NAME = "permission-gate";
@@ -49,7 +51,8 @@ const DESTRUCTIVE_GIT = [
 	/^git\s+reset\s+--hard\b/,
 	/^git\s+clean\b/,
 	/^git\s+push\s+.*(--force\b|--force-with-lease\b|-f\b|\s\+\S)/,
-	/^git\s+branch\s+(-D\b|--delete\s+--force\b)/,
+	// Flags can appear in either order (`branch --force --delete x` / `branch --delete --force x`).
+	/^git\s+branch\s+.*(-D\b|--delete\b.*--force\b|--force\b.*--delete\b)/,
 	/^git\s+stash\s+(drop|clear)\b/,
 ];
 
@@ -92,10 +95,11 @@ export async function confirmGatedAction(
 }
 
 function splitSegments(command: string): string[] {
-	// Good-enough split on shell connectors; quoted connectors are rare in
-	// agent-issued commands, and a false split only makes us more cautious.
+	// Good-enough split on shell connectors and newlines (bash treats a
+	// newline the same as `;`); quoted connectors are rare in agent-issued
+	// commands, and a false split only makes us more cautious.
 	return command
-		.split(/&&|\|\||;|\|/)
+		.split(/&&|\|\||;|\n|\|/)
 		.map((s) => s.trim())
 		.filter(Boolean);
 }
@@ -105,9 +109,13 @@ function segmentIsDestructive(segment: string): boolean {
 	while (tokens.length && (WRAPPERS.has(tokens[0]) || ENV_ASSIGNMENT.test(tokens[0]))) {
 		tokens.shift();
 	}
-	const cmd = tokens[0];
-	if (!cmd) return false;
-	const stripped = tokens.join(" ");
+	const rawCmd = tokens[0];
+	if (!rawCmd) return false;
+	// Match on the executable's basename, same as bashUsesGuardedWebCommand,
+	// so an absolute/relative path to the binary (e.g. `/bin/rm`) can't dodge
+	// a Set/string-equality check against the bare command name.
+	const cmd = rawCmd.split("/").at(-1) ?? rawCmd;
+	const stripped = [cmd, ...tokens.slice(1)].join(" ");
 	if (cmd === "sudo") return true;
 	if (DESTRUCTIVE_COMMANDS.has(cmd)) return true;
 	if (cmd.startsWith("mkfs")) return true;
@@ -147,8 +155,11 @@ function vendoredDirForPath(path: string): string | undefined {
 	}
 	const segments = path.split("/");
 	for (let i = 0; i < segments.length; i++) {
-		if (!VENDORED_DIRS.includes(segments[i])) continue;
-		if (segments[i] !== "node_modules") return segments[i];
+		// Case-insensitive: matters on the default case-insensitive macOS/Windows
+		// filesystems, where "NODE_MODULES" is the same directory as "node_modules".
+		const segmentLower = segments[i].toLowerCase();
+		if (!VENDORED_DIRS.some((dir) => dir.toLowerCase() === segmentLower)) continue;
+		if (segmentLower !== "node_modules") return segments[i];
 		const first = segments[i + 1];
 		if (!first) return "node_modules";
 		const pkg = first.startsWith("@") && segments[i + 2] ? `${first}/${segments[i + 2]}` : first;
@@ -206,21 +217,64 @@ export function vendoredDirForBash(command: string): string | undefined {
 	return undefined;
 }
 
-function expandTilde(path: string): string {
-	if (path === "~") return homedir();
-	if (path.startsWith("~/")) return resolve(homedir(), path.slice(2));
-	return path;
+/**
+ * Mirror the core write/edit/read tools' own path normalization
+ * (resolveToCwd -> normalizePath: strip a leading "@", expand "~", resolve
+ * file:// URLs) so the gate judges the same path the tool will actually
+ * touch, not a naively-resolved lookalike.
+ */
+function normalizeAgentPath(path: string): string {
+	let normalized = path.startsWith("@") ? path.slice(1) : path;
+	if (normalized === "~") return homedir();
+	if (normalized.startsWith("~/")) return resolve(homedir(), normalized.slice(2));
+	if (/^file:\/\//.test(normalized)) return fileURLToPath(normalized);
+	return normalized;
 }
 
-/** True if a resolved path arg reaches outside cwd. Unresolvable ($VAR) tokens are skipped. */
+function resolveLikeCoreTool(rawPath: string, cwd: string): string {
+	const normalized = normalizeAgentPath(rawPath);
+	return isAbsolute(normalized) ? resolve(normalized) : resolve(cwd, normalized);
+}
+
+/** Closest ancestor directory that actually exists on disk (walking up from path). */
+function closestExistingAncestor(absPath: string): string {
+	let dir = absPath;
+	while (!existsSync(dir)) {
+		const parent = dirname(dir);
+		if (parent === dir) return dir;
+		dir = parent;
+	}
+	return dir;
+}
+
+/**
+ * True if a path that lexically resolves inside root actually escapes it
+ * once symlinks are followed (e.g. a symlink inside the project pointing
+ * outside it). Best-effort: if root or the path's existing ancestor can't
+ * be stat'd, don't block on this check.
+ */
+function realEscapesRoot(absPath: string, root: string): boolean {
+	try {
+		const realAncestor = realpathSync(closestExistingAncestor(absPath));
+		const realRoot = realpathSync(root);
+		return realAncestor !== realRoot && !realAncestor.startsWith(`${realRoot}/`);
+	} catch {
+		return false;
+	}
+}
+
+/** True if a resolved path arg reaches outside cwd, including via symlinks. */
 function pathEscapesProject(rawPath: string, cwd: string): boolean {
 	const cleaned = rawPath.replace(/^['"]|['"]$/g, "");
-	if (!cleaned || cleaned.startsWith("$")) return false;
-	const expanded = expandTilde(cleaned);
-	const abs = isAbsolute(expanded) ? resolve(expanded) : resolve(cwd, expanded);
+	if (!cleaned) return false;
+	// Can't verify where an unresolved shell variable points — assume the
+	// worst (escapes) rather than silently allowing an unbounded scan.
+	if (cleaned.startsWith("$")) return true;
+	const abs = resolveLikeCoreTool(cleaned, cwd);
 	const root = resolve(cwd);
 	if (pathIsSafelisted(abs)) return false;
-	return abs !== root && !abs.startsWith(`${root}/`);
+	if (abs !== root && !abs.startsWith(`${root}/`)) return true;
+	return realEscapesRoot(abs, root);
 }
 
 const RECURSIVE_FLAG = /^-\w*[rR]\w*$|^--recursive$/;
@@ -299,16 +353,18 @@ export default function createExtension(pi: ExtensionAPI): void {
 		} else if (toolName === "edit" || toolName === "write") {
 			const rawPath = String(input.path ?? input.file_path ?? "");
 			if (rawPath) {
-				const full = isAbsolute(rawPath) ? resolve(rawPath) : resolve(ctx.cwd, rawPath);
+				const full = resolveLikeCoreTool(rawPath, ctx.cwd);
 				const root = resolve(ctx.cwd);
-				const insideProject = full === root || full.startsWith(`${root}/`);
+				const lexicallyInside = full === root || full.startsWith(`${root}/`);
+				const insideProject = lexicallyInside && !realEscapesRoot(full, root);
 				if (!insideProject && !pathIsSafelisted(full)) {
 					gate = { reason: `${toolName} outside the project directory:\n\n  ${full}` };
 				}
 			}
 		} else if (toolName === "read") {
 			const rawPath = String(input.path ?? input.file_path ?? "");
-			const vendored = rawPath ? vendoredDirForPath(rawPath) : undefined;
+			const normalizedPath = rawPath ? normalizeAgentPath(rawPath) : "";
+			const vendored = normalizedPath ? vendoredDirForPath(normalizedPath) : undefined;
 			if (vendored) {
 				gate = { reason: `Read vendored/dependency code (untrusted third-party text):\n\n  ${rawPath}` };
 			}

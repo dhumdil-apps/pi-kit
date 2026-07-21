@@ -93,8 +93,11 @@ export default function createExtension(pi: ExtensionAPI, deps?: Dependencies): 
 		}
 
 		const providerInstance = createProvider(detected);
-		const usage = await fetchWithCache(detected, REFRESH_INTERVAL_MS, () =>
-			providerInstance.fetchUsage(resolvedDeps),
+		const usage = await fetchWithCache(
+			detected,
+			REFRESH_INTERVAL_MS,
+			() => providerInstance.fetchUsage(resolvedDeps),
+			force,
 		);
 
 		// Only emit when we got good data. On errors (429 etc.),
@@ -109,7 +112,9 @@ export default function createExtension(pi: ExtensionAPI, deps?: Dependencies): 
 
 	const refreshTimer = setInterval(() => {
 		if (!lastContext || !currentProvider) return;
-		void refresh(lastContext);
+		// Never let an unexpected refresh failure become an unhandled
+		// rejection that could take down the whole pi process.
+		refresh(lastContext).catch(() => {});
 	}, REFRESH_INTERVAL_MS);
 	refreshTimer.unref?.();
 

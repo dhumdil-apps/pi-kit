@@ -31,14 +31,26 @@ describe("agent workflow lifecycle", () => {
 		expect(stopped.systemPrompt).toContain('flash="off"');
 	});
 
-	it("does not brake Flash for extension-authored input and clears it at agent end", async () => {
+	it("does not brake Flash for extension-authored input and clears it once the agent settles", async () => {
 		const { handlers, commands, emitted } = harness();
 		await commands.get("flash")!.handler("", {});
 		handlers.get("input")!({ source: "extension" });
 		const active = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
 		expect(active.systemPrompt).toContain('flash="active"');
-		handlers.get("agent_end")!();
+		handlers.get("agent_settled")!();
 		expect(emitted.at(-1)?.[1]).toEqual({ id: "flash", text: undefined });
+	});
+
+	it("does not clear Flash on a plain agent_end (pi may still auto-retry/auto-compact)", async () => {
+		const { handlers, commands, emitted } = harness();
+		await commands.get("flash")!.handler("", {});
+		const before = emitted.length;
+		handlers.get("agent_end")?.();
+		// agent_end has no registered handler in this extension at all — Flash
+		// state is untouched by it.
+		expect(emitted.length).toBe(before);
+		const active = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		expect(active.systemPrompt).toContain('flash="active"');
 	});
 
 	it("injects bounded session evidence for reflection commands", async () => {

@@ -78,5 +78,14 @@ export function buildSessionEvidence(
 	].join(" ");
 	const full = `${header}\n\n${lines.join("\n")}`;
 	if (full.length <= maxCharacters) return full;
-	return `${full.slice(0, maxCharacters)}\n\n[Evidence truncated by ${full.length - maxCharacters} characters; report this limitation.]`;
+
+	// Keep the newest entries, not the oldest: this evidence exists to answer
+	// "what just happened" for /retro and /forensic, so truncating from the
+	// end (dropping recent activity, keeping ancient history) is backwards.
+	const body = lines.join("\n");
+	const notice = "[earlier evidence omitted; report this limitation.]";
+	const budget = maxCharacters - header.length - notice.length - 4; // 2 blank-line separators
+	if (budget <= 0) return `${header}\n\n${notice}`;
+	const kept = body.slice(-budget);
+	return `${header}\n\n${notice}\n\n${kept}`;
 }

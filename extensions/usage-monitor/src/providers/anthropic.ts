@@ -29,6 +29,10 @@ function loadClaudeToken(deps: Dependencies): string | undefined {
 			.execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"], {
 				encoding: "utf-8",
 				stdio: ["ignore", "pipe", "ignore"],
+				// Without a timeout, a keychain re-lock can pop an interactive
+				// unlock dialog and hang this synchronous call — and with it the
+				// whole single-threaded pi process — indefinitely.
+				timeout: API_TIMEOUT_MS,
 			})
 			.trim();
 		if (keychainData) {

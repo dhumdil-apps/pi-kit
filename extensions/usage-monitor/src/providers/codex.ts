@@ -119,7 +119,16 @@ export class CodexProvider extends BaseProvider {
 				const sw = data.rate_limit.secondary_window;
 				const resetDate = sw.reset_at ? new Date(sw.reset_at * 1000) : undefined;
 				const windowHours = Math.round((sw.limit_window_seconds || 86400) / 3600);
-				const label = windowHours >= 144 ? "Week" : windowHours >= 24 ? "Day" : `${windowHours}h`;
+				// windowHours >= 24 used to always show "Day", even for a genuine
+				// multi-day (e.g. 72h) window — misleading reset cadence.
+				const label =
+					windowHours >= 144
+						? "Week"
+						: windowHours > 24
+							? `${Math.round(windowHours / 24)}d`
+							: windowHours === 24
+								? "Day"
+								: `${windowHours}h`;
 				windows.push({
 					label,
 					usedPercent: sw.used_percent || 0,

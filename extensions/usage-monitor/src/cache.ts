@@ -18,6 +18,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import * as fs from "fs";
 import * as path from "path";
 import type { FetchResult, ProviderName, UsageSnapshot } from "./types.js";
+import { API_TIMEOUT_MS, CLI_TIMEOUT_MS } from "./utils.js";
 
 interface CacheEntry {
 	fetchedAt: number;
@@ -30,7 +31,10 @@ const CACHE_DIR = path.join(getAgentDir(), "cache", "pi-usage");
 const CACHE_PATH = path.join(CACHE_DIR, "cache.json");
 const LOCK_PATH = path.join(CACHE_DIR, "cache.lock");
 const BACKOFF_PATH = path.join(CACHE_DIR, "backoff");
-const LOCK_STALE_MS = 5000;
+// Must exceed the slowest real fetch (Kiro chains a whoami call and a CLI
+// call, up to API_TIMEOUT_MS + CLI_TIMEOUT_MS) or a lock gets "stolen" from
+// a still-in-flight fetch, causing duplicate concurrent CLI/network calls.
+const LOCK_STALE_MS = API_TIMEOUT_MS + CLI_TIMEOUT_MS + 5000;
 const DEFAULT_BACKOFF_MS = 60_000;
 
 function ensureDir(): void {
@@ -144,10 +148,15 @@ export async function fetchWithCache(
 	provider: ProviderName,
 	ttlMs: number,
 	fetchFn: () => Promise<FetchResult>,
+	force = false,
 ): Promise<UsageSnapshot | undefined> {
-	// Fresh good data — use it.
-	const good = getGoodUsage(provider, ttlMs);
-	if (good) return good;
+	// Fresh good data — use it, unless the caller explicitly wants a real
+	// refetch (e.g. after a model/session switch where a same-TTL cache
+	// entry from another provider/instance would otherwise look "fresh").
+	if (!force) {
+		const good = getGoodUsage(provider, ttlMs);
+		if (good) return good;
+	}
 
 	// Backing off from a previous error — don't retry.
 	if (isBackingOff()) return undefined;
@@ -176,11 +185,18 @@ export async function fetchWithCache(
 			return undefined;
 		}
 
-		// Success — update cache and clear any backoff.
-		const cache = readCacheFile();
-		cache[provider] = { fetchedAt: Date.now(), usage: result.usage };
-		writeCacheFile(cache);
-		clearBackoff();
+		// Success — update cache and clear any backoff. A failure to persist
+		// (disk full, read-only cache dir, ...) shouldn't fail this call: the
+		// fetch itself succeeded and the caller can still use its result, it
+		// just won't be shared with other instances via the on-disk cache.
+		try {
+			const cache = readCacheFile();
+			cache[provider] = { fetchedAt: Date.now(), usage: result.usage };
+			writeCacheFile(cache);
+			clearBackoff();
+		} catch {
+			// Ignore — see comment above.
+		}
 
 		return result.usage;
 	} finally {

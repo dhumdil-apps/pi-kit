@@ -87,7 +87,7 @@ CRITICAL workflow:
 
 Todo states:
 - not-started: Todo not yet begun
-- in-progress: Currently working (multiple allowed for parallel work/subagents)
+- in-progress: Currently working (only one at a time)
 - completed: Finished successfully
 
 IMPORTANT: Mark todos completed as soon as they are done. Do not batch completions.`;

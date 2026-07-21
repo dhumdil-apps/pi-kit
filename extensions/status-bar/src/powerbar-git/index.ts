@@ -7,17 +7,46 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { execFile } from "child_process";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync, statSync } from "fs";
+import { isAbsolute, join, resolve } from "path";
 
-function getGitBranch(cwd: string): string | undefined {
+/**
+ * Resolve the real git dir for cwd. In a linked worktree or submodule, ".git"
+ * is a file containing "gitdir: <path-to-real-gitdir>", not a directory —
+ * without this, HEAD is looked up at the wrong path and the segment just
+ * silently disappears in an otherwise valid checkout.
+ */
+function resolveGitDir(cwd: string): string | undefined {
+	const gitPath = join(cwd, ".git");
 	try {
-		const head = readFileSync(join(cwd, ".git", "HEAD"), "utf-8").trim();
-		if (head.startsWith("ref: refs/heads/")) {
-			return head.slice(16);
+		const stat = statSync(gitPath);
+		if (stat.isDirectory()) return gitPath;
+		if (stat.isFile()) {
+			const match = readFileSync(gitPath, "utf-8").trim().match(/^gitdir:\s*(.+)$/);
+			if (match) return isAbsolute(match[1]) ? match[1] : resolve(cwd, match[1]);
 		}
-		// Detached HEAD — show short hash
-		return head.slice(0, 8);
+	} catch {
+		// Fall through to undefined below.
+	}
+	return undefined;
+}
+
+// Strip control/escape characters (ANSI escapes, etc.) before a git-derived
+// string reaches the terminal. A ref name shouldn't contain these, but HEAD
+// is plain file content — a crafted repo (e.g. from an untrusted archive)
+// could still smuggle a terminal escape sequence through it.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional stripping
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/g;
+
+export function getGitBranch(cwd: string): string | undefined {
+	const gitDir = resolveGitDir(cwd);
+	if (!gitDir) return undefined;
+	try {
+		const head = readFileSync(join(gitDir, "HEAD"), "utf-8").trim();
+		const branch = head.startsWith("ref: refs/heads/")
+			? head.slice(16) // Named branch.
+			: head.slice(0, 8); // Detached HEAD — short hash.
+		return branch.replace(CONTROL_CHARS, "");
 	} catch {
 		return undefined;
 	}

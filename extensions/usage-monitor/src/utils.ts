@@ -63,7 +63,7 @@ const SAFE_CLI_NAME = /^[a-zA-Z0-9._-]+$/;
 export function whichSync(cmd: string, deps: Dependencies): string | null {
 	if (!SAFE_CLI_NAME.test(cmd)) return null;
 	try {
-		return deps.execFileSync("which", [cmd], { encoding: "utf-8" }).trim();
+		return deps.execFileSync("which", [cmd], { encoding: "utf-8", timeout: API_TIMEOUT_MS }).trim();
 	} catch {
 		return null;
 	}

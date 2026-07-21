@@ -8,6 +8,12 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TodoItem, TodoDetails, ValidationResult, TodoStats, WorkflowPhase } from "./types.js";
 
+/**
+ * customType of the `pi.sendMessage` marker index.ts sends when the user
+ * runs `/todos clear`. See loadFromSession().
+ */
+export const CLEAR_ENTRY_TYPE = "progress-tracker:todos-cleared";
+
 export class TodoStateManager {
   private todos: TodoItem[] = [];
   private phase: WorkflowPhase = "goal";
@@ -22,7 +28,13 @@ export class TodoStateManager {
     this.todos = todos.map((t) => ({ ...t }));
   }
 
-  /** Clear all todos */
+  /**
+   * Clear all todos in memory. The caller (index.ts) is responsible for also
+   * persisting a clear marker via `pi.sendMessage` — see loadFromSession —
+   * so a later reload/`/tree` navigation doesn't resurrect the last `write`
+   * result that preceded this clear. `ctx.sessionManager` is read-only, so
+   * that can't be done from here.
+   */
   clear(): void {
     this.todos = [];
   }
@@ -46,7 +58,7 @@ export class TodoStateManager {
 
   /**
    * Validate a todo list before writing.
-   * Checks: required fields, valid statuses, max one in-progress, sequential IDs.
+   * Checks: required fields, valid statuses, max one in-progress.
    */
   validate(todos: TodoItem[]): ValidationResult {
     const errors: string[] = [];
@@ -98,6 +110,14 @@ export class TodoStateManager {
     for (const entry of ctx.sessionManager.getBranch()) {
       if (entry.type !== "message") continue;
       const msg = entry.message;
+
+      if (msg.role === "custom" && msg.customType === CLEAR_ENTRY_TYPE) {
+        // A later /todos clear always wins over an earlier write, but a
+        // write after this point (chronologically) should still win below.
+        this.todos = [];
+        continue;
+      }
+
       if (msg.role !== "toolResult" || msg.toolName !== "manage_todo_list") continue;
 
       const details = msg.details as TodoDetails | undefined;

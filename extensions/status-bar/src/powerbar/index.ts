@@ -113,6 +113,11 @@ export default function createExtension(pi: ExtensionAPI): void {
 	}
 
 	pi.on("session_start", async (_event, ctx) => {
+		// A new session starts with no state: without this, a segment whose
+		// producer doesn't proactively re-emit on every session_start (or skips
+		// emitting when its data is momentarily unavailable, e.g. ctx.model
+		// still unresolved) would keep showing the previous session's value.
+		segments.clear();
 		settings = loadSettings();
 		currentCtx = ctx;
 		hideFooter(ctx);

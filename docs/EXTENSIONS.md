@@ -24,8 +24,7 @@ extension.
 | --- | --- | --- |
 | Simplify skill | `skills/simplify/` | Pre-commit review/simplify pass over a step's diff |
 | Init prompt | `prompts/init.md` | Analyze a project and propose an `AGENTS.md` |
-| Bundle theme | `themes/dark.json` | Portable bundled dark theme |
-| Local theme | `~/.pi/agent/themes/github-dark.json` | Theme selected by this machine's settings |
+| Bundled themes | `themes/dark.json`, `themes/github-dark.json` | Portable bundled themes; registered by the bundle, so `"theme": "github-dark"` works with no machine-local copy |
 
 ## Single-agent policy
 

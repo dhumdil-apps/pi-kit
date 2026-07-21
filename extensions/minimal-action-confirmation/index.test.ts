@@ -1,8 +1,24 @@
+import { mkdtempSync, symlinkSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../extension-preferences/index.js", () => ({ getSetting: () => "on" }));
 
 import createPermissionGate, { bashUsesGuardedWebCommand, confirmGatedAction, vendoredDirForBash } from "./index.js";
+
+function makeGate() {
+	let toolCall: ((event: unknown, ctx: unknown) => Promise<unknown>) | undefined;
+	const pi = {
+		events: { emit: vi.fn() },
+		on: vi.fn((event: string, handler: (toolEvent: unknown, ctx: unknown) => Promise<unknown>) => {
+			if (event === "tool_call") toolCall = handler;
+		}),
+		sendMessage: vi.fn(),
+	};
+	createPermissionGate(pi as never);
+	return { toolCall: toolCall!, pi };
+}
 
 describe("confirmGatedAction", () => {
 	it("approves Proceed and collects optional denial guidance", async () => {
@@ -132,6 +148,66 @@ describe("vendoredDirForBash", () => {
 				{ toolName: "write", input: { path: "/tmp/project-copy/file.ts" } },
 				{ cwd: "/tmp/project", hasUI: false },
 			),
+		).resolves.toMatchObject({ block: true });
+	});
+});
+
+describe("gate bypass regressions", () => {
+	it("catches a destructive command invoked via an absolute/relative binary path", async () => {
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall({ toolName: "bash", input: { command: "/bin/rm -rf /tmp/whatever" } }, { cwd: process.cwd(), hasUI: false }),
+		).resolves.toMatchObject({ block: true });
+	});
+
+	it("catches a destructive command hidden after a literal newline", async () => {
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall(
+				{ toolName: "bash", input: { command: "printf hi\nrm -rf ./project-files" } },
+				{ cwd: process.cwd(), hasUI: false },
+			),
+		).resolves.toMatchObject({ block: true });
+	});
+
+	it("catches git branch force-delete regardless of flag order", async () => {
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall(
+				{ toolName: "bash", input: { command: "git branch --force --delete some-branch" } },
+				{ cwd: process.cwd(), hasUI: false },
+			),
+		).resolves.toMatchObject({ block: true });
+	});
+
+	it("expands ~ before judging a write/edit path as in-project", async () => {
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall(
+				{ toolName: "write", input: { path: "~/.ssh/authorized_keys" } },
+				{ cwd: process.cwd(), hasUI: false },
+			),
+		).resolves.toMatchObject({ block: true });
+	});
+
+	it("treats an unresolved shell variable path as escaping the project, not exempt", async () => {
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall(
+				{ toolName: "bash", input: { command: "find $HOME -name secret" } },
+				{ cwd: process.cwd(), hasUI: false },
+			),
+		).resolves.toMatchObject({ block: true });
+	});
+
+	it("catches a write that lexically resolves in-project but escapes via a symlink", async () => {
+		const root = mkdtempSync(join(tmpdir(), "gate-project-"));
+		const outside = mkdtempSync(join(tmpdir(), "gate-outside-"));
+		symlinkSync(outside, join(root, "escape"));
+
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall({ toolName: "write", input: { path: "escape/passwd" } }, { cwd: root, hasUI: false }),
 		).resolves.toMatchObject({ block: true });
 	});
 });

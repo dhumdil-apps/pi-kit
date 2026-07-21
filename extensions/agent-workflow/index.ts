@@ -140,7 +140,12 @@ export default function createExtension(pi: ExtensionAPI): void {
 			emitFlash(pi, false);
 		}
 	});
-	pi.on("agent_end", () => {
+	// agent_settled, not agent_end: agent_end fires per low-level run, but pi
+	// may still auto-retry/auto-compact/continue with queued follow-ups. Using
+	// agent_end here would let Flash silently turn itself off mid-task on an
+	// internal retry, contradicting the documented contract that only an
+	// ordinary user message or a fresh session disengages it.
+	pi.on("agent_settled", () => {
 		if (!flashActive) return;
 		flashActive = false;
 		emitFlash(pi, false);

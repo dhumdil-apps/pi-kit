@@ -147,7 +147,6 @@ const TABLE_LAYOUTS: TableLayoutCandidate[] = [
 function formatCost(cost: number): string {
 	if (cost === 0) return "-";
 	if (cost < 0.01) return `$${cost.toFixed(4)}`;
-	if (cost < 1) return `$${cost.toFixed(2)}`;
 	if (cost < 10) return `$${cost.toFixed(2)}`;
 	if (cost < 100) return `$${cost.toFixed(1)}`;
 	return `$${Math.round(cost)}`;
@@ -540,7 +539,9 @@ class UsageComponent {
 			}
 			const home = homedir();
 			const dir = resolveExportDir(configured, home, existsSync("/tmp"), tmpdir());
-			mkdirSync(dir, { recursive: true });
+			// mode only applies the first time the dir is created; a user-private
+			// directory keeps cost/project data off shared /tmp.
+			mkdirSync(dir, { recursive: true, mode: 0o700 });
 			const path = join(dir, name);
 			writeFileSync(path, content);
 			const shown = path.startsWith(home + "/") ? "~" + path.slice(home.length) : path;

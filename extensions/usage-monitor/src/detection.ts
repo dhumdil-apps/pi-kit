@@ -21,7 +21,11 @@ const DETECTION_HINTS: DetectionHint[] = [
 	{ provider: "gemini", providerTokens: ["google", "gemini"], modelTokens: ["gemini"] },
 	{ provider: "antigravity", providerTokens: ["antigravity"], modelTokens: ["antigravity"] },
 	{ provider: "codex", providerTokens: ["openai", "codex"], modelTokens: ["gpt", "o1", "o3"] },
-	{ provider: "kiro", providerTokens: ["kiro", "aws"], modelTokens: [] },
+	// "aws" alone is deliberately not a token here: it's broad enough to match
+	// "amazon-bedrock" or a similar AWS-hosted-but-not-Kiro provider string,
+	// reintroducing the exact false-positive class this module's header fix
+	// (explicit provider -> no fallback match) is meant to prevent.
+	{ provider: "kiro", providerTokens: ["kiro"], modelTokens: [] },
 	{ provider: "zai", providerTokens: ["zai", "z.ai", "xai"], modelTokens: [] },
 ];
 

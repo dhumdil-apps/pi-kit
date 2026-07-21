@@ -2,7 +2,7 @@
  * Read/write extension settings to JSON files.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
@@ -17,30 +17,74 @@ function getGlobalSettingsPath(): string {
 	return join(getAgentDir(), SETTINGS_FILE_NAME);
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSettingsFileShape(value: unknown): value is SettingsFile {
+	if (!isPlainObject(value)) return false;
+	return Object.values(value).every(
+		(ext) => isPlainObject(ext) && Object.values(ext).every((v) => typeof v === "string"),
+	);
+}
+
 /**
- * Load the settings file. Returns empty object if file doesn't exist or is invalid.
+ * Preserve an unreadable/malformed settings file instead of silently
+ * discarding it, so a hand-edit or partial write doesn't destroy every
+ * extension's stored preferences with no trace.
+ */
+function backUpUnreadableFile(path: string, content: string): void {
+	try {
+		writeFileSync(`${path}.bak-${Date.now()}`, content);
+	} catch {
+		// Best-effort backup only.
+	}
+}
+
+/**
+ * Load the settings file. Returns empty object if the file doesn't exist;
+ * if it exists but is unreadable, unparseable, or the wrong shape, backs it
+ * up (so no data is silently lost) and returns empty object.
  */
 function loadSettingsFile(path: string): SettingsFile {
 	if (!existsSync(path)) {
 		return {};
 	}
+	let content: string;
 	try {
-		const content = readFileSync(path, "utf-8");
-		return JSON.parse(content) as SettingsFile;
-	} catch {
+		content = readFileSync(path, "utf-8");
+	} catch (err) {
+		console.error(`[extension-preferences] failed to read ${path}:`, err);
 		return {};
 	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(content);
+	} catch (err) {
+		console.error(`[extension-preferences] ${path} is not valid JSON; backing it up and starting fresh:`, err);
+		backUpUnreadableFile(path, content);
+		return {};
+	}
+	if (!isSettingsFileShape(parsed)) {
+		console.error(`[extension-preferences] ${path} has an unexpected shape; backing it up and starting fresh.`);
+		backUpUnreadableFile(path, content);
+		return {};
+	}
+	return parsed;
 }
 
 /**
- * Save settings to the global file.
+ * Save settings to the global file, via a temp file + rename so a crash or
+ * full disk mid-write can't leave a truncated/corrupt settings file behind.
  */
 function saveSettingsFile(path: string, settings: SettingsFile): void {
 	const dir = dirname(path);
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
 	}
-	writeFileSync(path, JSON.stringify(settings, null, "\t"));
+	const tmpPath = `${path}.tmp-${process.pid}`;
+	writeFileSync(tmpPath, JSON.stringify(settings, null, "\t"));
+	renameSync(tmpPath, path);
 }
 
 /**

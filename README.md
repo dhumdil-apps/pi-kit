@@ -1,10 +1,6 @@
 # pi-bundle
 
-       _________________________________________________
-      |"""""""""|"""""""""|"""""""""|"|"""""""|"""""""""|
-      |         1         2         3 π       4         |
-      '-------------------------------------------------'
-      Measure twice, cut once
+Measure twice, cut once
 
 A single, vendored [Pi](https://pi.dev) package maintained by `dhumdil-apps`.
 It includes the active extensions and skills previously installed as separate

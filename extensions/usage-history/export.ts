@@ -27,8 +27,10 @@ export function parseExportDirSetting(settingsJson: string): string | null {
 
 /**
  * Pick the export directory. A configured dir wins (with `~` expanded);
- * otherwise exports go to /tmp so they never litter a repo or home
- * directory, falling back to the OS temp dir where /tmp doesn't exist.
+ * otherwise exports go to a private subdirectory of /tmp (cost/project data
+ * shouldn't be left world-readable in shared temp space) so they never
+ * litter a repo or home directory, falling back to the OS temp dir where
+ * /tmp doesn't exist.
  */
 export function resolveExportDir(
 	configured: string | null,
@@ -41,12 +43,18 @@ export function resolveExportDir(
 		if (configured.startsWith("~/")) return join(home, configured.slice(2));
 		return configured;
 	}
-	return slashTmpExists ? "/tmp" : fallbackTmp;
+	return join(slashTmpExists ? "/tmp" : fallbackTmp, "pi-usage");
 }
+
+// Leading characters that Excel/LibreOffice/Sheets treat as the start of a
+// formula/DDE payload when a CSV cell is opened (CSV/formula injection,
+// CWE-1236). A leading apostrophe forces the cell to be read as literal text.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
 
 /** Quote a CSV field only when it needs it (comma, quote, or newline). */
 function csvField(value: string | number): string {
-	const s = String(value);
+	let s = String(value);
+	if (FORMULA_TRIGGER.test(s)) s = `'${s}`;
 	return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

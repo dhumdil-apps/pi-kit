@@ -29,7 +29,14 @@ export class KiroProvider extends BaseProvider {
 					timeout: API_TIMEOUT_MS,
 					stdio: ["ignore", "pipe", "pipe"],
 				});
-			} catch {
+			} catch (err) {
+				// A timeout/kill (slow network, hung CLI) is not the same as an
+				// actual "not authenticated" exit — don't tell the user to
+				// re-login over a transient failure.
+				const nodeErr = err as NodeJS.ErrnoException & { signal?: string | null };
+				if (nodeErr?.code === "ETIMEDOUT" || nodeErr?.signal) {
+					return this.result(this.emptySnapshot(fetchFailed()));
+				}
 				return this.result(this.emptySnapshot(notLoggedIn()));
 			}
 
@@ -45,7 +52,7 @@ export class KiroProvider extends BaseProvider {
 			const windows: RateWindow[] = [];
 
 			// Parse credits percentage from "████...█ X%"
-			let creditsPercent = 0;
+			let creditsPercent: number | undefined;
 			const percentMatch = stripped.match(/█+\s*(\d+)%/);
 			if (percentMatch) {
 				creditsPercent = parseInt(percentMatch[1], 10);
@@ -53,12 +60,18 @@ export class KiroProvider extends BaseProvider {
 
 			// Parse credits used/total from "(X.XX of Y covered in plan)"
 			const creditsMatch = stripped.match(/\((\d+\.?\d*)\s+of\s+(\d+)\s+covered/);
-			if (creditsMatch && !percentMatch) {
+			if (creditsMatch && creditsPercent === undefined) {
 				const creditsUsed = parseFloat(creditsMatch[1]);
 				const creditsTotal = parseFloat(creditsMatch[2]);
 				if (creditsTotal > 0) {
 					creditsPercent = (creditsUsed / creditsTotal) * 100;
 				}
+			}
+
+			// Neither pattern matched (e.g. a kiro-cli output format change) —
+			// report failure instead of a misleading "0% used" (full quota).
+			if (creditsPercent === undefined) {
+				return this.result(this.emptySnapshot(fetchFailed()));
 			}
 
 			// Parse reset date from "resets on 01/01"
