@@ -167,7 +167,7 @@ function formatNumber(n: number): string {
 }
 
 // Compact axis/legend formatters for the graph view.
-function formatAxisCost(v: number): string {
+export function formatAxisCost(v: number): string {
 	if (v === 0) return "$0";
 	if (v < 1) return `$${v.toFixed(2)}`;
 	if (v < 100) return `$${v.toFixed(1)}`;
@@ -186,9 +186,9 @@ function formatAxisCount(v: number): string {
 
 // Bright ANSI palette for graph series (Total uses index 0).
 const SERIES_COLORS = ["\x1b[97m", "\x1b[96m", "\x1b[95m", "\x1b[93m", "\x1b[92m", "\x1b[94m", "\x1b[91m", "\x1b[90m"];
-const COLOR_RESET = "\x1b[39m";
+export const COLOR_RESET = "\x1b[39m";
 
-function seriesColor(index: number): string {
+export function seriesColor(index: number): string {
 	return SERIES_COLORS[index % SERIES_COLORS.length]!;
 }
 

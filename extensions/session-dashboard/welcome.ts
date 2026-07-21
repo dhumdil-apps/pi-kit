@@ -5,6 +5,8 @@ export const RULER_START = "<!-- session-dashboard-ruler -->";
 export const RULER_END = "<!-- /session-dashboard-ruler -->";
 export const SESSION_CONTEXT_START = "<!-- session-dashboard-context -->";
 export const SESSION_CONTEXT_END = "<!-- /session-dashboard-context -->";
+export const USAGE_CHART_START = "<!-- session-dashboard-usage-chart -->";
+export const USAGE_CHART_END = "<!-- /session-dashboard-usage-chart -->";
 
 export interface SessionContextSection {
 	label: string;
@@ -15,6 +17,8 @@ export interface WelcomeParts {
 	rulerPanel: string;
 	extensionDeck: string;
 	sessionContext: SessionContextSection[];
+	/** Serialized GraphModel (JSON) for the "This Week" cost chart, or "" to omit. */
+	usageChart?: string;
 }
 
 export function parseSessionContext(content: string): SessionContextSection[] {
@@ -37,7 +41,8 @@ function renderSessionContext(sections: SessionContextSection[]): string {
 }
 
 /** Assemble the interactive welcome message without coupling layout tests to Pi. */
-export function renderWelcomeText({ rulerPanel, extensionDeck, sessionContext }: WelcomeParts): string {
+export function renderWelcomeText({ rulerPanel, extensionDeck, sessionContext, usageChart }: WelcomeParts): string {
+	const usageBlock = usageChart ? `\n${USAGE_CHART_START}\n${usageChart}\n${USAGE_CHART_END}\n` : "";
 	return `
 ${HERO_QUOTE}
 ${RULER_START}
@@ -47,7 +52,7 @@ ${RULER_END}
 ${DASHBOARD_INVITATION}
 
 ${extensionDeck}
-
+${usageBlock}
 ${SESSION_CONTEXT_START}
 ${renderSessionContext(sessionContext)}
 ${SESSION_CONTEXT_END}

@@ -6,6 +6,8 @@ import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, type Component, Container, Markdown, Spacer, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { collectUsageData } from "../usage-history/data.js";
+import { buildGraphModel, type GraphModel, renderChart, TOTAL_SERIES_KEY } from "../usage-history/graph.js";
+import { COLOR_RESET, formatAxisCost, seriesColor } from "../usage-history/index.js";
 import { renderExtensionDeck } from "./extensions.js";
 import {
 	parseSessionContext,
@@ -13,6 +15,8 @@ import {
 	RULER_START,
 	SESSION_CONTEXT_END,
 	SESSION_CONTEXT_START,
+	USAGE_CHART_END,
+	USAGE_CHART_START,
 	renderWelcomeText,
 	type SessionContextSection,
 } from "./welcome.js";
@@ -104,6 +108,81 @@ export class SessionContextCard implements Component {
 
 	invalidate(): void {
 		// Stateless: theme callbacks are evaluated on every render.
+	}
+}
+
+const USAGE_CHART_MAX_WIDTH = 72;
+const USAGE_CHART_HEIGHT = 8;
+
+function padRightVis(text: string, len: number): string {
+	const pad = len - visibleWidth(text);
+	return pad > 0 ? text + " ".repeat(pad) : text;
+}
+
+function padLeftVis(text: string, len: number): string {
+	const pad = len - visibleWidth(text);
+	return pad > 0 ? " ".repeat(pad) + text : text;
+}
+
+/**
+ * Decorative, non-interactive reproduction of the /usage "Graphs" view for the
+ * "This Week · Per bucket cost · by provider" mode. Holds a pre-built GraphModel
+ * (serialized into the banner text, rebuilt here) and renders the same braille
+ * chart via the shared renderChart(), plus a static legend. Width-responsive:
+ * the chart is generated at the pane width (capped) and every line is clipped so
+ * a narrow pane degrades gracefully, like RulerText.
+ */
+export class UsageChartCard implements Component {
+	constructor(
+		private readonly model: GraphModel,
+		private readonly titleFn: (text: string) => string,
+		private readonly mutedFn: (text: string) => string,
+		private readonly dimFn: (text: string) => string,
+	) {}
+
+	render(width: number): string[] {
+		if (width <= 0) return [];
+		const lines: string[] = [this.titleFn("This Week") + this.mutedFn(" · Per bucket cost · by provider")];
+
+		if (this.model.groupedTotal === 0) {
+			lines.push(this.dimFn("  No usage yet this week"));
+			return lines.map((line) => truncateToWidth(line, width, ""));
+		}
+
+		const spanMs = this.model.domainEndMs - this.model.domainStartMs;
+		const formatTime = (ms: number): string => {
+			const d = new Date(ms);
+			if (spanMs <= 26 * 3_600_000) {
+				return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+			}
+			return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+		};
+
+		const chart = renderChart(this.model, {
+			width: Math.max(Math.min(width, USAGE_CHART_MAX_WIDTH), 30),
+			height: USAGE_CHART_HEIGHT,
+			formatValue: formatAxisCost,
+			formatTime,
+			colorize: (seriesIndex, text) => (seriesIndex < 0 ? this.dimFn(text) : seriesColor(seriesIndex) + text + COLOR_RESET),
+		});
+		lines.push(...chart, "");
+
+		for (let i = 0; i < this.model.series.length; i++) {
+			const s = this.model.series[i]!;
+			const marker = seriesColor(i) + "●" + COLOR_RESET;
+			const value = formatAxisCost(s.total);
+			const pct =
+				s.key !== TOTAL_SERIES_KEY && this.model.groupedTotal > 0
+					? ` ${this.dimFn(`${Math.round((s.total / this.model.groupedTotal) * 100)}%`)}`
+					: "";
+			lines.push(`  ${marker} ${padRightVis(s.label, 24)} ${padLeftVis(value, 8)}${pct}`);
+		}
+
+		return lines.map((line) => truncateToWidth(line, width, ""));
+	}
+
+	invalidate(): void {
+		// Stateless: theme callbacks and renderChart run on every render.
 	}
 }
 
@@ -243,13 +322,43 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		if (before) contentBox.addChild(markdown(before));
 		contentBox.addChild(new RulerText(ruler.split("\n"), (line) => theme.fg("mdLink", line)));
 
+		// Render a text segment, swapping any usage-chart marker block for a live
+		// UsageChartCard and rendering the surrounding text as markdown.
+		const addSegment = (segment: string) => {
+			const trimmed = segment.trim();
+			if (!trimmed) return;
+			const chartStart = trimmed.indexOf(USAGE_CHART_START);
+			const chartEnd = trimmed.indexOf(USAGE_CHART_END);
+			if (chartStart < 0 || chartEnd < chartStart) {
+				if (trimmed) contentBox.addChild(markdown(trimmed));
+				return;
+			}
+			const beforeChart = trimmed.slice(0, chartStart).trim();
+			const json = trimmed.slice(chartStart + USAGE_CHART_START.length, chartEnd).trim();
+			const afterChart = trimmed.slice(chartEnd + USAGE_CHART_END.length).trim();
+			if (beforeChart) contentBox.addChild(markdown(beforeChart));
+			try {
+				const model = JSON.parse(json) as GraphModel;
+				contentBox.addChild(new Spacer(1));
+				contentBox.addChild(new UsageChartCard(
+					model,
+					(line) => theme.fg("mdHeading", theme.bold(line)),
+					(line) => theme.fg("muted", line),
+					(line) => theme.fg("dim", line),
+				));
+			} catch {
+				// Malformed model: skip the panel rather than dumping raw JSON.
+			}
+			if (afterChart) contentBox.addChild(markdown(afterChart));
+		};
+
 		const contextStart = after.indexOf(SESSION_CONTEXT_START);
 		const contextEnd = after.indexOf(SESSION_CONTEXT_END);
 		if (contextStart >= 0 && contextEnd > contextStart) {
 			const beforeContext = after.slice(0, contextStart).trim();
 			const context = after.slice(contextStart + SESSION_CONTEXT_START.length, contextEnd).trim();
 			const afterContext = after.slice(contextEnd + SESSION_CONTEXT_END.length).trim();
-			if (beforeContext) contentBox.addChild(markdown(beforeContext));
+			addSegment(beforeContext);
 			if (context) {
 				contentBox.addChild(new Spacer(1));
 				contentBox.addChild(new SessionContextCard(
@@ -262,7 +371,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			}
 			if (afterContext) contentBox.addChild(markdown(afterContext));
 		} else if (after) {
-			contentBox.addChild(markdown(after));
+			addSegment(after);
 		}
 		box.addChild(contentBox);
 		return box;
@@ -293,6 +402,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				label: "project",
 				values: [truncateLeft(projectRow, MAX_PANEL_ROW)],
 			}];
+			let usageChart: string | undefined;
 			if (usage) {
 				const spend = [
 					`${formatUsdSpend(usage.today.totals.cost)} today`,
@@ -300,6 +410,18 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 					`${formatUsdSpend(usage.allTime.totals.cost)} all`,
 				].join(" · ");
 				sessionContext.push({ label: "spend", values: [spend] });
+
+				// Same model the /usage Graphs view builds for This Week · Per bucket
+				// cost · by provider. GraphModel is plain arrays/objects, so it serializes
+				// cleanly into the banner text and is rebuilt by the message renderer.
+				const model = buildGraphModel(usage.hourly, {
+					period: "thisWeek",
+					metric: "cost",
+					groupBy: "provider",
+					cumulative: false,
+					bounds: usage.bounds,
+				});
+				usageChart = JSON.stringify(model);
 			}
 
 			const bundle = loadBundleResources();
@@ -322,6 +444,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				rulerPanel: DASHBOARD_RULER.join("\n"),
 				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
 				sessionContext,
+				usageChart,
 			});
 
 			pi.sendMessage(
