@@ -7,9 +7,9 @@ describe("TodoStateManager workflow phase", () => {
     expect(state.getPhase()).toBe("goal");
 
     state.write([{ id: 1, title: "Implement feature", description: "Do the work", status: "in-progress" }]);
-    state.setPhase("cut");
+    state.setPhase("implementation");
 
-    expect(state.getPhase()).toBe("cut");
+    expect(state.getPhase()).toBe("implementation");
     expect(state.read()).toHaveLength(1);
   });
 
@@ -23,7 +23,7 @@ describe("TodoStateManager workflow phase", () => {
             message: {
               role: "toolResult",
               toolName: "manage_todo_list",
-              details: { operation: "phase", phase: "measure", todos: [] },
+              details: { operation: "phase", phase: "planning", todos: [] },
             },
           },
           {
@@ -33,7 +33,7 @@ describe("TodoStateManager workflow phase", () => {
               toolName: "manage_todo_list",
               details: {
                 operation: "write",
-                phase: "cut",
+                phase: "implementation",
                 todos: [{ id: 1, title: "Validate", description: "Run checks", status: "completed" }],
               },
             },
@@ -42,8 +42,29 @@ describe("TodoStateManager workflow phase", () => {
       },
     } as any);
 
-    expect(state.getPhase()).toBe("cut");
+    expect(state.getPhase()).toBe("implementation");
     expect(state.getStats().completed).toBe(1);
+  });
+
+  it("maps legacy persisted phase values and ignores malformed ones", () => {
+    const legacy = new TodoStateManager();
+    legacy.loadFromSession({
+      sessionManager: {
+        getBranch: () => [
+          { type: "message", message: { role: "toolResult", toolName: "manage_todo_list", details: { phase: "measure", todos: [] } } },
+          { type: "message", message: { role: "toolResult", toolName: "manage_todo_list", details: { phase: "cut", todos: [] } } },
+        ],
+      },
+    } as any);
+    expect(legacy.getPhase()).toBe("implementation");
+
+    const malformed = new TodoStateManager();
+    malformed.loadFromSession({
+      sessionManager: {
+        getBranch: () => [{ type: "message", message: { role: "toolResult", toolName: "manage_todo_list", details: { phase: "unknown", todos: [] } } }],
+      },
+    } as any);
+    expect(malformed.getPhase()).toBe("goal");
   });
 
   it("rejects more than one in-progress todo", () => {
@@ -68,7 +89,7 @@ describe("TodoStateManager workflow phase", () => {
               toolName: "manage_todo_list",
               details: {
                 operation: "write",
-                phase: "cut",
+                phase: "implementation",
                 todos: [{ id: 1, title: "Do thing", description: "Do the thing", status: "in-progress" }],
               },
             },

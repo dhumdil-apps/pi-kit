@@ -5,12 +5,19 @@
  * Shows status icons, progress stats, and a flat list.
  */
 
-import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { TodoStateManager } from "../state-manager.js";
 import type { WorkflowPhase } from "../types.js";
 
-const WORKFLOW_WIDGET_ID = "workflow-phase";
+const PHASE_WIDGET_ID = "workflow-phase";
 const TODO_WIDGET_ID = "todo-list";
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const PHASE_DISPLAY: Record<WorkflowPhase, { label: string; color: ThemeColor; messages: string[] }> = {
+  goal: { label: "GOAL", color: "accent", messages: ["Visioning…"] },
+  planning: { label: "PLANNING", color: "accent", messages: ["Exploring…", "Discovering…"] },
+  implementation: { label: "IMPLEMENTATION", color: "accent", messages: ["Implementing…", "Shaping…", "Polishing…"] },
+};
 
 /** Status icons for each todo state */
 export const STATUS_ICONS: Record<string, string> = {
@@ -25,41 +32,42 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
   return theme.fg("success", "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(width - filled));
 }
 
-export function phaseRibbon(phase: WorkflowPhase, theme: Theme): string {
-  const stages: Array<{ id: WorkflowPhase; label: string }> = [
-    { id: "goal", label: "GOAL" },
-    { id: "measure", label: "MEASURE TWICE" },
-    { id: "cut", label: "CUT ONCE" },
-  ];
-  const activeIndex = stages.findIndex((stage) => stage.id === phase);
+/** Replace pi's transient working row with a persistent phase-aware indicator. */
+export function updatePhaseIndicator(phase: WorkflowPhase, ctx: ExtensionContext, working: boolean): void {
+  ctx.ui.setWorkingVisible(false);
+  ctx.ui.setWidget(
+    PHASE_WIDGET_ID,
+    (tui, theme) => {
+      let tick = 0;
+      const timer = working
+        ? setInterval(() => {
+            tick++;
+            tui.requestRender();
+          }, 120)
+        : undefined;
+      timer?.unref?.();
 
-  return stages
-    .map((stage, index) => {
-      const branch = index === 0 ? "╭─" : index === stages.length - 1 ? "╰─" : "├─";
-      const state = index < activeIndex ? "completed" : index === activeIndex ? "current" : "upcoming";
-      const marker = state === "completed" ? "✓" : state === "current" ? "◉" : "○";
-      const text = `${marker} ${stage.label}`;
-      const styled =
-        state === "completed"
-          ? theme.fg("success", text)
-          : state === "current"
-            ? theme.fg("warning", theme.bold(text))
-            : theme.fg("dim", text);
-      return `${theme.fg("accent", "▍ ")}${theme.fg("muted", `${branch} `)}${styled}`;
-    })
-    .join("\n");
+      return {
+        render: (width: number) => {
+          const display = PHASE_DISPLAY[phase];
+          const text = working
+            ? `${SPINNER_FRAMES[tick % SPINNER_FRAMES.length]} ${display.messages[Math.floor(tick / 12) % display.messages.length]}`
+            : `● ${display.label}`;
+          return [truncateToWidth(theme.fg(display.color, text), width)];
+        },
+        invalidate: () => {},
+        dispose: () => {
+          if (timer) clearInterval(timer);
+        },
+      };
+    },
+    { placement: "aboveEditor" },
+  );
 }
 
-/** Show the global workflow route independently from local todos. */
-export function updateWorkflowWidget(state: TodoStateManager, ctx: ExtensionContext): void {
-  ctx.ui.setWidget(WORKFLOW_WIDGET_ID, (_tui, theme) => ({
-    render: () => phaseRibbon(state.getPhase(), theme).split("\n"),
-    invalidate: () => {},
-  }));
-}
-
-export function clearWorkflowWidget(ctx: ExtensionContext): void {
-  ctx.ui.setWidget(WORKFLOW_WIDGET_ID, undefined);
+export function clearPhaseIndicator(ctx: ExtensionContext): void {
+  ctx.ui.setWidget(PHASE_WIDGET_ID, undefined);
+  ctx.ui.setWorkingVisible(true);
 }
 
 /** Show local todos only when explicitly visible and non-empty. */

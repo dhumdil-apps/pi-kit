@@ -154,6 +154,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 			bar: pct,
 			barSegments: BAR_SEGMENTS,
 			color,
+			row: 3,
 		});
 	}
 
@@ -187,6 +188,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 					id: "net",
 					text: `${LABELS.net} ↓${humanBytes(net.value.down)} ↑${humanBytes(net.value.up)}`,
 					color: "muted",
+					row: 3,
 				});
 			}
 		} finally {

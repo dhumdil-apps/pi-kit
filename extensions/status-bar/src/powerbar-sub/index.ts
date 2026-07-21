@@ -53,6 +53,7 @@ function emitWindow(pi: ExtensionAPI, segmentId: string, window: RateWindow | un
 		bar: pct,
 		barSegments,
 		color: getColor(pct),
+		row: 3,
 	});
 }
 

@@ -7,6 +7,7 @@ import type { OrderedListOption, SettingDefinition } from "../../../extension-pr
 import { getSetting } from "../../../extension-preferences/index.js";
 
 export const EXTENSION_NAME = "powerbar";
+const DEFAULT_LEFT_SEGMENTS = "session-name,git-branch,agent-stats,context-usage,tokens,cpu,ram,disk,net";
 
 export interface PowerbarSettings {
 	left: string[];
@@ -23,7 +24,7 @@ export function registerSettings(pi: ExtensionAPI, segmentOptions: OrderedListOp
 			id: "left",
 			label: "Left segments",
 			description: "Segments shown on the left side of the powerbar",
-			defaultValue: "git-branch,tokens,context-usage,cpu,ram,disk,net",
+			defaultValue: DEFAULT_LEFT_SEGMENTS,
 			options: segmentOptions,
 		},
 		{
@@ -70,7 +71,12 @@ export function registerSettings(pi: ExtensionAPI, segmentOptions: OrderedListOp
 }
 
 export function loadSettings(): PowerbarSettings {
-	const leftStr = getSetting(EXTENSION_NAME, "left", "git-branch,tokens,context-usage,cpu,ram,disk,net") ?? "";
+	const leftStr =
+		getSetting(
+			EXTENSION_NAME,
+			"left",
+			DEFAULT_LEFT_SEGMENTS,
+		) ?? "";
 	const rightStr = getSetting(EXTENSION_NAME, "right", "provider,model,sub-hourly,sub-weekly") ?? "";
 	const separator = getSetting(EXTENSION_NAME, "separator", " │ ") ?? " │ ";
 	const placement = getSetting(EXTENSION_NAME, "placement", "belowEditor") ?? "belowEditor";

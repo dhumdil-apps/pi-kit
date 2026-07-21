@@ -30,6 +30,7 @@ function emitContextUsage(pi: ExtensionAPI, ctx: ExtensionContext): void {
 		bar: pct,
 		barSegments: CONTEXT_BAR_SEGMENTS,
 		color: getColor(pct),
+		row: 2,
 	});
 }
 
@@ -41,6 +42,7 @@ function resetContextUsage(pi: ExtensionAPI): void {
 		bar: 0,
 		barSegments: CONTEXT_BAR_SEGMENTS,
 		color: getColor(0),
+		row: 2,
 	});
 }
 

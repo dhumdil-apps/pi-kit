@@ -19,6 +19,7 @@ interface PowerbarUpdatePayload {
 	color?: string;
 	bar?: number;
 	barSegments?: number;
+	row?: 1 | 2 | 3;
 	transient?: boolean;
 }
 
@@ -35,6 +36,7 @@ function segmentEquals(left: Segment | undefined, right: Segment): boolean {
 		left.color === right.color &&
 		left.bar === right.bar &&
 		left.barSegments === right.barSegments &&
+		left.row === right.row &&
 		left.transient === right.transient
 	);
 }
@@ -64,8 +66,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 			(_tui: TUI, theme: Theme): Component & { dispose?(): void } => {
 				return {
 					render(width: number): string[] {
-						const line = renderBar(segments, settings, theme, width);
-						return [line];
+						return renderBar(segments, settings, theme, width);
 					},
 					invalidate(): void {
 						// No cached state to clear
@@ -93,6 +94,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 				color: payload.color,
 				bar: payload.bar,
 				barSegments: payload.barSegments,
+				row: payload.row,
 				transient: payload.transient,
 			};
 			if (segmentEquals(segments.get(payload.id), nextSegment)) return;

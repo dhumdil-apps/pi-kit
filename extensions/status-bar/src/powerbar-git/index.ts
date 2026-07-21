@@ -72,6 +72,7 @@ async function emitBranch(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void
 			text: dirty ? `${branch}*` : branch,
 			icon: "⎇",
 			color: dirty ? "warning" : "muted",
+			row: 1,
 		});
 	} else {
 		pi.events.emit("powerbar:update", {

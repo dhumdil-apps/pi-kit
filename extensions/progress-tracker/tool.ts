@@ -35,10 +35,10 @@ const TodoItemSchema = Type.Object({
 export const ManageTodoListParams = Type.Object({
   operation: Type.Union([Type.Literal("write"), Type.Literal("read"), Type.Literal("phase")], {
     description:
-      "write: Replace the todo list. read: Retrieve current state. phase: Update only the GOAL/MEASURE/CUT workflow phase.",
+      "write: Replace the todo list. read: Retrieve current state. phase: Update only the GOAL/PLANNING/IMPLEMENTATION workflow phase.",
   }),
   phase: Type.Optional(
-    Type.Union([Type.Literal("goal"), Type.Literal("measure"), Type.Literal("cut")], {
+    Type.Union([Type.Literal("goal"), Type.Literal("planning"), Type.Literal("implementation")], {
       description: "Required for phase operation. Tracks workflow independently from implementation todos.",
     }),
   ),
@@ -58,8 +58,8 @@ export const TOOL_DESCRIPTION = `Track the high-level workflow phase and a struc
 
 Workflow phases:
 - goal: session starting point and project overview
-- measure: discovery, questions, rubric, and plan approval
-- cut: implementation, validation, review, documentation, and follow-up learning
+- planning: discovery, questions, rubric, and plan approval
+- implementation: implementation, validation, review, documentation, and follow-up learning
 
 Use operation=phase at each transition. Phase updates never create or replace todos.
 The local todo list is independent of the workflow phase and may track discovery, planning, implementation, and validation work.

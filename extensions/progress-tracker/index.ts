@@ -3,7 +3,8 @@
  *
  * Provides:
  * - A single `manage_todo_list` tool with read/write operations
- * - A read-only widget showing todo progress
+ * - An always-visible phase-aware working indicator
+ * - A read-only widget showing local todo progress
  * - /todos command to toggle widget
  * - /todos clear command to clear the list
  * - Session persistence via tool result details
@@ -12,44 +13,34 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CLEAR_ENTRY_TYPE, TodoStateManager } from "./state-manager.js";
 import { createManageTodoListTool } from "./tool.js";
-import {
-  clearWorkflowWidget,
-  updateTodoWidget,
-  updateWorkflowWidget,
-} from "./ui/todo-widget.js";
+import { clearPhaseIndicator, updatePhaseIndicator, updateTodoWidget } from "./ui/todo-widget.js";
 
 export default function (pi: ExtensionAPI) {
   const state = new TodoStateManager();
 
   let currentCtx: ExtensionContext | undefined;
-  let workflowVisible = false;
   let todosVisible = false;
+  let working = false;
 
-  const refreshWidgets = () => {
+  const refreshStatus = () => {
     if (!currentCtx) return;
-    if (workflowVisible) updateWorkflowWidget(state, currentCtx);
-    else clearWorkflowWidget(currentCtx);
+    updatePhaseIndicator(state.getPhase(), currentCtx, working);
     updateTodoWidget(state, currentCtx, todosVisible);
   };
-
-  const hasSubmittedPrompt = (ctx: ExtensionContext): boolean =>
-    ctx.sessionManager.getBranch().some(
-      (entry) => entry.type === "message" && entry.message.role === "user"
-    );
 
   // --- Reconstruct state from session on load/switch/fork/tree ---
 
   const reconstructState = (ctx: ExtensionContext) => {
     currentCtx = ctx;
     state.loadFromSession(ctx);
-    workflowVisible = hasSubmittedPrompt(ctx);
     todosVisible = state.read().length > 0;
-    refreshWidgets();
+    working = !ctx.isIdle();
+    refreshStatus();
   };
 
   const onTodoUpdate = (operation: "phase" | "write") => {
     if (operation === "write") todosVisible = state.read().length > 0;
-    refreshWidgets();
+    refreshStatus();
   };
 
   pi.on("session_start", async (_event, ctx) => reconstructState(ctx));
@@ -58,8 +49,19 @@ export default function (pi: ExtensionAPI) {
   // Keep ctx reference fresh on every turn
   pi.on("input", async (_event, ctx) => {
     currentCtx = ctx;
-    workflowVisible = true;
-    refreshWidgets();
+    refreshStatus();
+  });
+
+  pi.on("agent_start", async (_event, ctx) => {
+    currentCtx = ctx;
+    working = true;
+    refreshStatus();
+  });
+
+  pi.on("agent_settled", async (_event, ctx) => {
+    currentCtx = ctx;
+    working = false;
+    refreshStatus();
   });
 
   pi.on("turn_start", async (_event, ctx) => {
@@ -68,7 +70,13 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("turn_end", async (_event, ctx) => {
     currentCtx = ctx;
-    refreshWidgets();
+    refreshStatus();
+  });
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    clearPhaseIndicator(ctx);
+    currentCtx = undefined;
+    working = false;
   });
 
   // --- Register the manage_todo_list tool ---
@@ -90,21 +98,20 @@ export default function (pi: ExtensionAPI) {
         // branch) doesn't resurrect the list that preceded this clear.
         pi.sendMessage({ customType: CLEAR_ENTRY_TYPE, content: "", display: false }, { triggerTurn: false });
         todosVisible = false;
-        refreshWidgets();
+        refreshStatus();
         ctx.ui.notify("Todo list cleared.", "info");
         return;
       }
 
-      workflowVisible = true;
       const todos = state.read();
       if (todos.length === 0) {
-        refreshWidgets();
-        ctx.ui.notify("No local todos. Workflow progress is visible.", "info");
+        refreshStatus();
+        ctx.ui.notify("No local todos. Workflow phase is shown above the editor.", "info");
         return;
       }
 
       todosVisible = !todosVisible;
-      refreshWidgets();
+      refreshStatus();
       ctx.ui.notify(
         todosVisible
           ? `${state.getStats().completed}/${state.getStats().total} todos completed.`

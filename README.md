@@ -21,8 +21,8 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 
 ## Features
 
-- **agent-workflow** — the visible **GOAL (VISION) → MEASURE (DISCOVER) →
-  CUT (SHAPE → POLISH)** flow, conversational question batches and plan
+- **agent-workflow** — the visible **GOAL (VISION) → PLANNING (DISCOVER) →
+  IMPLEMENTATION (SHAPE → POLISH)** flow, conversational question batches and plan
   approval, `/flash` cruise control, and `/retro`, `/forensic`, and
   `/improvements` learning commands. See
   [docs/FLOW.md](docs/FLOW.md).
@@ -36,7 +36,7 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 - **project memory** — optional, user-owned `.pi/MEMORY.md`. The workflow reads
   it at task start; only explicit `/retro` and `/forensic` reflection may
   maintain concise, durable, deduplicated lessons.
-- **progress-tracker** — a global GOAL → MEASURE TWICE → CUT ONCE route,
+- **progress-tracker** — a global GOAL → PLANNING → IMPLEMENTATION route,
   shown after the first prompt or `/todos`; local todos remain independent and
   `/todos` toggles their separate widget.
 - **session-dashboard** — the interactive startup ruler, project/spend panel,

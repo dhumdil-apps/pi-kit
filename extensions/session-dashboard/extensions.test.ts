@@ -8,7 +8,16 @@ import {
 	presentationCoverageErrors,
 	renderExtensionDeck,
 } from "./extensions.js";
-import { DASHBOARD_INVITATION, RULER_END, RULER_START, renderWelcomeText } from "./welcome.js";
+import {
+	DASHBOARD_INVITATION,
+	HERO_QUOTE,
+	RULER_END,
+	RULER_START,
+	SESSION_CONTEXT_END,
+	SESSION_CONTEXT_START,
+	parseSessionContext,
+	renderWelcomeText,
+} from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -29,27 +38,39 @@ describe("session dashboard extension deck", () => {
 		const deck = renderExtensionDeck(names);
 		for (const group of EXTENSION_GROUPS) expect(deck).toContain(`**${group.title}**`);
 		for (const presentation of EXTENSION_PRESENTATIONS) {
+			expect(presentation.description).not.toBe("");
+			expect(readFileSync(join(BUNDLE_ROOT, presentation.readme), "utf8")).not.toBe("");
 			expect(deck).toContain(`**${presentation.name}** — ${presentation.description}`);
+			expect(deck).toContain(`README: \`${presentation.readme}\``);
 		}
+		expect(deck).toContain("README paths are relative to the bundle root.");
 		expect(deck.indexOf("**UI**")).toBeLessThan(deck.indexOf("**Flow**"));
 		expect(deck.indexOf("**Flow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 
-	it("renders the dashboard in reference-to-invitation order without a duplicate phase ribbon", () => {
+	it("renders the hero, extensions, and session context in order without a duplicate phase ribbon", () => {
 		const welcome = renderWelcomeText({
 			rulerPanel: "RULER PANEL",
-			infoPanel: "PROJECT PANEL",
-			sections: ["CONTEXT", "SKILLS"],
 			extensionDeck: "EXTENSIONS",
+			sessionContext: [
+				{ label: "project", values: ["PROJECT"] },
+				{ label: "resources", values: ["📜 CONTEXT", "🎓 SKILLS"] },
+				{ label: "commands", values: ["⌨️ COMMANDS"] },
+			],
 		});
+		expect(welcome.startsWith(`${HERO_QUOTE}\n${RULER_START}`)).toBe(true);
 		expect(welcome).toContain(`${RULER_START}\nRULER PANEL\n${RULER_END}`);
-		expect(welcome).not.toContain("```\nRULER PANEL\n```");
-		expect(welcome).toContain("```\nPROJECT PANEL\n```");
-		expect(welcome.indexOf("CONTEXT")).toBeLessThan(welcome.indexOf("EXTENSIONS"));
-		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("PROJECT PANEL"));
-		expect(welcome.indexOf("PROJECT PANEL")).toBeLessThan(welcome.indexOf("⌨️"));
-		expect(welcome.indexOf("⌨️")).toBeLessThan(welcome.indexOf(DASHBOARD_INVITATION));
-		expect(welcome.endsWith(DASHBOARD_INVITATION)).toBe(true);
+		expect(welcome).toContain(`${SESSION_CONTEXT_START}\nproject\tPROJECT\nresources\t📜 CONTEXT\n\t🎓 SKILLS\ncommands\t⌨️ COMMANDS\n${SESSION_CONTEXT_END}`);
+		expect(welcome.indexOf("RULER PANEL")).toBeLessThan(welcome.indexOf(DASHBOARD_INVITATION));
+		expect(welcome.indexOf(DASHBOARD_INVITATION)).toBeLessThan(welcome.indexOf("EXTENSIONS"));
+		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("PROJECT"));
 		expect(welcome).not.toContain("GOAL (VISION)");
+	});
+
+	it("round-trips context sections with continuation values", () => {
+		expect(parseSessionContext("project\t~/work main · clean\nresources\t📜 AGENTS.md\n\t🎓 simplify")).toEqual([
+			{ label: "project", values: ["~/work main · clean"] },
+			{ label: "resources", values: ["📜 AGENTS.md", "🎓 simplify"] },
+		]);
 	});
 });

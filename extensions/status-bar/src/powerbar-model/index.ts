@@ -24,6 +24,7 @@ function emitModel(pi: ExtensionAPI, ctx: ExtensionContext): void {
 		id: "model",
 		text,
 		color: "dim",
+		row: 1,
 	});
 }
 

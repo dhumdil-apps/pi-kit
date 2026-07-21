@@ -6,9 +6,13 @@ function harness() {
 	const commands = new Map<string, { handler: (args: string, ctx: any) => Promise<void> }>();
 	const emitted: Array<[string, unknown]> = [];
 	const messages: string[] = [];
+	let sessionName: string | undefined;
 	const pi = {
 		on: vi.fn((name: string, handler: (event?: any) => any) => handlers.set(name, handler)),
 		registerCommand: vi.fn((name: string, command: any) => commands.set(name, command)),
+		registerTool: vi.fn(),
+		getSessionName: vi.fn(() => sessionName),
+		setSessionName: vi.fn((name: string) => { sessionName = name; }),
 		sendUserMessage: vi.fn((message: string) => messages.push(message)),
 		events: { emit: vi.fn((name: string, value: unknown) => emitted.push([name, value])) },
 	};
@@ -73,5 +77,62 @@ describe("agent workflow lifecycle", () => {
 		expect(prompt.systemPrompt).toContain("before planning changes");
 		expect(prompt.systemPrompt).toContain("never silently overwrite or absorb them");
 		expect(prompt.systemPrompt).toContain("state the conflict and selected resolution");
+	});
+
+	it("requires fresh approval for any substantive IMPLEMENTATION feedback", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		const feedbackRule = guidance.slice(
+			guidance.indexOf("When Flash is off"),
+			guidance.indexOf("There is no hard pre-approval execution gate"),
+		);
+
+		for (const category of [
+			"outcome",
+			"requirements",
+			"constraints",
+			"scope",
+			"assumptions",
+			"behavior",
+			"acceptance criteria",
+			"validation expectations",
+			"mismatch",
+		]) {
+			expect(feedbackRule).toContain(category);
+		}
+		expect(feedbackRule).toContain("Judge the substance rather than matching examples or keywords");
+		expect(feedbackRule).toContain("novel feedback counts");
+		expect(feedbackRule).toContain("do not edit or use other state-changing implementation tools");
+		expect(feedbackRule).toContain("even with zero questions");
+		expect(feedbackRule).toContain("Earlier approval does not carry forward");
+		expect(feedbackRule).toContain("ordinary user input brakes Flash first");
+
+		for (const planningDimension of [
+			"states and transitions",
+			"boundaries",
+			"timing",
+			"lifecycle and recovery",
+			"failure modes",
+			"accessibility or fallbacks",
+			"external interactions",
+			"validation",
+		]) {
+			expect(guidance).toContain(planningDimension);
+		}
+		expect(guidance).toContain("Do not mechanically include dimensions that do not apply");
+
+		const feedback = guidance.indexOf("ordinary user feedback during IMPLEMENTATION");
+		const planning = guidance.indexOf("Return to PLANNING", feedback);
+		const investigate = guidance.indexOf("investigate read-only", planning);
+		const changed = guidance.indexOf("identify what changed", investigate);
+		const revisedPlan = guidance.indexOf("present the complete revised goal", changed);
+		const freshApproval = guidance.indexOf("request fresh explicit approval", revisedPlan);
+		expect(feedback).toBeGreaterThan(-1);
+		expect(planning).toBeGreaterThan(feedback);
+		expect(investigate).toBeGreaterThan(planning);
+		expect(changed).toBeGreaterThan(investigate);
+		expect(revisedPlan).toBeGreaterThan(changed);
+		expect(freshApproval).toBeGreaterThan(revisedPlan);
 	});
 });

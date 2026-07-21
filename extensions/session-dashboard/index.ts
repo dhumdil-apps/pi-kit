@@ -4,10 +4,18 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir, loadProjectContextFiles } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Box, type Component, Container, Markdown } from "@earendil-works/pi-tui";
+import { Box, type Component, Container, Markdown, Spacer, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { collectUsageData } from "../usage-history/data.js";
 import { renderExtensionDeck } from "./extensions.js";
-import { RULER_END, RULER_START, renderWelcomeText } from "./welcome.js";
+import {
+	parseSessionContext,
+	RULER_END,
+	RULER_START,
+	SESSION_CONTEXT_END,
+	SESSION_CONTEXT_START,
+	renderWelcomeText,
+	type SessionContextSection,
+} from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MAX_PANEL_ROW = 60;
@@ -38,6 +46,64 @@ export class RulerText implements Component {
 
 	invalidate(): void {
 		// Stateless: render() has no cache to invalidate.
+	}
+}
+
+const SESSION_CONTEXT_MAX_WIDTH = 72;
+const SESSION_CONTEXT_TITLE = " Session context ";
+
+export class SessionContextCard implements Component {
+	constructor(
+		private readonly sections: SessionContextSection[],
+		private readonly borderFn: (text: string) => string,
+		private readonly titleFn: (text: string) => string,
+		private readonly labelFn: (text: string) => string,
+		private readonly contentFn: (text: string) => string,
+	) {}
+
+	render(width: number): string[] {
+		if (width <= 0 || this.sections.length === 0) return [];
+		const labelWidth = Math.max(...this.sections.map(({ label }) => visibleWidth(label)));
+		const desiredWidth = Math.max(
+			visibleWidth(SESSION_CONTEXT_TITLE) + 3,
+			...this.sections.flatMap(({ values }) => values.map((value) => labelWidth + 2 + visibleWidth(value) + 4)),
+		);
+		const cardWidth = Math.min(width, SESSION_CONTEXT_MAX_WIDTH, desiredWidth);
+		if (cardWidth < 4) return [this.borderFn("─".repeat(cardWidth))];
+
+		const titleFits = cardWidth >= visibleWidth(SESSION_CONTEXT_TITLE) + 3;
+		const top = titleFits
+			? this.borderFn("╭─") + this.titleFn(SESSION_CONTEXT_TITLE) + this.borderFn(`${"─".repeat(cardWidth - visibleWidth(SESSION_CONTEXT_TITLE) - 3)}╮`)
+			: this.borderFn(`╭${"─".repeat(cardWidth - 2)}╮`);
+		const innerWidth = cardWidth - 4;
+		if (innerWidth <= 0) return [top, this.borderFn(`╰${"─".repeat(cardWidth - 2)}╯`)];
+		const rows = this.sections.flatMap(({ label, values }) => {
+			if (innerWidth <= labelWidth + 3) {
+				return [
+					{ label: truncateToWidth(label, innerWidth, "…"), content: "", stacked: true },
+					...values.flatMap((value) => wrapTextWithAnsi(value, innerWidth).map((line) => ({ label: "", content: line, stacked: true }))),
+				];
+			}
+
+			const contentWidth = innerWidth - labelWidth - 2;
+			return values.flatMap((value, valueIndex) => wrapTextWithAnsi(value, contentWidth).map((line, lineIndex) => ({
+				label: valueIndex === 0 && lineIndex === 0 ? label : "",
+				content: line,
+				stacked: false,
+			})));
+		});
+		const body = rows.map(({ label, content, stacked }) => {
+			const labelText = label ? truncateToWidth(label, labelWidth, "…") : "";
+			const prefix = stacked ? this.labelFn(labelText) : this.labelFn(labelText.padEnd(labelWidth)) + "  ";
+			const rendered = truncateToWidth(prefix + this.contentFn(content), innerWidth, "");
+			const padding = " ".repeat(Math.max(0, innerWidth - visibleWidth(rendered)));
+			return this.borderFn("│ ") + rendered + padding + this.borderFn(" │");
+		});
+		return [top, ...body, this.borderFn(`╰${"─".repeat(cardWidth - 2)}╯`)];
+	}
+
+	invalidate(): void {
+		// Stateless: theme callbacks are evaluated on every render.
 	}
 }
 
@@ -139,13 +205,6 @@ function contextFileList(cwd: string): string[] {
 	}
 }
 
-/** Box-drawing only inside the panel — emoji are double-width and break alignment. */
-function renderPanel(rows: string[]): string {
-	const width = Math.max(...rows.map((r) => r.length));
-	const body = rows.map((r) => `│  ${r.padEnd(width)}  │`);
-	return [`╭${"─".repeat(width + 4)}╮`, ...body, `╰${"─".repeat(width + 4)}╯`].join("\n");
-}
-
 export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 	pi.registerMessageRenderer("session-dashboard", (message, _options, theme) => {
 		const content = typeof message.content === "string" ? message.content : message.content
@@ -183,7 +242,28 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		const after = content.slice(rulerEnd + RULER_END.length).trim();
 		if (before) contentBox.addChild(markdown(before));
 		contentBox.addChild(new RulerText(ruler.split("\n"), (line) => theme.fg("mdLink", line)));
-		if (after) contentBox.addChild(markdown(after));
+
+		const contextStart = after.indexOf(SESSION_CONTEXT_START);
+		const contextEnd = after.indexOf(SESSION_CONTEXT_END);
+		if (contextStart >= 0 && contextEnd > contextStart) {
+			const beforeContext = after.slice(0, contextStart).trim();
+			const context = after.slice(contextStart + SESSION_CONTEXT_START.length, contextEnd).trim();
+			const afterContext = after.slice(contextEnd + SESSION_CONTEXT_END.length).trim();
+			if (beforeContext) contentBox.addChild(markdown(beforeContext));
+			if (context) {
+				contentBox.addChild(new Spacer(1));
+				contentBox.addChild(new SessionContextCard(
+					parseSessionContext(context),
+					(line) => theme.fg("borderMuted", line),
+					(line) => theme.fg("mdHeading", theme.bold(line)),
+					(line) => theme.fg("muted", line),
+					(line) => theme.fg("customMessageText", line),
+				));
+			}
+			if (afterContext) contentBox.addChild(markdown(afterContext));
+		} else if (after) {
+			contentBox.addChild(markdown(after));
+		}
 		box.addChild(contentBox);
 		return box;
 	});
@@ -192,59 +272,68 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 		// Purely decorative banner: in headless/print mode it would land after the
 		// prompt and trigger a spurious extra turn, so interactive sessions only.
 		if (!ctx.hasUI) return;
-		const cwd = ctx.cwd;
-		// Independent lookups — run concurrently so a cold usage-cache build
-		// doesn't add its full duration on top of the two git calls before this
-		// purely decorative banner can render.
-		const [branchResult, dirtyOutput, usage] = await Promise.all([
-			git(pi, cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
-			git(pi, cwd, ["status", "--porcelain"]),
-			collectUsageData().catch(() => null),
-		]);
-		const branch = branchResult || "no git";
-		const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
+		ctx.ui.setWidget("session-dashboard-loading", ["Preparing session dashboard…"]);
+		try {
+			const cwd = ctx.cwd;
+			// Independent lookups — run concurrently so a cold usage-cache build
+			// doesn't add its full duration on top of the two git calls before this
+			// purely decorative banner can render.
+			const [branchResult, dirtyOutput, usage] = await Promise.all([
+				git(pi, cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
+				git(pi, cwd, ["status", "--porcelain"]),
+				collectUsageData().catch(() => null),
+			]);
+			const branch = branchResult || "no git";
+			const dirtyCount = dirtyOutput ? dirtyOutput.split("\n").filter(Boolean).length : 0;
 
-		const projectRow = `${truncateLeft(tildify(cwd), 34)}  ${branch} · ${
-			dirtyCount === 0 ? "clean" : `${dirtyCount} modified`
-		}`;
-		const rulerPanel = [...DASHBOARD_RULER, "Measure twice, cut once"].join("\n");
-		const infoRows = [`project  ${truncateLeft(projectRow, MAX_PANEL_ROW - 9)}`];
-		if (usage) {
-			const spend = [
-				`${formatUsdSpend(usage.today.totals.cost)} today`,
-				`${formatUsdSpend(usage.last30Days.totals.cost)} 30d`,
-				`${formatUsdSpend(usage.allTime.totals.cost)} all`,
-			].join(" · ");
-			infoRows.push(`spend    ${spend}`);
-		}
+			const projectRow = `${truncateLeft(tildify(cwd), 34)}  ${branch} · ${
+				dirtyCount === 0 ? "clean" : `${dirtyCount} modified`
+			}`;
+			const sessionContext: SessionContextSection[] = [{
+				label: "project",
+				values: [truncateLeft(projectRow, MAX_PANEL_ROW)],
+			}];
+			if (usage) {
+				const spend = [
+					`${formatUsdSpend(usage.today.totals.cost)} today`,
+					`${formatUsdSpend(usage.last30Days.totals.cost)} 30d`,
+					`${formatUsdSpend(usage.allTime.totals.cost)} all`,
+				].join(" · ");
+				sessionContext.push({ label: "spend", values: [spend] });
+			}
 
-		const bundle = loadBundleResources();
-		const contextFiles = contextFileList(cwd);
-		const sections: string[] = [];
-		if (contextFiles.length > 0) {
-			sections.push(`📜 **Context** · ${contextFiles.map((f) => `\`${f}\``).join(" · ")}`);
-		}
-		if (bundle.skills.length > 0) {
-			sections.push(`🎓 **Skills** (${bundle.skills.length}) · ${bundle.skills.join(" · ")}`);
-		}
-		if (bundle.prompts.length > 0) {
-			sections.push(`⌘ **Prompts** · ${bundle.prompts.map((p) => `\`${p}\``).join(" · ")}`);
-		}
+			const bundle = loadBundleResources();
+			const contextFiles = contextFileList(cwd);
+			const resources: string[] = [];
+			if (contextFiles.length > 0) resources.push(`📜 ${contextFiles.join(" · ")}`);
+			if (bundle.skills.length > 0) resources.push(`🎓 ${bundle.skills.join(" · ")}`);
+			if (bundle.prompts.length > 0) resources.push(`⌘ ${bundle.prompts.join(" · ")}`);
+			if (resources.length > 0) sessionContext.push({ label: "resources", values: resources });
+			sessionContext.push({
+				label: "commands",
+				values: ["⌨️ ! <cmd> bash · /todos progress · /flash cruise control · /retro reflect · escape confirm cancel"],
+			});
+			sessionContext.push({
+				label: "updates",
+				values: ["automatic checks off · run pi update periodically"],
+			});
 
-		const welcomeText = renderWelcomeText({
-			rulerPanel,
-			infoPanel: renderPanel(infoRows),
-			sections,
-			extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
-		});
+			const welcomeText = renderWelcomeText({
+				rulerPanel: DASHBOARD_RULER.join("\n"),
+				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
+				sessionContext,
+			});
 
-		pi.sendMessage(
-			{
-				customType: "session-dashboard",
-				content: welcomeText,
-				display: true,
-			},
-			{ triggerTurn: false }
-		);
+			pi.sendMessage(
+				{
+					customType: "session-dashboard",
+					content: welcomeText,
+					display: true,
+				},
+				{ triggerTurn: false }
+			);
+		} finally {
+			ctx.ui.setWidget("session-dashboard-loading", undefined);
+		}
 	});
 }

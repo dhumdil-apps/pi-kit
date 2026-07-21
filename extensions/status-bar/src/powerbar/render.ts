@@ -1,8 +1,8 @@
 /**
  * Rendering logic for the powerbar.
  *
- * Builds a single line with left-aligned and right-aligned segments,
- * joined by themed separators. Supports two progress bar styles:
+ * Builds independently aligned semantic rows, joined by themed separators.
+ * Supports two progress bar styles:
  * continuous (█ + partial-width glyphs ▏▎▍▌▋▊▉) and blocks
  * (discrete partial-height glyphs ▁▂▃▄▅▆▇█ with dim background).
  */
@@ -23,6 +23,8 @@ export interface Segment {
 	bar?: number;
 	/** Hint for how many discrete blocks to use in blocks mode. Falls back to barWidth setting. */
 	barSegments?: number;
+	/** Fixed semantic row: identity (1), session/context (2), or system/quota (3). */
+	row?: 1 | 2 | 3;
 	/** Render on the right while active even when absent from saved settings. */
 	transient?: boolean;
 }
@@ -174,7 +176,9 @@ function shrinkWidest(segments: RenderedSegment[], overflow: number): void {
 	};
 }
 
-export function renderBar(
+function renderAlignedLine(
+	leftIds: string[],
+	rightIds: string[],
 	segments: Map<string, Segment>,
 	settings: PowerbarSettings,
 	theme: Theme,
@@ -182,41 +186,52 @@ export function renderBar(
 ): string {
 	const separator = theme.fg("dim", settings.separator);
 	const separatorWidth = visibleWidth(separator);
+	const leftSegs = renderSideSegments(leftIds, segments, settings, theme);
+	const rightSegs = renderSideSegments(rightIds, segments, settings, theme);
+	const allSegs = [...leftSegs, ...rightSegs];
 
-	const leftSegs = renderSideSegments(settings.left, segments, settings, theme);
+	const leftSepCount = Math.max(0, leftSegs.length - 1);
+	const rightSepCount = Math.max(0, rightSegs.length - 1);
+	const totalSepWidth = (leftSepCount + rightSepCount) * separatorWidth;
+	const minPadding = 1;
+	let overflow = allSegs.reduce((sum, segment) => sum + segment.width, 0) + totalSepWidth + minPadding - width;
+
+	for (let i = 0; i < allSegs.length && overflow > 0; i++) {
+		shrinkWidest(allSegs, overflow);
+		const segmentWidth = allSegs.reduce((sum, segment) => sum + segment.width, 0);
+		overflow = segmentWidth + totalSepWidth + minPadding - width;
+	}
+
+	const left = joinSegments(allSegs.slice(0, leftSegs.length), separator, separatorWidth);
+	const right = joinSegments(allSegs.slice(leftSegs.length), separator, separatorWidth);
+	const padding = Math.max(minPadding, width - left.width - right.width);
+	return truncateToWidth(`${left.text}${" ".repeat(padding)}${right.text}`, width, "…");
+}
+
+/** Render identity, session/context, and system/quota segments on independent rows. */
+export function renderBar(
+	segments: Map<string, Segment>,
+	settings: PowerbarSettings,
+	theme: Theme,
+	width: number,
+): string[] {
 	const configured = new Set([...settings.left, ...settings.right]);
 	const transient = [...segments.values()]
 		.filter((segment) => segment.transient && !configured.has(segment.id))
 		.map((segment) => segment.id);
-	const rightSegs = renderSideSegments([...settings.right, ...transient], segments, settings, theme);
-	const allSegs = [...leftSegs, ...rightSegs];
+	const right = [...settings.right, ...transient];
+	const rowFor = (id: string): 1 | 2 | 3 => segments.get(id)?.row ?? 1;
+	const hasContent = (id: string): boolean => {
+		const segment = segments.get(id);
+		return !!segment && (!!segment.text || !!segment.suffix || segment.bar !== undefined);
+	};
 
-	// Calculate total content width (segments + separators within each side + 1 for minimum padding)
-	const leftSepCount = Math.max(0, leftSegs.length - 1);
-	const rightSepCount = Math.max(0, rightSegs.length - 1);
-	const totalSepWidth = (leftSepCount + rightSepCount) * separatorWidth;
-	const totalSegWidth = allSegs.reduce((sum, s) => sum + s.width, 0);
-	const minPadding = 1;
-	const totalNeeded = totalSegWidth + totalSepWidth + minPadding;
-
-	// Shrink the widest segment(s) until it fits
-	if (totalNeeded > width) {
-		let overflow = totalNeeded - width;
-		const maxPasses = allSegs.length;
-		for (let i = 0; i < maxPasses && overflow > 0; i++) {
-			shrinkWidest(allSegs, overflow);
-			const newSegWidth = allSegs.reduce((sum, s) => sum + s.width, 0);
-			overflow = newSegWidth + totalSepWidth + minPadding - width;
-		}
+	const lines: string[] = [];
+	for (const row of [1, 2, 3] as const) {
+		const leftIds = settings.left.filter((id) => rowFor(id) === row && hasContent(id));
+		const rightIds = right.filter((id) => rowFor(id) === row && hasContent(id));
+		if (leftIds.length === 0 && rightIds.length === 0) continue;
+		lines.push(renderAlignedLine(leftIds, rightIds, segments, settings, theme, width));
 	}
-
-	// Rebuild left/right from the (possibly truncated) segments
-	const left = joinSegments(allSegs.slice(0, leftSegs.length), separator, separatorWidth);
-	const right = joinSegments(allSegs.slice(leftSegs.length), separator, separatorWidth);
-
-	const padding = Math.max(minPadding, width - left.width - right.width);
-	const line = `${left.text}${" ".repeat(padding)}${right.text}`;
-
-	// Safety net
-	return truncateToWidth(line, width, "…");
+	return lines.length > 0 ? lines : [" ".repeat(width)];
 }

@@ -3,13 +3,8 @@
  *
  * Simplified fork of @marckrenn/pi-sub-core (https://github.com/marckrenn/pi-sub).
  * Supports all providers (anthropic, copilot, gemini, antigravity, codex, kiro, zai)
- * with two bug fixes:
- *
- * 1. Bedrock false positive: detection no longer falls back to model tokens when
- *    the provider field is explicitly set and doesn't match any known provider.
- *
- * 2. Aggressive refresh on turn_end/tool_result: always respects cache TTL instead
- *    of bypassing it with force:true (see https://github.com/marckrenn/pi-sub/issues/58).
+ * with corrected provider detection: Bedrock no longer falls back to model tokens
+ * when the provider field is explicitly set and doesn't match any known provider.
  *
  * Emits:
  *   - "usage-core:ready"          → { state: UsageCoreState }
@@ -39,6 +34,7 @@ export default function createExtension(pi: ExtensionAPI, deps?: Dependencies): 
 	let lastState: UsageCoreState = {};
 	let lastSnapshot = "";
 	let currentProvider: ProviderName | undefined;
+	let refreshGeneration = 0;
 	let stopCacheWatch: (() => void) | undefined;
 
 	// --- Emit helpers ---
@@ -63,7 +59,7 @@ export default function createExtension(pi: ExtensionAPI, deps?: Dependencies): 
 	// --- Refresh ---
 
 	async function refresh(ctx: ExtensionContext, force = false): Promise<void> {
-		lastContext = ctx;
+		const generation = ++refreshGeneration;
 
 		const detected = detectProvider(ctx.model);
 		if (!detected) {
@@ -83,13 +79,12 @@ export default function createExtension(pi: ExtensionAPI, deps?: Dependencies): 
 			return;
 		}
 
-		// Check cache first (unless forced).
-		if (!force) {
-			const cached = getGoodUsage(detected, REFRESH_INTERVAL_MS);
-			if (cached) {
-				emitState({ provider: detected, usage: cached });
-				return;
-			}
+		// Keep the provider's last good snapshot visible while a refresh runs.
+		// Backoff or a failed request must not leave the quota segments blank.
+		const cached = getGoodUsage(detected, force ? Number.POSITIVE_INFINITY : REFRESH_INTERVAL_MS);
+		if (cached) {
+			emitState({ provider: detected, usage: cached });
+			if (!force) return;
 		}
 
 		const providerInstance = createProvider(detected);
@@ -100,44 +95,67 @@ export default function createExtension(pi: ExtensionAPI, deps?: Dependencies): 
 			force,
 		);
 
-		// Only emit when we got good data. On errors (429 etc.),
-		// fetchWithCache writes a backoff file so all instances wait.
-		// UI keeps showing last good state.
-		if (usage) {
-			emitState({ provider: detected, usage });
-		}
+		// The selected model may have changed while the request was in flight.
+		// Never let an older provider refresh overwrite the current provider.
+		if (generation !== refreshGeneration || currentProvider !== detected) return;
+
+		// Only emit when we got good data. On errors (429 etc.), the cache
+		// snapshot emitted above remains visible while all instances back off.
+		if (usage) emitState({ provider: detected, usage });
 	}
 
-	// --- Periodic refresh ---
+	function restoreCached(ctx: ExtensionContext): void {
+		const detected = detectProvider(ctx.model);
+		if (!detected) {
+			currentProvider = undefined;
+			emitState({});
+			return;
+		}
+
+		if (detected !== currentProvider) {
+			currentProvider = detected;
+			setupCacheWatch(detected);
+		}
+
+		if (!hasCredentials(detected, resolvedDeps)) {
+			emitState({ provider: detected });
+			return;
+		}
+
+		const cached = getGoodUsage(detected, Number.POSITIVE_INFINITY);
+		emitState(cached ? { provider: detected, usage: cached } : { provider: detected });
+	}
+
+	pi.registerCommand("usage-refresh", {
+		description: "Refresh subscription quota usage",
+		handler: async (_args, ctx) => {
+			await refresh(ctx, true);
+		},
+	});
 
 	const refreshTimer = setInterval(() => {
 		if (!lastContext || !currentProvider) return;
-		// Never let an unexpected refresh failure become an unhandled
-		// rejection that could take down the whole pi process.
 		refresh(lastContext).catch(() => {});
 	}, REFRESH_INTERVAL_MS);
 	refreshTimer.unref?.();
 
 	// --- Lifecycle ---
 
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", (_event, ctx) => {
 		lastContext = ctx;
-		await refresh(ctx);
+		restoreCached(ctx);
 		pi.events.emit("usage-core:ready", { state: lastState });
 	});
 
 	pi.on("model_select" as any, async (_event: unknown, ctx: ExtensionContext) => {
-		// Model changed — force refresh.
 		await refresh(ctx, true);
 	});
 
 	pi.on("turn_start", async (_event, ctx) => {
-		// Respect TTL — emit cached, don't force.
 		lastContext = ctx;
 	});
 
 	pi.on("turn_end", async (_event, ctx) => {
-		// Respect TTL — this is the fix for pi-sub#58.
 		lastContext = ctx;
 	});
 

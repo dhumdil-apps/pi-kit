@@ -33,9 +33,9 @@ function isSettingsFileShape(value: unknown): value is SettingsFile {
  * discarding it, so a hand-edit or partial write doesn't destroy every
  * extension's stored preferences with no trace.
  */
-function backUpUnreadableFile(path: string, content: string): void {
+function backUpUnreadableFile(path: string): void {
 	try {
-		writeFileSync(`${path}.bak-${Date.now()}`, content);
+		renameSync(path, `${path}.bak-${Date.now()}`);
 	} catch {
 		// Best-effort backup only.
 	}
@@ -62,12 +62,12 @@ function loadSettingsFile(path: string): SettingsFile {
 		parsed = JSON.parse(content);
 	} catch (err) {
 		console.error(`[extension-preferences] ${path} is not valid JSON; backing it up and starting fresh:`, err);
-		backUpUnreadableFile(path, content);
+		backUpUnreadableFile(path);
 		return {};
 	}
 	if (!isSettingsFileShape(parsed)) {
 		console.error(`[extension-preferences] ${path} has an unexpected shape; backing it up and starting fresh.`);
-		backUpUnreadableFile(path, content);
+		backUpUnreadableFile(path);
 		return {};
 	}
 	return parsed;

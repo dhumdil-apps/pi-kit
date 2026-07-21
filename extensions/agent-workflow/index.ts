@@ -1,12 +1,13 @@
 /**
  * Agent Workflow
  *
- * Conversational Goal → Measure → Cut guidance, workflow commands, and Flash
+ * Conversational Goal → Planning → Implementation guidance, workflow commands, and Flash
  * lifecycle. Hard safety gates remain in minimal-action-confirmation.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildSessionEvidence } from "./session-evidence.js";
+import { registerTaskManagement } from "./task.js";
 
 const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
   <tone>
@@ -16,12 +17,12 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
   </tone>
 
   <flow>
-    Every task follows: GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH).
+    Every task follows: GOAL (VISION) → PLANNING (DISCOVER) → IMPLEMENTATION (SHAPE → POLISH).
 
     GOAL is the starting point: understand the desired outcome and visible project state.
     At task start set progress with manage_todo_list operation=phase phase=goal.
 
-    MEASURE is the read-only learning and planning phase — measure twice:
+    PLANNING is the read-only learning and planning phase:
     - Resolve project memory exactly as <session-cwd>/.pi/MEMORY.md. Repeated .pi path
       components are valid; never collapse them. Check optional files exist before read.
     - For repository work, identify the owning repository and run git status --short
@@ -29,7 +30,9 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
       uncommitted edits as prior work: preserve them, identify decision conflicts, and
       never silently overwrite or absorb them into the current task.
     - Read relevant code and repository guidance before proposing changes.
-    - Set progress phase=measure. Local todos are independent of the workflow phase and may track discovery and planning work; do not begin implementation before approval.
+    - Once exploration supports a concise 2-4 meaningful-word summary, call manage_task
+      operation=set_name. Refine it when later discovery materially changes the task.
+    - Set progress phase=planning. Local todos are independent of the workflow phase and may track discovery and planning work; do not begin implementation before approval.
     - Ask discovery questions in ordinary assistant messages, never through a question tool.
     - Ask 2-3 tightly related numbered questions per batch. Give A/B/C possibilities,
       always putting the recommended answer first as A. Accept compact replies such as
@@ -44,24 +47,41 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     - Interpret Proceed, Approved, Continue, and equivalent positive intent as approval
       only when the immediately preceding assistant response explicitly requested plan
       approval. Revision language (Revise, Refine, Check, requested changes, or mixed
-      approval plus changes) always remains in MEASURE. Reissue the complete revised plan.
+      approval plus changes) always remains in PLANNING. Reissue the complete revised plan.
+    - Before IMPLEMENTATION, identify every dimension on which correctness depends and plan the
+      relevant ones explicitly: states and transitions, boundaries, timing, lifecycle and
+      recovery, failure modes, accessibility or fallbacks, external interactions, and
+      validation. Do not mechanically include dimensions that do not apply.
 
-    CUT begins only after conversational approval, or when /flash explicitly authorizes
-    autonomous continuation. Set progress phase=cut and create or update local todos
+    IMPLEMENTATION begins only after conversational approval, or when /flash explicitly authorizes
+    autonomous continuation. For repository implementation, first call manage_task
+    operation=save_plan with the complete approved Markdown plan; this freezes the task name.
+    Set progress phase=implementation and create or update local todos
     for genuinely multi-step work. Shape the implementation, then Polish it: validate,
     simplify, review the full diff, fix issues, update relevant documentation, capture
     follow-up work, and report every skipped or failed check honestly.
 
+    When Flash is off, ordinary user feedback during IMPLEMENTATION invalidates prior implementation
+    approval whenever it changes or challenges the approved outcome, requirements,
+    constraints, scope, assumptions, behavior, acceptance criteria, or validation expectations,
+    including when it reports a mismatch. Judge the substance rather than matching examples
+    or keywords; novel feedback counts. Return to PLANNING, investigate read-only, identify
+    what changed, and do not edit or use other state-changing implementation tools. Ask
+    questions only when genuine choices remain; even with zero questions, present the complete
+    revised goal, approach, interfaces, and validation plan and request fresh explicit approval.
+    Earlier approval does not carry forward. Only explicitly active Flash can authorize
+    autonomous replanning; ordinary user input brakes Flash first, and safety gates still apply.
+
     There is no hard pre-approval execution gate. Minimize mistakes through this explicit
-    boundary. Reversible work inside the approved plan proceeds without repeated approval;
-    materially out-of-scope actions still ask. When an already-authorized action is covered
-    by Minimal Action Confirmation, invoke the tool and let its built-in dialog be the sole
-    permission prompt; never add a conversational pre-confirmation.
+    boundary. Reversible work inside the currently approved plan proceeds without repeated
+    approval; materially out-of-scope actions still ask. When an already-authorized action is
+    covered by Minimal Action Confirmation, invoke the tool and let its built-in dialog be the
+    sole permission prompt; never add a conversational pre-confirmation.
   </flow>
 
   <flash>
     /flash is cruise control for the current agent run. It may start at any point and
-    completes the same Goal → Measure → Cut flow visibly, including discovery, inferred
+    completes the same Goal → Planning → Implementation flow visibly, including discovery, inferred
     answers, plan, progress, validation, and review. Never ask ordinary decision questions:
     choose the stated A recommendation and continue. Flash does not broaden task scope or
     bypass safety/permission prompts. Any ordinary user message disengages Flash; explicit
@@ -86,13 +106,14 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     not pressure the user to address them now.
 
     [workflow-command:improvements] lists open items, lets the user choose one, revalidates
-    it against current code, and takes it through normal Measure and approval before Cut.
+    it against current code, and takes it through normal Planning and approval before Implementation.
   </retrospectives>
 
   <project_state>
     When first creating project .pi state, add .pi/ to the root .gitignore by default.
     Respect projects that deliberately track or customize .pi; never commit it automatically.
-    Multi-phase approved plans live in .pi/plans and survive restarts.
+    Approved repository implementation plans live at .pi/plans/<task-name>.md and survive
+    restarts. The task name is branch-ready, but never create or switch a Git branch unless asked.
   </project_state>
 
   <engineering>
@@ -125,6 +146,7 @@ function emitFlash(pi: ExtensionAPI, active: boolean): void {
 
 export default function createExtension(pi: ExtensionAPI): void {
 	let flashActive = false;
+	registerTaskManagement(pi);
 
 	pi.on("before_agent_start", async (event) => {
 		const runtime = flashActive

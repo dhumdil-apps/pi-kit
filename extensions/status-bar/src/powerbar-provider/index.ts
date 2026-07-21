@@ -15,6 +15,7 @@ function emitProvider(pi: ExtensionAPI, ctx: ExtensionContext): void {
 		id: "provider",
 		text: model.provider,
 		color: "dim",
+		row: 1,
 	});
 }
 

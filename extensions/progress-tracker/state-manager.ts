@@ -6,7 +6,7 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { TodoItem, TodoDetails, ValidationResult, TodoStats, WorkflowPhase } from "./types.js";
+import { normalizeWorkflowPhase, type TodoItem, type TodoDetails, type ValidationResult, type TodoStats, type WorkflowPhase } from "./types.js";
 
 /**
  * customType of the `pi.sendMessage` marker index.ts sends when the user
@@ -124,7 +124,8 @@ export class TodoStateManager {
       if (details?.todos) {
         this.todos = details.todos.map((t) => ({ ...t }));
       }
-      if (details?.phase) this.phase = details.phase;
+      const phase = normalizeWorkflowPhase(details?.phase);
+      if (phase) this.phase = phase;
     }
   }
 }

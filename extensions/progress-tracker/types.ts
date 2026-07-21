@@ -7,7 +7,22 @@
 export type TodoStatus = "not-started" | "in-progress" | "completed";
 
 /** High-level workflow phase shown independently from implementation todos. */
-export type WorkflowPhase = "goal" | "measure" | "cut";
+export type WorkflowPhase = "goal" | "planning" | "implementation";
+
+export function normalizeWorkflowPhase(phase: unknown): WorkflowPhase | undefined {
+  switch (phase) {
+    case "goal":
+    case "planning":
+    case "implementation":
+      return phase;
+    case "measure":
+      return "planning";
+    case "cut":
+      return "implementation";
+    default:
+      return undefined;
+  }
+}
 
 /** A single todo item — matches manage_todo_list schema exactly */
 export interface TodoItem {

@@ -1,22 +1,26 @@
 # Session Dashboard
 
-Startup banner for interactive parent sessions: a box-drawn "command deck"
-standalone blue ASCII ruler that marks π between 3 and 4, with “Measure twice,
-cut once” below. Context and bundle resources follow, then a separate panel shows git context
-(branch, status) and a spend summary (reusing
-`usage-history`'s `collectUsageData`), followed by the info pi's default
-(non-quiet) startup listing would show — grouped, descriptive loaded
-extensions, context files, skills, and prompts. Extension names are read live
-from the bundle's `package.json`; `extensions.ts` supplies the user-facing
-group/order/description for each active extension, and its focused test
-requires an exact one-to-one match with that manifest. Context files come from
-pi core's `loadProjectContextFiles`, so the list always matches what is
-actually loaded.
+Startup banner for interactive parent sessions. Its hero starts with the bold
+“Measure twice, cut once” line, followed by a standalone blue ASCII ruler that
+marks π between 3 and 4 and an invitation that sets expectations for discovery,
+plan approval, implementation, and polish.
 
-The extension deck groups every active extension as UI, Flow, or Config. It
-appears before the shortcut row; the dashboard ends with an invitation that
-sets expectations for discovery, plan approval, implementation, and polish,
-without duplicating the Progress Tracker phase ribbon.
+The extension deck follows the hero and groups every active extension as UI,
+Flow, or Config. Extension names are read live from the bundle's `package.json`;
+`extensions.ts` supplies the user-facing group/order/description for each active
+extension, and its focused test requires an exact one-to-one match with that
+manifest.
+
+A compact, responsive “Session context” card closes the dashboard. It combines
+git context (branch and status), the spend summary from `usage-history`'s
+`collectUsageData`, loaded context files, skills and prompts, and shortcut help.
+Context files come from pi core's `loadProjectContextFiles`, so the list always
+matches what is actually loaded. Labels align across sections, additional
+resource values use indented continuation rows, and long values wrap within the
+available terminal width. Terminal-visible widths keep emoji and ANSI styling
+inside the border; unavailable spend and resource sections are omitted.
+
+The dashboard does not duplicate the Progress Tracker phase ribbon.
 
 ## User surface
 

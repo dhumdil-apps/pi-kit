@@ -1,7 +1,7 @@
 # The working flow
 
 Pi uses one visible workflow:
-**GOAL (VISION) → MEASURE (DISCOVER) → CUT (SHAPE → POLISH)**.
+**GOAL (VISION) → PLANNING (DISCOVER) → IMPLEMENTATION (SHAPE → POLISH)**.
 The phase route is persistent guidance, not a hard state machine. Its initial
 state is shown in the dashboard's compact startup mark, then its labeled route appears
 after the first submitted prompt (or an explicit `/todos` request). Local todos
@@ -15,7 +15,7 @@ The dashboard is the starting point. The user describes the desired outcome;
 Pi confirms the goal and reads project `.pi/MEMORY.md` when present. The file
 is user-owned and ignored by this bundle's Git default.
 
-## MEASURE (DISCOVER)
+## PLANNING (DISCOVER)
 
 Pi explores read-only and keeps the user involved without modal pressure:
 
@@ -30,6 +30,13 @@ Pi explores read-only and keeps the user involved without modal pressure:
 - After every batch, show an extremely concise cumulative summary: the big
   picture, planning progress, settled/open topics, estimated batches remaining,
   and what comes next.
+- Once exploration supports a concise summary, set a branch-ready task identity
+  with `manage_task`. It uses `SI-0000` when no ticket is supplied and may be
+  refined while Planning continues.
+- Before IMPLEMENTATION, identify every dimension on which correctness depends and plan the
+  relevant ones explicitly: states and transitions, boundaries, timing,
+  lifecycle and recovery, failure modes, accessibility or fallbacks, external
+  interactions, and validation. Do not add irrelevant dimensions mechanically.
 
 When direction is clear, Pi presents the plan in conversation. `Proceed`,
 `Approved`, or `Continue` approves only when it directly answers that plan.
@@ -37,12 +44,28 @@ When direction is clear, Pi presents the plan in conversation. `Proceed`,
 silence, an unrelated acknowledgement, or an earlier approval as permission to
 start implementation.
 
-## CUT (SHAPE → POLISH)
+## IMPLEMENTATION (SHAPE → POLISH)
 
-After explicit approval, Pi shapes the change, validates it, and polishes the
-result. The separate local todo list can track ordinary work while the global
-phase route stays on CUT. Polish includes the full diff, tests, simplification, follow-up learnings, and
-documentation—not just a final review. Pushes still require an explicit request.
+After explicit approval, Pi saves repository implementation plans once at
+`.pi/plans/<task-name>.md`; this freezes the task identity across resume. The
+name can be used for a branch, but Pi does not create or switch branches unless
+asked. Pi then shapes the change, validates it, and polishes the result. The separate local todo list can track ordinary work while the global
+phase route stays on IMPLEMENTATION. Polish includes the full diff, tests, simplification,
+follow-up learnings, and documentation—not just a final review. Pushes still
+require an explicit request.
+
+When Flash is off, ordinary IMPLEMENTATION feedback invalidates the earlier approval
+whenever it changes or challenges the approved outcome, requirements,
+constraints, scope, assumptions, behavior, acceptance criteria, or validation
+expectations, including by reporting a mismatch. Pi judges the substance rather
+than matching known examples or keywords, so novel feedback follows the same
+rule. It returns to PLANNING, revalidates read-only, and identifies what changed.
+It asks questions only when choices remain, but always presents the complete
+revised goal, approach, interfaces, and validation plan and waits for fresh
+explicit approval before editing or using another state-changing implementation
+tool. Earlier approval does not carry forward. Explicit Flash may authorize
+autonomous replanning, but ordinary user input brakes Flash first and safety
+confirmations still apply.
 
 ## Flash mode
 
