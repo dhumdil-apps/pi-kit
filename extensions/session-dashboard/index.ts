@@ -14,18 +14,6 @@ import { USAGE_CHART_END, USAGE_CHART_START, renderWelcomeText } from "./welcome
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/**
- * Handy workflow commands the Extensions deck does not already spell out,
- * surfaced on the slim context line (emoji + command). The deck already covers
- * /usage, /todos, /extension-settings, etc.
- */
-const WORKFLOW_COMMANDS: { emoji: string; cmd: string }[] = [
-	{ emoji: "⚡", cmd: "/flash" },
-	{ emoji: "🪞", cmd: "/retro" },
-	{ emoji: "🔬", cmd: "/forensic" },
-	{ emoji: "🌱", cmd: "/init" },
-];
-
 /** One consistent separator across the whole context line. */
 const CONTEXT_SEP = " · ";
 
@@ -311,14 +299,14 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// Two slim markdown lines with a blank line between: context (working
-			// directory + loaded files, italic/de-emphasised) first, then the commands
-			// (as code so they pop) on their own line. Chips share one CONTEXT_SEP.
-			const contextChips = [`*${truncateLeft(tildify(cwd), 60)}*`];
+			// One concise markdown line: working directory + loaded files (italic /
+			// de-emphasised) then `/help` as code so it pops — `/help` lists every
+			// other command, so it is the only pointer the banner needs.
+			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
-			if (contextFiles.length > 0) contextChips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
-			const commandChips = ["❓ `/help`", ...WORKFLOW_COMMANDS.map(({ emoji, cmd }) => `${emoji} \`${cmd}\``)];
-			const contextInfo = `${contextChips.join(CONTEXT_SEP)}\n\n${commandChips.join(CONTEXT_SEP)}`;
+			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
+			chips.push("❓ `/help`");
+			const contextInfo = chips.join(CONTEXT_SEP);
 
 			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
