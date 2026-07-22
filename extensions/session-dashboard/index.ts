@@ -9,7 +9,6 @@ import { renderHelp } from "./help.js";
 import { collectUsageData } from "../usage-history/data.js";
 import { buildGraphModel, type GraphModel, renderChart, TOTAL_SERIES_KEY } from "../usage-history/graph.js";
 import { COLOR_RESET, formatAxisCost, seriesColor } from "../usage-history/index.js";
-import { renderExtensionDeck } from "./extensions.js";
 import { USAGE_CHART_END, USAGE_CHART_START, renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -308,9 +307,8 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			chips.push("❓ `/help`");
 			const contextInfo = chips.join(CONTEXT_SEP);
 
-			const bundle = loadBundleResources();
 			const welcomeText = renderWelcomeText({
-				extensionDeck: bundle.extensions.length > 0 ? renderExtensionDeck(bundle.extensions) : "",
+				welcome: "π **Measure twice, cut once.**",
 				usageChart,
 				contextInfo,
 			});

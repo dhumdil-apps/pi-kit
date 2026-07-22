@@ -136,13 +136,15 @@ export function bashUsesGuardedWebCommand(command: string): boolean {
  * otherwise the vendored dir itself. Undefined when no vendored dir is touched.
  */
 function vendoredDirForPath(path: string): string | undefined {
+	const normalized = normalizeAgentPath(path);
+	if (TRUSTED_PACKAGES.some((t) => normalized.includes(t))) return undefined;
+
 	const agentDirs = [resolve(homedir(), ".pi/agent/git"), resolve(homedir(), ".pi/agent/cache")];
-	const abs = isAbsolute(path) ? resolve(path) : undefined;
-	if (abs) {
-		for (const dir of agentDirs) {
-			if (abs === dir || abs.startsWith(`${dir}/`)) return dir;
-		}
+	const abs = isAbsolute(normalized) ? resolve(normalized) : undefined;
+	if (abs && agentDirs.some((dir) => abs === dir || abs.startsWith(`${dir}/`))) {
+		return undefined;
 	}
+
 	const segments = path.split("/");
 	for (let i = 0; i < segments.length; i++) {
 		// Case-insensitive: matters on the default case-insensitive macOS/Windows
@@ -257,10 +259,14 @@ function realEscapesRoot(absPath: string, root: string): boolean {
 function pathEscapesProject(rawPath: string, cwd: string): boolean {
 	const cleaned = rawPath.replace(/^['"]|['"]$/g, "");
 	if (!cleaned) return false;
+	const normalized = normalizeAgentPath(cleaned);
+	if (TRUSTED_PACKAGES.some((t) => normalized.includes(t))) return false;
+	const agentDirs = [resolve(homedir(), ".pi/agent/git"), resolve(homedir(), ".pi/agent/cache")];
+	const abs = resolveLikeCoreTool(cleaned, cwd);
+	if (agentDirs.some((dir) => abs === dir || abs.startsWith(`${dir}/`))) return false;
 	// Can't verify where an unresolved shell variable points — assume the
 	// worst (escapes) rather than silently allowing an unbounded scan.
 	if (cleaned.startsWith("$")) return true;
-	const abs = resolveLikeCoreTool(cleaned, cwd);
 	const root = resolve(cwd);
 	if (abs !== root && !abs.startsWith(`${root}/`)) return true;
 	return realEscapesRoot(abs, root);

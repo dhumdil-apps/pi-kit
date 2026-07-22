@@ -17,7 +17,7 @@ function activeExtensionNames(): string[] {
 	return pkg.pi.extensions.map((entry: string) => entry.split("/").filter(Boolean).at(-2));
 }
 
-describe("session dashboard extension deck", () => {
+describe("session dashboard extension metadata", () => {
 	it("has presentation metadata for exactly the active manifest extensions", () => {
 		const names = activeExtensionNames();
 		expect(presentationCoverageErrors(names)).toEqual([]);
@@ -40,26 +40,26 @@ describe("session dashboard extension deck", () => {
 		expect(deck.indexOf("**Workflow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 
-	it("renders the extension deck, then the context info, in order", () => {
+	it("renders the Pi-glyph welcome, then the context info, in order", () => {
 		const welcome = renderWelcomeText({
-			extensionDeck: "EXTENSIONS",
-			contextInfo: "~/work\n📜 AGENTS.md\n⚡ /flash",
+			welcome: "π **Measure twice, cut once.**",
+			contextInfo: "~/work\n📜 AGENTS.md\n❓ `/help`",
 		});
-		expect(welcome.startsWith("EXTENSIONS")).toBe(true);
-		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf("~/work"));
-		expect(welcome.trimEnd().endsWith("⚡ /flash")).toBe(true);
-		expect(welcome).not.toContain("Measure twice");
+		expect(welcome.startsWith("π **Measure twice, cut once.**")).toBe(true);
+		expect(welcome.indexOf("Measure twice")).toBeLessThan(welcome.indexOf("~/work"));
+		expect(welcome.trimEnd().endsWith("❓ `/help`")).toBe(true);
+		expect(welcome).not.toContain("🧩 **Extensions**");
 		expect(welcome).not.toContain("Session context");
 		expect(welcome).not.toContain("Quick reference");
 	});
 
-	it("places the usage chart between the extensions and the context info", () => {
+	it("places the usage chart between the welcome and the context info", () => {
 		const welcome = renderWelcomeText({
-			extensionDeck: "EXTENSIONS",
+			welcome: "π **Measure twice, cut once.**",
 			contextInfo: "~/work",
 			usageChart: '{"model":true}',
 		});
-		expect(welcome.indexOf("EXTENSIONS")).toBeLessThan(welcome.indexOf('{"model":true}'));
+		expect(welcome.indexOf("Measure twice")).toBeLessThan(welcome.indexOf('{"model":true}'));
 		expect(welcome.indexOf('{"model":true}')).toBeLessThan(welcome.indexOf("~/work"));
 	});
 });

@@ -39,8 +39,8 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 - **progress-tracker** — a global GOAL → PLANNING → IMPLEMENTATION route,
   shown after the first prompt or `/todos`; local todos remain independent and
   `/todos` toggles their separate widget.
-- **session-dashboard** — the interactive startup ruler, project/spend panel,
-  and loaded-resource map.
+- **session-dashboard** — the interactive Pi-glyph welcome, This-Week spend chart,
+  and concise project-context line.
 - **status-bar** (+ live quota via **usage-monitor**), **usage-history**
   (`/usage` history), separate **review** and **simplify** skills, bundled `dark`
   and `github-dark` themes, and `/init` prompt.

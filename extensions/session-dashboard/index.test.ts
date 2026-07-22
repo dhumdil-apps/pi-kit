@@ -94,7 +94,10 @@ describe("session dashboard startup", () => {
 
 		await startup;
 
-		expect(sendMessage).toHaveBeenCalledOnce();
+		expect(sendMessage).toHaveBeenCalledWith(
+			expect.objectContaining({ content: expect.stringContaining("π **Measure twice, cut once.**") }),
+			expect.anything(),
+		);
 		expect(setWidget).toHaveBeenLastCalledWith("session-dashboard-loading", undefined);
 	});
 });

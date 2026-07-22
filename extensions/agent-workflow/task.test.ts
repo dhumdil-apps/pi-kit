@@ -27,14 +27,14 @@ const activePlan = "# Goal\n\n## Checklist\n\n- [ ] Implement slice → verify i
 const donePlan = "# Goal\n\n## Checklist\n\n- [x] Implement slice → verified\n";
 
 describe("normalizeTaskName", () => {
-	it("uses a concise two-to-four word summary and a fallback ticket", () => {
-		expect(normalizeTaskName("please reimagine this dashboard resource section to make it better")).toBe("SI-0000-reimagine-dashboard-resource-section");
+	it("uses a concise two-to-four word summary without fallback ticket", () => {
+		expect(normalizeTaskName("please reimagine this dashboard resource section to make it better")).toBe("reimagine-dashboard-resource-section");
 	});
 	it("preserves a supplied or current ticket", () => {
 		expect(normalizeTaskName("SI-42 cache recovery")).toBe("SI-42-cache-recovery");
 		expect(normalizeTaskName("dashboard polish", "SI-91-existing-task")).toBe("SI-91-dashboard-polish");
 	});
-	it("pads a one-word summary", () => expect(normalizeTaskName("dashboard")).toBe("SI-0000-dashboard-task"));
+	it("pads a one-word summary", () => expect(normalizeTaskName("dashboard")).toBe("dashboard-task"));
 });
 
 describe("task lifecycle plans", () => {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "@sinclair/typebox";
 
-const SESSION_NAME = /^SI-(\d+)-([a-z0-9]+(?:-[a-z0-9]+)*)$/i;
+const SESSION_NAME = /^(?:SI-(\d+)-)?([a-z0-9]+(?:-[a-z0-9]+)*)$/i;
 const TICKET_ID = /\bSI-(\d+)\b/i;
 const UNCHECKED_ITEM = /^\s*[-*]\s+\[ \]/m;
 const MAX_SLUG_WORDS = 4;
@@ -51,7 +51,8 @@ interface PlanState {
 
 export function normalizeTaskName(summary: string, currentName?: string): string {
 	const suppliedTicket = summary.match(TICKET_ID)?.[1];
-	const currentTicket = currentName?.match(SESSION_NAME)?.[1];
+	const currentTicket = currentName?.match(TICKET_ID)?.[1];
+	const ticket = suppliedTicket ?? currentTicket;
 	const words = summary
 		.normalize("NFKD")
 		.replace(/[\u0300-\u036f]/g, "")
@@ -64,12 +65,16 @@ export function normalizeTaskName(summary: string, currentName?: string): string
 		.slice(0, MAX_SLUG_WORDS);
 	if (words.length === 0) words.push("task", "summary");
 	if (words.length === 1) words.push("task");
-	return `SI-${suppliedTicket ?? currentTicket ?? "0000"}-${words.join("-")}`;
+	const slug = words.join("-");
+	return ticket ? `SI-${ticket}-${slug}` : slug;
 }
 
 function canonicalTaskName(name: string | undefined): string | undefined {
 	const match = name?.trim().match(SESSION_NAME);
-	return match ? `SI-${match[1]}-${match[2].toLowerCase()}` : undefined;
+	if (!match) return undefined;
+	const ticket = match[1];
+	const slug = match[2].toLowerCase();
+	return ticket ? `SI-${ticket}-${slug}` : slug;
 }
 
 function taskPlanPath(cwd: string, name: string, status: PlanStatus): string {

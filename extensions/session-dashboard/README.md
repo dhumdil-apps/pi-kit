@@ -2,14 +2,12 @@
 
 Startup banner for interactive parent sessions.
 
-The dashboard opens with the extension deck: one compact line per group
-(`Display`, `Usage`, `Workflow`, `Guardrails`, `Config`) listing the active
-extension names — no per-extension prose, so the banner stays short. Names are
-read live from the bundle's `package.json`; `extensions.ts` supplies the
-group/order for each active extension, and its focused test requires an exact
-one-to-one match with that manifest.
+The dashboard opens with `π **Measure twice, cut once.**` — a static,
+theme-rendered welcome that keeps startup focused. `extensions.ts` still supplies
+the grouped metadata and descriptions for `/help`; its focused test requires an
+exact one-to-one match with the active extension manifest.
 
-A "This Week · Per bucket cost · by provider" usage chart follows the deck: a
+A "This Week · Per bucket cost · by provider" usage chart follows the welcome: a
 non-interactive braille line chart built from `usage-history`'s `buildGraphModel`
 and `renderChart`, showing this week's spend by provider (with a "No usage yet
 this week" fallback). Its x-axis uses weekday + time labels so the ticks stay
@@ -22,10 +20,9 @@ pops. Git branch/status are intentionally not repeated here — the status bar
 already shows them persistently.
 
 `❓ /help` is the single pointer the banner needs: it prints a full reference —
-commands, shortcuts, and every active extension with its complete description
-(the compact deck lists names only). The help document is built by `help.ts`
-from the same `EXTENSION_PRESENTATIONS` manifest and rendered in the banner's
-themed box.
+commands, shortcuts, and every active extension with its complete description.
+The help document is built by `help.ts` from the same
+`EXTENSION_PRESENTATIONS` manifest and rendered in the banner's themed box.
 
 The dashboard does not duplicate the Progress Tracker phase ribbon.
 

@@ -210,4 +210,27 @@ describe("gate bypass regressions", () => {
 			toolCall({ toolName: "write", input: { path: "escape/passwd" } }, { cwd: root, hasUI: false }),
 		).resolves.toMatchObject({ block: true });
 	});
+
+	it("exempts trusted @earendil-works packages and .pi/agent git/cache paths from read and search gates", async () => {
+		const { toolCall } = makeGate();
+		await expect(
+			toolCall(
+				{ toolName: "read", input: { path: "~/.pi/agent/git/github.com/dhumdil-apps/pi-kit/skills/simplify/SKILL.md" } },
+				{ cwd: process.cwd(), hasUI: false },
+			),
+		).resolves.toBeUndefined();
+
+		await expect(
+			toolCall(
+				{
+					toolName: "bash",
+					input: {
+						command:
+							"find /Users/martin-peter.lakatos/.nvm/versions/node/v26.2.0/lib/node_modules/@earendil-works/pi-coding-agent/examples -type f",
+					},
+				},
+				{ cwd: process.cwd(), hasUI: false },
+			),
+		).resolves.toBeUndefined();
+	});
 });

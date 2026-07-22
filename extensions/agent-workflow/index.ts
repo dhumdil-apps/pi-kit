@@ -42,8 +42,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
       operation=set_name. Refine it when later discovery materially changes the task.
     - Set progress phase=planning. Local todos are independent of the workflow phase and may track discovery and planning work; do not begin implementation before approval.
     - Ask discovery questions in ordinary assistant messages, never through a question tool.
-    - Ask 2-3 tightly related numbered questions per batch. Give A/B/C possibilities,
-      always putting the recommended answer first as A. Accept compact replies such as
+    - Ask 2-3 tightly related numbered questions per batch. For EACH numbered question, provide clear, distinct lettered options (A, B, C...) with A as the recommended option. Never format multiple questions with only a single 'A' option. Accept compact replies such as
       "1A 2C 3B" and natural prose.
     - After the first answers, state the inferred rubric. Challenge contradictions and
       reopen earlier choices when needed. All discovery answers remain provisional.
@@ -55,7 +54,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
       plans, approves, implements, reviews, and validates exactly one slice. Use conservative
       sizing; if an approved slice unexpectedly grows, finish that slice cleanly.
     - Before any implementation, present the complete goal/approach/interfaces/validation
-      plan and end with: Reply Proceed to approve, or write revisions.
+      plan and end with: Proceed or revise?
     - Write every implementation step as change → verification. Prefer a runnable command;
       when no command can prove the outcome, name the specific manual acceptance check.
       Separate mechanical verification from human acceptance for visual, interactive, or

@@ -40,11 +40,10 @@ Pi explores read-only and keeps the user involved without modal pressure:
 - Before adding an external dependency, integration, or new abstraction, check
   repository and primary-documentation prior art and explicitly choose reuse,
   adapt, or build. Routine changes do not acquire a mandatory research stage.
-- Ask related questions in conversational batches of two or three.
-- Give lettered options and keep the recommended answer at **A**.
+- Ask related questions in conversational batches of two or three. For EACH numbered question, provide clear, distinct lettered options (A, B, C...) with A as the recommended option.
 - Accept compact replies such as `1A 2C 3B` or normal prose.
 - After the first batch, infer a shared rubric and use it consistently.
-- Challenge conflicts with that rubric and reopen earlier choices when useful.
+- Challenge conflicts with that rubric and reopen earlier choices when needed.
 - After every batch, show an extremely concise cumulative summary: the big
   picture, planning progress, settled/open topics, estimated batches remaining,
   and what comes next.
@@ -52,9 +51,9 @@ Pi explores read-only and keeps the user involved without modal pressure:
   plan whose checklist splits it into independently committable slices. Each
   session approves and completes one slice. Size conservatively; if an approved
   slice unexpectedly grows, finish that slice cleanly.
-- Once exploration supports a concise summary, set a branch-ready task identity
-  with `manage_task`. It uses `SI-0000` when no ticket is supplied and may be
-  refined while Planning continues.
+- Once exploration supports a concise summary, set a task identity with `manage_task`.
+  It defaults to a short-description slug (and includes `SI-<ticket>-` only when a ticket is supplied)
+  and may be refined while Planning continues.
 - Before IMPLEMENTATION, identify every dimension on which correctness depends and plan the
   relevant ones explicitly: states and transitions, boundaries, timing,
   lifecycle and recovery, failure modes, accessibility or fallbacks, external
@@ -69,7 +68,7 @@ Pi explores read-only and keeps the user involved without modal pressure:
   unrelated behavioral changes. Boundary-change validation covers both the
   producer and consumer, not just types or one side of the contract.
 
-When direction is clear, Pi presents the plan in conversation. `Proceed`,
+When direction is clear, Pi presents the plan in conversation ending with "Proceed or revise?". `Proceed`,
 `Approved`, or `Continue` approves only when it directly answers that plan.
 `Revise`, `Refine`, or `Check` means planning continues. Pi never treats
 silence, an unrelated acknowledgement, or an earlier approval as permission to
