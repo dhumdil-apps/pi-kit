@@ -6,9 +6,9 @@ explicit plan approval, Flash mode, retrospective learning, and engineering
 practice. Safety gates remain in `minimal-action-confirmation`.
 
 [`docs/FLOW.md`](../../docs/FLOW.md) is the canonical human-readable behavior
-specification; this extension's injected prompt is its operational mirror.
-Project-level `AGENTS.md` files own project-specific stack and repository
-conventions.
+contract; this extension's injected prompt is its operational mirror and the
+source of operational detail. Project-level `AGENTS.md` files own
+project-specific stack and repository conventions.
 
 ## User surface
 
@@ -41,7 +41,8 @@ workflow protocol with explicit user confirmation.
 
 - The stable workflow block stays near the start of extension load order for
   provider prefix-cache reuse; only Flash state is appended dynamically.
-- The full behavior is documented in [docs/FLOW.md](../../docs/FLOW.md).
+- The behavior contract is documented in [docs/FLOW.md](../../docs/FLOW.md);
+  the injected prompt in `index.ts` carries the full operational detail.
 
 ## Origin
 

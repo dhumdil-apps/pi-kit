@@ -148,6 +148,31 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("fixed at the root cause");
 	});
 
+	it("scales questioning to the task without ever skipping exploration", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("Explore on every task, regardless of size");
+		expect(guidance).toContain("only the questioning scales down, never the investigation");
+		expect(guidance).toContain("only for genuine open choices that exploration surfaced");
+		expect(guidance).toContain("present the plan directly without ceremonial questions");
+		// Batch summaries are qualitative — no confabulated progress metrics.
+		expect(guidance).toContain("settled and open topics, and what comes next");
+		expect(guidance).toContain("No invented metrics");
+		expect(guidance).not.toContain("planning percentage");
+		expect(guidance).not.toContain("estimated batches remaining");
+	});
+
+	it("locks the read-before-edit, no-test-weakening, and honest-uncertainty levers", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("read it and its immediate callers or tests");
+		expect(guidance).toContain("Never weaken a test, assertion, or check to make it pass");
+		expect(guidance).toContain("a failing check is information about the change");
+		expect(guidance).toContain("say so and propose how to verify instead of guessing");
+	});
+
 	it("requires fresh approval for any substantive IMPLEMENTATION feedback", async () => {
 		const { handlers } = harness();
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
@@ -175,7 +200,8 @@ describe("agent workflow lifecycle", () => {
 		expect(feedbackRule).toContain("do not edit or use other state-changing implementation tools");
 		expect(feedbackRule).toContain("even with zero questions");
 		expect(feedbackRule).toContain("Earlier approval does not carry forward");
-		expect(feedbackRule).toContain("ordinary user input brakes Flash first");
+		// Flash braking is stated once, in <flash>, not duplicated in the feedback rule.
+		expect(guidance).toContain("brakes Flash immediately");
 
 		for (const planningDimension of [
 			"states and transitions",
