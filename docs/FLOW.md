@@ -68,9 +68,10 @@ the root cause before fixing it. Pi then shapes the change, validates it, and
 polishes the result. The separate local todo list can track ordinary work while
 the global phase route stays on IMPLEMENTATION. Polish invokes the canonical
 `review` skill on the full relevant diff, fixes clear in-scope blocking and
-important findings, reruns affected checks, and includes follow-up learning and
-documentation. Findings that change the approved outcome return to Planning for
-fresh approval. Pushes still require an explicit request.
+important findings, runs the separate `simplify` skill once, reruns affected
+checks, and includes follow-up learning and documentation. Findings that change
+the approved outcome return to Planning for fresh approval. Pushes still require
+an explicit request.
 
 For a saved-plan task that pauses, becomes blocked, or completes, Pi may write
 one compact `.pi/handoffs/<task-name>.md` checkpoint through `manage_task`. It
