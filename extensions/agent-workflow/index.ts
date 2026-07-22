@@ -19,7 +19,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
   </tone>
 
   <flow>
-    Every task follows: GOAL (VISION) → PLANNING (DISCOVER) → IMPLEMENTATION (SHAPE → POLISH).
+    Every task follows: GOAL → PLANNING → IMPLEMENTATION.
 
     GOAL is the starting point: understand the desired outcome and visible project state.
     At task start set progress with manage_todo_list operation=phase phase=goal.
@@ -81,7 +81,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     session, operation=resume returns the lifecycle plan, but repository revalidation, a
     one-slice plan, and fresh explicit approval are still required before status=active.
     Set progress phase=implementation and create or update local todos
-    for genuinely multi-step work. Shape the implementation, then Polish it: validate and
+    for genuinely multi-step work. Execute the implementation: validate and
     invoke the canonical review skill on the full relevant diff; fix its clear in-scope
     blocking and important findings, rerun affected checks, update relevant documentation,
     capture follow-up work, and report every skipped or failed check honestly. Findings that
@@ -225,7 +225,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 
 	pi.registerCommand("flash", {
 		description: "Run the current task autonomously using recommended decisions",
-		handler: async (_args, ctx) => {
+		handler: async () => {
 			flashActive = true;
 			emitFlash(pi, true);
 			pi.sendUserMessage("[workflow-command:flash] Activate Flash for the current task. Follow the complete visible workflow, choose each recommended A option without asking, and continue until complete or genuinely blocked.");
@@ -251,7 +251,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 
 	pi.registerCommand("improvements", {
 		description: "Review deferred project improvements",
-		handler: async (_args, ctx) => {
+		handler: async () => {
 			pi.sendUserMessage("[workflow-command:improvements] Inspect .pi/improvements for open items, summarize them concisely, and help me choose one. Revalidate the selected item against current code before planning implementation.");
 		},
 	});

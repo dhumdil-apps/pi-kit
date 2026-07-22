@@ -1,6 +1,6 @@
 # Agent Workflow
 
-Appends the **GOAL (VISION) → PLANNING (DISCOVER) → IMPLEMENTATION (SHAPE → POLISH)**
+Appends the **GOAL → PLANNING → IMPLEMENTATION**
 working agreement to every turn. It guides conversational question batches,
 explicit plan approval, Flash mode, retrospective learning, and engineering
 practice. Safety gates remain in `minimal-action-confirmation`.

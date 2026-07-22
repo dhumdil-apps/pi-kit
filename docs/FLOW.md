@@ -7,7 +7,7 @@ tests together. Project-level `AGENTS.md` files own project-specific stack and
 repository conventions.
 
 Pi uses one visible workflow:
-**GOAL (VISION) → PLANNING (DISCOVER) → IMPLEMENTATION (SHAPE → POLISH)**.
+**GOAL → PLANNING → IMPLEMENTATION**.
 The phase route is persistent guidance, not a hard state machine. Its initial
 state is shown in the dashboard's compact startup mark, then its labeled route appears
 after the first submitted prompt (or an explicit `/todos` request). Local todos
@@ -21,13 +21,13 @@ Pi leads with the outcome and stays concise. For code changes it summarizes the
 diff or shows focused snippets instead of pasting whole files unless the user
 requests them.
 
-## GOAL (VISION)
+## GOAL
 
 The dashboard is the starting point. The user describes the desired outcome;
 Pi confirms the goal and reads project `.pi/MEMORY.md` when present. The file
 is user-owned and ignored by this bundle's Git default.
 
-## PLANNING (DISCOVER)
+## PLANNING
 
 Pi explores read-only and keeps the user involved without modal pressure:
 
@@ -68,9 +68,9 @@ Pi explores read-only and keeps the user involved without modal pressure:
   unrelated behavioral changes. Boundary-change validation covers both the
   producer and consumer, not just types or one side of the contract.
 
-When direction is clear, Pi presents the plan in conversation ending with "Proceed or revise?", (proceed, yes, y, continue, approved, ...) approvals are only when it directly answers that plan, anything other then a clear confirmation means planning continues. Pi never treat earlier approval as permission to start implementation.
+When direction is clear, Pi presents the plan in conversation ending with "Proceed or revise?", (proceed, yes, y, continue, approved, ...) approvals are only when it directly answers that plan, anything other than a clear confirmation means planning continues. Pi never treats earlier approval as permission to start implementation.
 
-## IMPLEMENTATION (SHAPE → POLISH)
+## IMPLEMENTATION
 
 After explicit approval, Pi saves the big picture and checklist at
 `.pi/plans/<task-name>.todo.md`, then activates the single approved slice by
