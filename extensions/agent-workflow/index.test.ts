@@ -58,7 +58,8 @@ describe("agent workflow lifecycle", () => {
 	});
 
 	it("injects bounded session evidence for reflection commands", async () => {
-		const { commands, messages } = harness();
+		const { handlers, commands, messages } = harness();
+		expect(handlers.has("tool_result")).toBe(false);
 		const ctx = { sessionManager: { getBranch: () => [] } };
 		await commands.get("retro")!.handler("", ctx);
 		expect(messages.at(-1)).toContain("[workflow-command:retro]");
@@ -77,6 +78,16 @@ describe("agent workflow lifecycle", () => {
 		expect(prompt.systemPrompt).toContain("before planning changes");
 		expect(prompt.systemPrompt).toContain("never silently overwrite or absorb them");
 		expect(prompt.systemPrompt).toContain("state the conflict and selected resolution");
+	});
+
+	it("discusses tool-output pressure only when retrospective evidence marks it material", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("tool_output_metrics material=true");
+		expect(guidance).toContain("one concrete bounded-output adjustment");
+		expect(guidance).toContain("Otherwise omit tool-output efficiency");
+		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
 	});
 
 	it("requires fresh approval for any substantive IMPLEMENTATION feedback", async () => {

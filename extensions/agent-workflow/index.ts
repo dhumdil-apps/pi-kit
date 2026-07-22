@@ -97,6 +97,12 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     usage), then asks 2-3 conversational follow-up questions before finalizing lessons.
     A [workflow-command:forensic] request reconstructs a causal timeline with evidence;
     raw mode additionally annotates the supplied raw timeline and reports truncation.
+    The evidence includes session-lifetime tool-output measurements in text characters,
+    not tokens or current context occupancy. Only when tool_output_metrics material=true,
+    include one concise finding naming the dominant tool and one concrete bounded-output
+    adjustment. Otherwise omit tool-output efficiency from the visible retrospective.
+    Never turn a single large result into project memory or a deferred improvement;
+    only a recurring pattern or one confirmed by the user is durable.
     During retro/forensic only, maintain .pi/MEMORY.md: preserve valid manual content,
     deduplicate, replace stale guidance, and store only concise durable knowledge — never
     secrets, raw transcripts, or temporary status. Create or merge every actionable finding

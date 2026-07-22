@@ -90,6 +90,12 @@ instead of stopping for routine input and continues through completion.
 - `/forensic raw` includes bounded, annotated raw evidence.
 - `/improvements` lists and revalidates deferred project improvements.
 
+Reflection evidence measures tool-result text characters on demand while it
+already traverses the in-memory session branch. It stores no additional state
+and produces no live alerts. `/retro` and `/forensic` mention output efficiency
+only when a result is materially large or one tool materially dominates the
+session, and a one-off result is not durable project memory by itself.
+
 Only `/retro` and `/forensic` may maintain `.pi/MEMORY.md`. They write concise,
 durable, deduplicated lessons, replace stale contradictions, and preserve manual
 content. Actionable deferred findings go to `.pi/improvements/<slug>.md` with

@@ -22,7 +22,11 @@ are never overwritten. Frozen task identity is recovered from session history
 or the matching plan on resume.
 
 The extension also injects bounded current-session evidence for the reflection
-commands. The agent, not the extension, maintains `.pi/MEMORY.md` and
+commands. That evidence measures session-lifetime tool-result text characters,
+images, errors, per-tool totals, and the largest results only when reflection is
+requested; there is no live hook or persistent metrics store. Material output
+pressure receives one retrospective recommendation, while ordinary sessions stay
+quiet. The agent, not the extension, maintains `.pi/MEMORY.md` and
 `.pi/improvements/` according to the workflow protocol.
 
 ## Notes
