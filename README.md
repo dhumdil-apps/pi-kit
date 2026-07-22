@@ -14,7 +14,6 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 - [Extension and resource catalog](docs/EXTENSIONS.md)
 - [The working flow](docs/FLOW.md)
 - [Commands and tools](docs/COMMANDS.md)
-- [Local Pi setup](docs/LOCAL_SETUP.md)
 - [Development and maintenance](docs/DEVELOPMENT.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Vendored upstream inventory](UPSTREAM.md)
@@ -56,8 +55,7 @@ pi install https://github.com/dhumdil-apps/pi-kit
 Refresh it after a release with `pi update --extensions`. For a fresh machine,
 follow [docs/SETUP.md](docs/SETUP.md).
 
-Maintainers use a separate editable checkout. On Martin's Mac it lives at
-`~/Github/pi-kit`; see [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md). Test
+Maintainers use a separate editable checkout; see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Test
 unpublished changes directly from that checkout:
 
 ```bash

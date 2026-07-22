@@ -2,7 +2,7 @@
 
 ## What this is / start here
 
-- Personal vendored Pi package loaded directly from this working copy.
+- Vendored Pi package loaded directly from this working copy.
 - Start with `README.md` and `docs/README.md`; component provenance is in `UPSTREAM.md`.
 - Active code lives under `extensions/`; portable skills, prompts, and themes are declared in `package.json` (`pi.extensions`, resource roots).
 - Extension catalog: `docs/EXTENSIONS.md`.
@@ -39,6 +39,6 @@
 
 - Preserve headless bypasses and Minimal Action Confirmation's denylist scope (destructive commands, outside-project writes, web access, vendored-code reads, recursive search rooted outside the project).
 - Update the focused guide under `docs/` whenever behavior, commands, settings, local paths, or invariants change.
-- Preserve `LICENSES/` and update `UPSTREAM.md` whenever importing or replacing vendored code.
+- Preserve upstream license notices in `UPSTREAM.md` whenever importing or replacing vendored code.
 - Do not create commits or stashes. After the current slice, inspect status and its diff, then hand the user a ready-to-use commit message; stashing requires explicit authorization.
 - Never commit `~/.pi/agent/auth.json`, sessions, caches, runtime model catalogs, or project `.pi/` state.

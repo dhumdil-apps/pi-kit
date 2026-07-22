@@ -1,4 +1,29 @@
 node_modules
 .DS_Store
+Thumbs.db
 *.log
+
+# Environments and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDEs and local tools
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build and test outputs
+dist/
+coverage/
+.vitest/
+.turbo/
+
+# Pi runtime state
 .pi/
+

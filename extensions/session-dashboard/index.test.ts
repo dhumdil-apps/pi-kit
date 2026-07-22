@@ -95,7 +95,7 @@ describe("session dashboard startup", () => {
 		await startup;
 
 		expect(sendMessage).toHaveBeenCalledWith(
-			expect.objectContaining({ content: expect.stringContaining("π **Measure twice, cut once.**") }),
+			expect.objectContaining({ content: expect.stringContaining("> π Measure twice, cut once.") }),
 			expect.anything(),
 		);
 		expect(setWidget).toHaveBeenLastCalledWith("session-dashboard-loading", undefined);

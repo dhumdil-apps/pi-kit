@@ -226,7 +226,7 @@ describe("gate bypass regressions", () => {
 					toolName: "bash",
 					input: {
 						command:
-							"find /Users/martin-peter.lakatos/.nvm/versions/node/v26.2.0/lib/node_modules/@earendil-works/pi-coding-agent/examples -type f",
+							"find /home/user/.nvm/versions/node/v26.2.0/lib/node_modules/@earendil-works/pi-coding-agent/examples -type f",
 					},
 				},
 				{ cwd: process.cwd(), hasUI: false },

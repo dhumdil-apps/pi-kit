@@ -52,7 +52,6 @@ workflow questions, Flash lifecycle, and safety dialogs.
 - `docs/EXTENSIONS.md`: what is loaded and why.
 - `docs/FLOW.md`: the working flow (guidance) and the enforced gates.
 - `docs/COMMANDS.md`: user-facing reference.
-- `docs/LOCAL_SETUP.md`: reproducible local configuration, without secrets.
 - `docs/TROUBLESHOOTING.md`: symptoms and recovery.
 - `AGENTS.md`: short repository instructions for coding agents.
 - `UPSTREAM.md`: provenance, removals, and compatibility patches.

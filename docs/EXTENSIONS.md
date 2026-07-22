@@ -47,9 +47,7 @@ These are the settings currently exposed through `/extension-settings`:
 Status Bar defaults place
 `git-branch,session-name,agent-stats,context-usage,tokens,cpu,ram,disk,net` on
 the left and `provider,model,sub-hourly,sub-weekly` on the right. Unnamed
-sessions receive `<short-desc>` (or `<ticket>-<short-desc>` when a ticket is supplied). The local machine overrides
-separator, placement, bar style, and width; see
-[LOCAL_SETUP.md](LOCAL_SETUP.md#active-extension-settings).
+sessions receive `<short-desc>` (or `<ticket>-<short-desc>` when a ticket is supplied). Global extension values are configured via `/extension-settings`.
 
 Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
 

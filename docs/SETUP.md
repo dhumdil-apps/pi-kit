@@ -22,7 +22,7 @@ managed copy. Update it after new changes are published:
 pi update --extensions
 ```
 
-Maintainers use a separate checkout; see [LOCAL_SETUP.md](LOCAL_SETUP.md).
+Maintainers use a separate checkout; see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## 3. Configure Pi
 

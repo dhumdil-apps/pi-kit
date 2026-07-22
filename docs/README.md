@@ -11,7 +11,6 @@ that loads it.
 | Understand what is installed | [Extension and resource catalog](EXTENSIONS.md) |
 | Understand the default workflow | [The working flow](FLOW.md) |
 | Find a command quickly | [Commands and tools](COMMANDS.md) |
-| Recreate or inspect this Mac's setup | [Local setup](LOCAL_SETUP.md) |
 | Change, test, or update the bundle | [Development and maintenance](DEVELOPMENT.md) |
 | Diagnose something that is not behaving | [Troubleshooting](TROUBLESHOOTING.md) |
 | Trace vendored code to its source | [Upstream inventory](../UPSTREAM.md) |
