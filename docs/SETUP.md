@@ -1,73 +1,63 @@
 # Clean-machine setup
 
-How to get a fully working Pi setup from this repo on a fresh machine.
+How to install the consumer package on a fresh machine.
 
 ## 1. Prerequisites
 
-- Node LTS + npm, git with SSH access to `github.com:dhumdil-apps`.
+- Node LTS + npm and Git.
 - Install Pi: `npm install -g @earendil-works/pi` (see [pi.dev](https://pi.dev)
   if the install method has changed).
 
-## 2. Clone the bundle
+## 2. Install the bundle
 
 ```bash
-git clone git@github.com:dhumdil-apps/pi-kit.git ~/.pi/pi-kit
-cd ~/.pi/pi-kit && npm install
+pi install https://github.com/dhumdil-apps/pi-kit
 ```
 
-`~/.pi/pi-kit` is the canonical location on every machine — the config
-template's `packages` entry already points there (Pi expands `~`). A different
-clone location works too; it just has to match the `packages` path below.
-
-## 3. Copy the config templates
-
-Run Pi once (`pi`, then quit) so `~/.pi/agent/` exists, then:
+Pi records the Git source in `~/.pi/agent/settings.json`, clones a managed copy
+under `~/.pi/agent/git/`, and installs runtime dependencies. Do not edit that
+managed copy. Update it after new changes are published:
 
 ```bash
-cp ~/.pi/pi-kit/setup/settings.json            ~/.pi/agent/settings.json
-cp ~/.pi/pi-kit/setup/settings-extensions.json ~/.pi/agent/settings-extensions.json
+pi update --extensions
 ```
 
-The template's `packages` entry is `~/.pi/pi-kit`; if you cloned elsewhere,
-edit `~/.pi/agent/settings.json` to point at your clone path. If Pi already
-wrote defaults you want to keep (e.g. `lastChangelogVersion`), merge instead
-of overwriting.
+Maintainers use a separate checkout; see [LOCAL_SETUP.md](LOCAL_SETUP.md).
+
+## 3. Configure Pi
+
+The install command owns the package entry. Configure provider, model, theme,
+and other machine-local preferences through Pi or `~/.pi/agent/settings.json`.
+Configure bundle UI preferences through `/extension-settings`; missing values
+use the defaults registered by each extension.
 
 Universal behavior is injected by the bundle's Agent Workflow extension; no
 global `~/.pi/agent/AGENTS.md` is required. Project-level `AGENTS.md` files own
-project-specific stack and repository conventions.
+project-specific conventions.
 
-The `github-dark` theme ships in this repo's `themes/` and is registered by
-the bundle, so `"theme": "github-dark"` works with no extra copy.
+The `github-dark` theme ships in this package, so `"theme": "github-dark"`
+works without a separate theme copy.
 
-## 4. Authenticate (manual — never in this repo)
+## 4. Authenticate
 
-- Run `pi` and log in to your provider (writes `~/.pi/agent/auth.json`).
-- Custom providers / API keys (e.g. OpenRouter, a local LM Studio endpoint) go
-  in `~/.pi/agent/models.json` by hand. Both files hold secrets — never commit
-  them anywhere.
-- Optionally add `defaultProvider` / `defaultModel` to
-  `~/.pi/agent/settings.json` once you know which provider you'll use.
+- Run `pi` and log in to your provider; credentials are written to
+  `~/.pi/agent/auth.json`.
+- Custom providers and API keys belong in machine-local configuration.
+- Never copy authentication files into this repository.
 
 ## 5. What is intentionally not restored
 
-Machine-local runtime data that Pi recreates or that shouldn't travel:
-
-- `~/.pi/agent/sessions/`, caches, `run-history.jsonl`, `models-store.json`
-- `~/.pi/agent/bin/` (Pi re-fetches `fd`/`rg`)
-- `~/.pi/agent/npm/` — previously npm-installed extensions (`pi-subagents`,
-  `pi-simplify`, `pi-add-dir`, `pi-web-access`) are removed or superseded by
-  this bundle; do not reinstall them on a new machine (they can be removed
-  from old machines too).
-- Per-project `.pi/` dirs (memory, plans, and deferred improvements) — they
-  belong to their projects and are ignored by default.
+- Sessions, caches, run history, and runtime model catalogs.
+- `~/.pi/agent/bin/`; Pi recreates helper binaries.
+- Old npm or Git package clones; Pi recreates the managed package from settings.
+- Per-project `.pi/` directories; they belong to their projects.
 
 ## 6. Verify
 
-Start `pi` in any project:
+```bash
+pi list
+pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
+```
 
-- Session Dashboard and Status Bar appear, `github-dark` theme is active.
-- `/usage` opens the usage history.
-- `/flash`, `/retro`, `/forensic`, and `/improvements` are available.
-- A destructive command (e.g. asking it to `rm` something) triggers Minimal
-  Action Confirmation.
+The dashboard and status bar should appear in an interactive session. `/usage`,
+`/flash`, `/retro`, `/forensic`, and `/improvements` should be available.

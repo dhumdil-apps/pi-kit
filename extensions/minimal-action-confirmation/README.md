@@ -14,9 +14,7 @@ it immediately. It is not persisted automatically.
   `find -delete/-exec rm|mv`, `xargs rm|mv`, recursive `chmod`/`chown`/`chgrp`,
   destructive git (`reset --hard`, `clean`, force push, `branch -D`,
   `stash drop/clear`).
-- `edit`/`write` targeting paths outside the project cwd. Paths in the
-  `SAFE_PATHS` list in `index.ts` (the user's own bundle working copy at
-  `~/.pi/pi-kit`) count as in-project.
+- `edit`/`write` targeting paths outside the project cwd.
 - Web access: agent-issued `curl` plus any externally supplied `web_search`,
   `fetch_content`, or `get_search_content` tools
   (fetched pages are untrusted text — prompt-injection risk).
@@ -25,8 +23,7 @@ it immediately. It is not persisted automatically.
   `TRUSTED_PACKAGES` list in `index.ts` (one entry per line; an entry is an
   npm scope like `@earendil-works` or a single package like `lodash`).
 - Recursive search/list commands (`find`, `grep -r`, `rg`, `tree`, `ls -R`)
-  whose target reaches outside the project directory (`SAFE_PATHS` exempt
-  here too).
+  whose target reaches outside the project directory.
 
 Everything else runs without prompting. Deliberately NOT gated: redirects and
 `tee`, `mv`/`cp`, package managers, `kill`.

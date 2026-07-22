@@ -43,27 +43,25 @@ Start with the [documentation index](docs/README.md), then use the focused guide
   and loaded-resource map.
 - **status-bar** (+ live quota via **usage-monitor**), **usage-history**
   (`/usage` history), separate **review** and **simplify** skills, bundled `dark`
-  and `github-dark` themes, and `/init` prompt. Config templates for a new
-  machine live in [`setup/`](setup/).
+  and `github-dark` themes, and `/init` prompt.
 
-## Install (local path)
+## Install
 
-This is a working copy loaded directly by Pi. In `~/.pi/agent/settings.json`,
-point `packages` at your clone (absolute path):
-
-```json
-"packages": ["/absolute/path/to/pi-kit"]
-```
-
-Edits apply on the next Pi start — no `pi install`/`pi update` needed. GitHub
-(`git@github.com:dhumdil-apps/pi-kit.git`) is the backup remote; push after
-meaningful changes. For a fresh machine, follow
-[docs/SETUP.md](docs/SETUP.md).
-
-For a one-off test without changing settings:
+Consumers install the public Git package and let Pi manage its runtime copy:
 
 ```bash
-pi -ne -e /absolute/path/to/pi-kit
+pi install https://github.com/dhumdil-apps/pi-kit
+```
+
+Refresh it after a release with `pi update --extensions`. For a fresh machine,
+follow [docs/SETUP.md](docs/SETUP.md).
+
+Maintainers use a separate editable checkout. On Martin's Mac it lives at
+`~/Github/pi-kit`; see [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md). Test
+unpublished changes directly from that checkout:
+
+```bash
+pi -ne -e .
 ```
 
 ## Development

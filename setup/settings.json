@@ -1,9 +1,0 @@
-{
-  "quietStartup": true,
-  "theme": "github-dark",
-  "defaultThinkingLevel": "medium",
-  "defaultProjectTrust": "ask",
-  "packages": [
-    "~/.pi/pi-kit"
-  ]
-}

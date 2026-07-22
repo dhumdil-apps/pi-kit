@@ -1,21 +1,21 @@
 # Local Pi setup
 
-This documents the active installation on Martin's Mac. It is intentionally
-separate from portable bundle code.
+This documents the active maintainer installation on Martin's Mac.
 
-## Paths
+## Ownership boundaries
 
-| Path | Purpose | Backup/commit policy |
+| Path | Purpose | Policy |
 | --- | --- | --- |
-| `~/.pi/pi-kit` | Git working copy loaded by Pi | Commit and push intentional changes |
-| `~/.pi/agent/settings.json` | Core Pi settings, local package path, thinking level | Private machine config; document values, do not blindly publish |
-| `~/.pi/agent/settings-extensions.json` | Extension UI values | Private machine config; safe to reconstruct from this guide |
-| `~/.pi/agent/themes/` | Optional machine-local theme overrides | The active `github-dark` theme now ships in the bundle (`themes/github-dark.json`); a local copy here is redundant |
-| `~/.pi/agent/auth.json` | Authentication credentials/tokens | Secret; never print, copy into docs, or commit |
-| `~/.pi/agent/sessions/` | Session history | Generated/private |
-| `~/.pi/agent/usage-extension-cache.json` | Usage cache | Generated |
-| `~/.pi/agent/models*.json` | Runtime model catalogs/overrides | Local/generated unless deliberately curated |
-| `~/.pi/agent/npm/`, `~/.pi/agent/git/` | Pi package runtime/cache areas | Generated; not the bundle source |
+| `~/Github/pi-kit` | Editable Git working copy | Develop, test, commit, and push here |
+| `~/.pi/agent/git/github.com/dhumdil-apps/pi-kit` | Pi-managed runtime copy | Do not edit; refresh with Pi |
+| `~/.pi/agent/settings.json` | Core Pi settings and Git package source | Machine-local; never publish secrets |
+| `~/.pi/agent/settings-extensions.json` | Extension UI values | Machine-local and reproducible |
+| `~/.pi/agent/auth.json` | Authentication credentials | Secret; never print or commit |
+| `~/.pi/agent/sessions/` | Session history | Generated and private |
+
+The working copy is the source of truth. Normal Pi sessions deliberately load
+the managed Git installation so the maintainer exercises the same package path
+as consumers.
 
 ## Active core settings
 
@@ -27,12 +27,11 @@ The important values in `~/.pi/agent/settings.json` are:
   "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "medium",
   "theme": "github-dark",
-  "packages": ["~/.pi/pi-kit"]
+  "packages": ["https://github.com/dhumdil-apps/pi-kit"]
 }
 ```
 
-Provider, model, and thinking level are the `~/.pi/agent/settings.json` values
-shown above; there are no per-role overrides (the bundle is single-agent).
+Provider, model, and thinking level remain machine-local choices.
 
 ## Active extension settings
 
@@ -49,34 +48,31 @@ shown above; there are no per-role overrides (the bundle is single-agent).
 }
 ```
 
-Extension Settings are global and string-backed. Missing values use the default
-registered by the extension.
-
-## Load and update behavior
-
-Pi loads the `~/.pi/pi-kit` working copy directly. Source edits apply
-on the next Pi process; there is no install/update step between editing and
-testing.
-
-Useful checks:
+## Development and release flow
 
 ```bash
-pi list
-pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
-cd ~/.pi/pi-kit
+cd ~/Github/pi-kit
 npm test
 npm run typecheck
+pi -ne -e . -p --no-session --tools '' "Reply exactly HEADLESS_OK"
 ```
 
-The GitHub remote is a backup and collaboration surface, not the runtime load
-source. Committing/pushing does not refresh a running Pi process; restart Pi.
+The explicit `-e .` smoke loads unpublished working-copy code without changing
+settings. After intentional changes are committed and pushed:
+
+```bash
+pi update --extensions
+```
+
+Restart Pi after the update. Do not patch the managed copy: reconciliation may
+reset and clean it.
 
 ## Recreate the setup
 
-Follow [SETUP.md](SETUP.md) — it covers cloning, the config templates in
-`setup/`, authentication, and verification. Machine-specific extras for this
-Mac: the `defaultProvider`/`defaultModel`/`defaultThinkingLevel` values shown
-above.
+Follow [SETUP.md](SETUP.md) for consumer installation, then clone the maintainer
+working copy separately:
 
-Do not restore stale Git-package clones or old settings backups; the
-`~/.pi/pi-kit` local package path is the intended setup.
+```bash
+git clone git@github.com:dhumdil-apps/pi-kit.git ~/Github/pi-kit
+cd ~/Github/pi-kit && npm install
+```

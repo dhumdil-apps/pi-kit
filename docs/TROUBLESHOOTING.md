@@ -2,10 +2,10 @@
 
 ## Pi does not show the bundle
 
-1. Check `packages` in `~/.pi/agent/settings.json` contains the absolute
-   path of your `pi-kit` clone.
+1. Check `packages` in `~/.pi/agent/settings.json` contains
+   `https://github.com/dhumdil-apps/pi-kit`.
 2. Run `pi list`.
-3. Restart Pi; a running process does not reload edited extensions.
+3. Run `pi update --extensions`, then restart Pi.
 4. Run the headless smoke from [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## The agent edits before we agreed on a direction

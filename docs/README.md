@@ -31,10 +31,13 @@ that loads it.
 
 ## Repository locations
 
-- Local working copy: `~/.pi/pi-kit`
+- Maintainer working copy: `~/Github/pi-kit`
+- Consumer/runtime source: `https://github.com/dhumdil-apps/pi-kit`
+- Pi-managed runtime copy: `~/.pi/agent/git/github.com/dhumdil-apps/pi-kit`
 - GitHub remote: `git@github.com:dhumdil-apps/pi-kit.git`
 - Active branch: `main`
 - Local Pi directory: `~/.pi`
 
-Changes to the local working copy are picked up on the next Pi start because
-Pi loads the package by absolute path.
+Unpublished changes are tested explicitly from the working copy. Normal Pi
+sessions load the managed copy; after pushing changes, refresh it with
+`pi update --extensions`.

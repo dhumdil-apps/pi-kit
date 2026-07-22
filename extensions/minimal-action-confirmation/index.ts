@@ -19,9 +19,7 @@
  * - Recursive search/list commands (find, grep -r, rg, tree, ls -R) whose
  *   target path reaches outside the project directory — avoids runaway
  *   scans of the home directory / filesystem when an agent goes looking
- *   for context files with too broad a root. Paths in SAFE_PATHS (the
- *   user's own bundle at ~/.pi/pi-kit) count as in-project for both
- *   this and the edit/write gate.
+ *   for context files with too broad a root.
  *
  * Everything else runs without prompting. Deliberately NOT gated: redirects
  * and tee (can't cheaply tell truncate vs create), mv/cp (recoverable),
@@ -69,14 +67,6 @@ const TRUSTED_PACKAGES = [
 ];
 
 const SEARCH_COMMANDS = new Set(["find", "grep", "rg", "tree", "ls"]);
-
-// Paths treated as in-project everywhere: the user's own bundle working
-// copy — searching, reading, and editing it from any cwd is routine.
-const SAFE_PATHS = [resolve(homedir(), ".pi/pi-kit")];
-
-function pathIsSafelisted(abs: string): boolean {
-	return SAFE_PATHS.some((dir) => abs === dir || abs.startsWith(`${dir}/`));
-}
 
 const GATE_OPTIONS = ["Proceed", "Deny", "Deny with guidance"];
 
@@ -272,7 +262,6 @@ function pathEscapesProject(rawPath: string, cwd: string): boolean {
 	if (cleaned.startsWith("$")) return true;
 	const abs = resolveLikeCoreTool(cleaned, cwd);
 	const root = resolve(cwd);
-	if (pathIsSafelisted(abs)) return false;
 	if (abs !== root && !abs.startsWith(`${root}/`)) return true;
 	return realEscapesRoot(abs, root);
 }
@@ -357,7 +346,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 				const root = resolve(ctx.cwd);
 				const lexicallyInside = full === root || full.startsWith(`${root}/`);
 				const insideProject = lexicallyInside && !realEscapesRoot(full, root);
-				if (!insideProject && !pathIsSafelisted(full)) {
+				if (!insideProject) {
 					gate = { reason: `${toolName} outside the project directory:\n\n  ${full}` };
 				}
 			}
