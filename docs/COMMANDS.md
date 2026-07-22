@@ -24,7 +24,7 @@ mode and no `/plan` command — the working flow is guidance, described in
 | Tool | Owner | Purpose |
 | --- | --- | --- |
 | `manage_todo_list` | Progress Tracker | Read/write local todos independently of the workflow phase |
-| `manage_task` | Agent Workflow | Set/freeze task identity, save an immutable approved plan, and checkpoint/resume a compact cross-session handoff |
+| `manage_task` | Agent Workflow | Set/freeze task identity and create, update, transition, or resume a status-suffixed lifecycle plan |
 
 ## Shell and keyboard reminders
 

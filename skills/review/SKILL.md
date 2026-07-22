@@ -14,6 +14,9 @@ is a self-review, not an independent or human review.
 1. Read the approved plan or current request, repository instructions,
    `git status --short`, and the complete relevant diff. Inspect surrounding
    code, callers, tests, and history only where needed to establish behavior.
+   Then classify the changed surface: for each conditional pass below, record
+   whether the diff activates it and why, in one line, so no applicable pass is
+   skipped.
 2. Run the Intent, Adversarial correctness, and Validation core passes plus each
    triggered conditional pass below. Collect their complete finding set before
    editing so local fixes do not hide systemic issues. Defer Simplification and
@@ -37,17 +40,24 @@ is a self-review, not an independent or human review.
 
 ## Core passes
 
-- **Intent — assume the wrong outcome was implemented.** Trace every approved
-  outcome and acceptance criterion to implementation plus evidence. Flag missing,
-  contradicted, or accidentally expanded behavior.
+- **Intent — assume the wrong outcome was implemented.** First reconstruct from
+  the approved plan alone what a correct implementation must do; then read the
+  diff and flag where it diverges, rather than reading the diff first and
+  rationalizing it. Trace every approved outcome and acceptance criterion to
+  implementation plus evidence. Flag missing, contradicted, or accidentally
+  expanded behavior.
 - **Adversarial correctness — assume the happy path hides a defect.** Probe
   empty, missing, invalid, minimum, and maximum inputs plus relevant ordering,
   state transitions, timing/concurrency, retry, idempotency, partial completion,
   cleanup, and recovery behavior.
 - **Validation — assume green checks provide false confidence.** Confirm tests
   assert observable behavior and would fail if the implementation were removed
-  or reverted. Detect weak assertions, excessive mocking, the wrong test level,
-  and missing negative, boundary, failure, or regression cases.
+  or reverted. For the single riskiest new behavior, when cheap and safe,
+  confirm this empirically: briefly regress it (revert one line or invert a
+  condition), run the covering test to observe the failure, then restore —
+  prefer this evidence over asserting the test would fail. Detect weak
+  assertions, excessive mocking, the wrong test level, and missing negative,
+  boundary, failure, or regression cases.
 - **Simplification — assume the diff is larger than necessary.** Run the
   standalone simplification procedure at the prescribed point in this workflow.
 - **Completion challenge — assume something important remains unproven.** Name
@@ -56,7 +66,7 @@ is a self-review, not an independent or human review.
 
 ## Conditional passes
 
-Run only those activated by the changed surface:
+Run those your step-1 surface classification marked triggered:
 
 - **Integration/contracts** — APIs, schemas, configuration, persistence, events,
   serialization, or CLI contracts: verify producers, consumers, defaults, and

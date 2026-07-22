@@ -8,7 +8,7 @@ separate from portable bundle code.
 | Path | Purpose | Backup/commit policy |
 | --- | --- | --- |
 | `~/.pi/pi-kit` | Git working copy loaded by Pi | Commit and push intentional changes |
-| `~/.pi/agent/settings.json` | Core Pi settings, local package path, role overrides | Private machine config; document values, do not blindly publish |
+| `~/.pi/agent/settings.json` | Core Pi settings, local package path, thinking level | Private machine config; document values, do not blindly publish |
 | `~/.pi/agent/settings-extensions.json` | Extension UI values | Private machine config; safe to reconstruct from this guide |
 | `~/.pi/agent/themes/` | Optional machine-local theme overrides | The active `github-dark` theme now ships in the bundle (`themes/github-dark.json`); a local copy here is redundant |
 | `~/.pi/agent/auth.json` | Authentication credentials/tokens | Secret; never print, copy into docs, or commit |
@@ -31,8 +31,8 @@ The important values in `~/.pi/agent/settings.json` are:
 }
 ```
 
-Role thinking overrides are documented in
-[Extension and resource catalog](EXTENSIONS.md#role-policy).
+Provider, model, and thinking level are the `~/.pi/agent/settings.json` values
+shown above; there are no per-role overrides (the bundle is single-agent).
 
 ## Active extension settings
 
@@ -75,8 +75,8 @@ source. Committing/pushing does not refresh a running Pi process; restart Pi.
 
 Follow [SETUP.md](SETUP.md) — it covers cloning, the config templates in
 `setup/`, authentication, and verification. Machine-specific extras for this
-Mac: the role thinking overrides from [EXTENSIONS.md](EXTENSIONS.md) and the
-`defaultProvider`/`defaultModel` values shown above.
+Mac: the `defaultProvider`/`defaultModel`/`defaultThinkingLevel` values shown
+above.
 
 Do not restore stale Git-package clones or old settings backups; the
 `~/.pi/pi-kit` local package path is the intended setup.

@@ -16,7 +16,7 @@ extension.
 | Progress Tracker | Global workflow route plus separate local todo widget | `manage_todo_list`, `/todos` | On |
 | Session Dashboard | Startup ruler, project/spend panel, and resource map | Interactive startup message | Interactive parent sessions only |
 | Agent Workflow | Conversational workflow, Flash mode, and session learning | `/flash`, `/retro`, `/forensic`, `/improvements` | On; see [FLOW.md](FLOW.md) |
-| Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, and vendored-code reads | Built-in Pi dialog | On; deliberately not a general approval gate |
+| Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, vendored-code reads, and recursive search/list rooted outside the project | Built-in Pi dialog | On; deliberately not a general approval gate |
 
 ## Supporting resources
 

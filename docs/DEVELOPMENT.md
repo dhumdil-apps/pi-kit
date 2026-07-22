@@ -29,20 +29,21 @@ workflow questions, Flash lifecycle, and safety dialogs.
 
 ## Change checklist
 
-1. Identify the owning repository, run `git status --short`, and inspect the
-   relevant uncommitted diff before planning changes.
+1. Identify the owning repository, run `git status --short`, inspect relevant
+   diffs, and classify matching continuation versus separate completed or
+   unfinished work before planning changes.
 2. Read the relevant focused guide and upstream README/source.
-3. Preserve unrelated working-tree changes and explicitly resolve overlaps
-   with earlier decisions.
+3. Resolve separate work before implementation: the user commits completed work;
+   unfinished work is finished or explicitly planned and stashed.
 4. Keep extension imports compatible with the active
    `@earendil-works/pi-*` packages.
 5. Add focused tests for extracted state/persistence/safety logic.
 6. Update the matching document when behavior, commands, settings, paths, or
    ownership rules change.
 7. Run focused tests/typecheck, headless load, and relevant interactive smoke.
-8. Before discussing or creating a commit, run `git status --short` and inspect
-   the relevant diff. Keep pre-existing work separate, verify status afterward,
-   and never commit local secrets or runtime state.
+8. Never commit or stash automatically. After one committable slice, inspect its
+   diff, verify status, propose the commit message, and never include secrets or
+   runtime state.
 9. Update `UPSTREAM.md` and license material when importing a new snapshot.
 
 ## Documentation ownership

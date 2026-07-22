@@ -8,7 +8,7 @@ Rules for developing the extensions in this kit. Each rule: trigger → action �
 2. **Executing a plan from a `"blocked"` phase** → resume with the existing todo items, never overwrite them → progress made before the block must survive the restart.
 3. **Soliciting a choice from the user** → use built-in Pi dialogs or conversational turns, not `ctx.ui.select` → consistent TUI experience; also skip filler options like "Continue exploring" when escape/dismiss already covers it.
 4. **Emitting `powerbar:update` / segment-deletion events** → emit unconditionally, never gated behind `ctx.hasUI` → headless and RPC clients rely on the event bus to stay in sync.
-5. **Any user-facing modal or notification when `ctx.hasUI` is false** → fall back to `pi.sendMessage` in the chat log (e.g. how to execute the plan, that checkpoints were created) → headless runs must never silently drop warnings or status.
+5. **Any user-facing modal or notification when `ctx.hasUI` is false** → fall back to `pi.sendMessage` in the chat log (e.g. how to execute the plan or that lifecycle state changed) → headless runs must never silently drop warnings or status.
 
 ## Running & verifying
 

@@ -25,7 +25,6 @@ Run Pi once (`pi`, then quit) so `~/.pi/agent/` exists, then:
 
 ```bash
 cp ~/.pi/pi-kit/setup/settings.json            ~/.pi/agent/settings.json
-cp ~/.pi/pi-kit/setup/AGENTS.md                ~/.pi/agent/AGENTS.md
 cp ~/.pi/pi-kit/setup/settings-extensions.json ~/.pi/agent/settings-extensions.json
 ```
 
@@ -33,6 +32,10 @@ The template's `packages` entry is `~/.pi/pi-kit`; if you cloned elsewhere,
 edit `~/.pi/agent/settings.json` to point at your clone path. If Pi already
 wrote defaults you want to keep (e.g. `lastChangelogVersion`), merge instead
 of overwriting.
+
+Universal behavior is injected by the bundle's Agent Workflow extension; no
+global `~/.pi/agent/AGENTS.md` is required. Project-level `AGENTS.md` files own
+project-specific stack and repository conventions.
 
 The `github-dark` theme ships in this repo's `themes/` and is registered by
 the bundle, so `"theme": "github-dark"` works with no extra copy.
@@ -66,5 +69,5 @@ Start `pi` in any project:
 - Session Dashboard and Status Bar appear, `github-dark` theme is active.
 - `/usage` opens the usage history.
 - `/flash`, `/retro`, `/forensic`, and `/improvements` are available.
-- A destructive command (e.g. asking it to `rm` something) triggers the
-  permission gate.
+- A destructive command (e.g. asking it to `rm` something) triggers Minimal
+  Action Confirmation.

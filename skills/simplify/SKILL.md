@@ -23,7 +23,9 @@ cleanup.
 - **Dead code** — Remove unused imports, variables, functions, unreachable
   branches, commented-out code, debug output, dumps, and obsolete TODOs.
 - **Duplication** — Reuse an established utility or consolidate logic repeated
-  in the diff. Do not create an abstraction when simple local code is clearer.
+  in the diff. For a non-trivial new helper, first search the repository for an
+  existing equivalent and prefer it when one exists. Do not create an
+  abstraction when simple local code is clearer.
 - **Over-abstraction** — Remove helpers, interfaces, options, parameters, or
   configuration introduced for one caller or a hypothetical future. Make every
   abstraction earn its place.

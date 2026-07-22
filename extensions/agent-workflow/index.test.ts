@@ -69,18 +69,31 @@ describe("agent workflow lifecycle", () => {
 		expect(messages.at(-1)).toContain('raw="true"');
 	});
 
-	it("injects command ownership and pre-commit inspection discipline", async () => {
+	it("injects universal communication and commit-message defaults", async () => {
 		const { handlers } = harness();
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
-		expect(prompt.systemPrompt).toContain("repository or package manifest that owns the command");
-		expect(prompt.systemPrompt).toContain("git status --short");
-		expect(prompt.systemPrompt).toContain("Separate pre-existing changes");
-		expect(prompt.systemPrompt).toContain("before planning changes");
-		expect(prompt.systemPrompt).toContain("never silently overwrite or absorb them");
-		expect(prompt.systemPrompt).toContain("state the conflict and selected resolution");
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("summarize the diff or show focused snippets");
+		expect(guidance).toContain("instead of pasting whole files unless the user requests them");
+		expect(guidance).toContain("Follow the repository's commit convention");
+		expect(guidance).toContain("short imperative subject without a trailing period");
 	});
 
-	it("keeps plans verifiable and resumed handoffs subordinate to current evidence", async () => {
+	it("classifies dirty work and preserves user control of commits and stashes", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("repository or package manifest that owns the command");
+		expect(guidance).toContain("git status --short");
+		expect(guidance).toContain("matching the requested goal is a continuation");
+		expect(guidance).toContain("separate completed work must be");
+		expect(guidance).toContain("separate unfinished work must be finished");
+		expect(guidance).toContain("Never commit or stash automatically");
+		expect(guidance).toContain("never absorb unrelated work merely because");
+		expect(guidance).toContain("state the conflict and selected resolution");
+	});
+
+	it("keeps lifecycle plans small, verifiable, and subordinate to current evidence", async () => {
 		const { handlers } = harness();
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
 		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
@@ -88,11 +101,13 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("name the specific manual acceptance check");
 		expect(guidance).toContain("never claim the user's acceptance on their behalf");
 		expect(guidance).toContain("public interfaces, persistence, dependencies, security, or migrations");
-		expect(guidance).toContain("only when pausing, becoming blocked, or completing");
-		expect(guidance).toContain("one resume pointer, not a copy of local todos");
-		expect(guidance).toContain("Treat a resumed handoff only as a hint");
-		expect(guidance).toContain("Current evidence and user feedback always win");
-		expect(guidance).toContain("Completed handoffs are retained for diagnosis but are not active resume state");
+		expect(guidance).toContain("independently reviewable and committable checklist slices");
+		expect(guidance).toContain("exactly one slice");
+		expect(guidance).toContain("fresh explicit approval");
+		expect(guidance).toContain("<task-name>.<status>.md");
+		expect(guidance).toContain("only cross-session source of truth");
+		expect(guidance).toContain("legacy unsuffixed plans and .pi/handoffs files are ignored and preserved");
+		expect(guidance).toContain("current intent, Git state, diffs, and validation evidence always win");
 	});
 
 	it("uses proportional evidence and the canonical review skill", async () => {

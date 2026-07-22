@@ -24,9 +24,8 @@ that loads it.
   theme, and package path on this machine.
 - `~/.pi/agent/settings-extensions.json` stores global, string-backed extension
   settings changed through `/extension-settings`.
-- Project-specific files belong to the project: `.pi/MEMORY.md`, approved plans,
-  optional task handoffs, and deferred improvement records. `.pi/` is ignored
-  by default.
+- Project-specific files belong to the project: `.pi/MEMORY.md`, status-suffixed
+  lifecycle plans, and deferred improvement records. `.pi/` is ignored by default.
 - Sessions, authentication, caches, generated package state, and model catalogs
   are runtime data. They are not bundle configuration and must not be committed.
 

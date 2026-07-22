@@ -5,6 +5,11 @@ working agreement to every turn. It guides conversational question batches,
 explicit plan approval, Flash mode, retrospective learning, and engineering
 practice. Safety gates remain in `minimal-action-confirmation`.
 
+[`docs/FLOW.md`](../../docs/FLOW.md) is the canonical human-readable behavior
+specification; this extension's injected prompt is its operational mirror.
+Project-level `AGENTS.md` files own project-specific stack and repository
+conventions.
+
 ## User surface
 
 - `/flash` — autonomous recommended-choice cruise control. Any ordinary user
@@ -14,21 +19,17 @@ practice. Safety gates remain in `minimal-action-confirmation`.
   evidence.
 - `/improvements` — list and revalidate deferred improvement records.
 - `manage_task` — set a concise `SI-<ticket>-<summary>` identity after
-  exploration, refine it during Planning, save the approved plan and freeze the
-  name, or persist/resume one compact cross-session handoff. Saved names are
-  branch-ready; the tool never changes Git branches.
+  exploration, refine it during Planning, then create, transition, update, or
+  resume its lifecycle plan. Saved names are branch-ready; the tool never changes
+  Git branches.
 
-Approved repository plans are created once at `.pi/plans/<task-name>.md` and
-are never overwritten. Frozen task identity is recovered from session history
-or the matching plan on resume.
-
-Optional handoffs live at `.pi/handoffs/<task-name>.md`. A checkpoint records
-only status, the last completed plan step, the next action, remaining checks,
-and one open decision; it is written only when pausing, blocked, or complete and
-never mirrors local todos. `manage_task` with `operation=resume` returns the
-immutable plan plus an active/blocked handoff and requires comparison with the
-current request, Git state, diff, and validation evidence. Completed handoffs
-remain local for diagnosis but are not returned as active resume state.
+Lifecycle plans use `.pi/plans/<task-name>.<status>.md`: `todo` waits for its
+next slice, `active` records the one approved slice underway, and `done` means
+the full checklist and final validation completed. The mutable plan is the
+cross-session source of truth; local todos cover only the current slice. Resume
+always requires comparison with current intent, Git state, diff, and validation,
+then fresh approval for one committable slice. Legacy unsuffixed plans and
+`.pi/handoffs/` files are ignored and preserved.
 
 The extension also injects bounded current-session evidence for the reflection
 commands. That evidence measures session-lifetime tool-result text characters,

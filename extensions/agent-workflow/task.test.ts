@@ -1,13 +1,10 @@
-import { access, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeTaskName, registerTaskManagement } from "./task.js";
 
-interface HarnessOptions {
-	name?: string;
-	branch?: unknown[];
-}
+interface HarnessOptions { name?: string; branch?: unknown[] }
 
 function makeHarness(cwd: string, options: HarnessOptions = {}) {
 	const handlers = new Map<string, (event: any, ctx: any) => Promise<void>>();
@@ -20,195 +17,142 @@ function makeHarness(cwd: string, options: HarnessOptions = {}) {
 		setSessionName: vi.fn((name: string) => { sessionName = name; }),
 	};
 	registerTaskManagement(pi as never);
-	const ctx = {
-		cwd,
-		sessionManager: { getBranch: () => options.branch ?? [] },
-	};
+	const ctx = { cwd, sessionManager: { getBranch: () => options.branch ?? [] } };
 	const execute = (params: any) => tool.execute("call", params, undefined, undefined, ctx);
-	return { execute, handlers, pi, ctx, getName: () => sessionName };
+	return { execute, handlers, ctx, getName: () => sessionName };
 }
+
+const todoPlan = "# Goal\n\n## Checklist\n\n- [ ] Implement slice → verify it\n";
+const activePlan = "# Goal\n\n## Checklist\n\n- [ ] Implement slice → verify it\n\n## Current slice\n\nImplement slice\n";
+const donePlan = "# Goal\n\n## Checklist\n\n- [x] Implement slice → verified\n";
 
 describe("normalizeTaskName", () => {
 	it("uses a concise two-to-four word summary and a fallback ticket", () => {
-		expect(normalizeTaskName("please reimagine this dashboard resource section to make it better")).toBe(
-			"SI-0000-reimagine-dashboard-resource-section",
-		);
+		expect(normalizeTaskName("please reimagine this dashboard resource section to make it better")).toBe("SI-0000-reimagine-dashboard-resource-section");
 	});
-
 	it("preserves a supplied or current ticket", () => {
 		expect(normalizeTaskName("SI-42 cache recovery")).toBe("SI-42-cache-recovery");
-		expect(normalizeTaskName("SI-42-cache-recovery")).toBe("SI-42-cache-recovery");
 		expect(normalizeTaskName("dashboard polish", "SI-91-existing-task")).toBe("SI-91-dashboard-polish");
 	});
-
-	it("pads a one-word summary so names remain descriptive", () => {
-		expect(normalizeTaskName("dashboard")).toBe("SI-0000-dashboard-task");
-	});
+	it("pads a one-word summary", () => expect(normalizeTaskName("dashboard")).toBe("SI-0000-dashboard-task"));
 });
 
-describe("task management lifecycle", () => {
+describe("task lifecycle plans", () => {
 	let cwd: string;
+	beforeEach(async () => { cwd = await mkdtemp(join(tmpdir(), "pi-task-management-")); });
+	afterEach(async () => { await rm(cwd, { recursive: true, force: true }); });
 
-	beforeEach(async () => {
-		cwd = await mkdtemp(join(tmpdir(), "pi-task-management-"));
-	});
-
-	afterEach(async () => {
-		await rm(cwd, { recursive: true, force: true });
-	});
-
-	it("allows refinement before saving a plan", async () => {
+	it("refines identity before saving, then creates todo without overwrite", async () => {
 		const harness = makeHarness(cwd);
 		await harness.execute({ operation: "set_name", name: "dashboard resources" });
-		await harness.execute({ operation: "set_name", name: "dashboard workflow polish" });
-		expect(harness.getName()).toBe("SI-0000-dashboard-workflow-polish");
-	});
-
-	it("saves without overwrite and freezes the task name", async () => {
-		const harness = makeHarness(cwd);
 		await harness.execute({ operation: "set_name", name: "SI-7 dashboard polish" });
-		const saved = await harness.execute({ operation: "save_plan", plan: "# Approved plan" });
-		const path = join(cwd, ".pi", "plans", "SI-7-dashboard-polish.md");
-		expect(saved.isError).toBeUndefined();
-		expect(await readFile(path, "utf8")).toBe("# Approved plan\n");
-
-		const rename = await harness.execute({ operation: "set_name", name: "different scope" });
-		expect(rename.isError).toBe(true);
-		expect(harness.getName()).toBe("SI-7-dashboard-polish");
-
-		const overwrite = await harness.execute({ operation: "save_plan", plan: "replacement" });
-		expect(overwrite.isError).toBe(true);
-		expect(await readFile(path, "utf8")).toBe("# Approved plan\n");
+		const saved = await harness.execute({ operation: "save_plan", plan: todoPlan });
+		const path = join(cwd, ".pi", "plans", "SI-7-dashboard-polish.todo.md");
+		expect(saved.details).toMatchObject({ status: "todo", path, frozen: true });
+		expect(await readFile(path, "utf8")).toBe(todoPlan);
+		expect((await harness.execute({ operation: "set_name", name: "other work" })).isError).toBe(true);
+		expect((await harness.execute({ operation: "save_plan", plan: todoPlan })).isError).toBe(true);
 	});
 
-	it("restores a frozen name from session tool results", async () => {
-		const branch = [{
-			type: "message",
-			message: {
-				role: "toolResult",
-				toolName: "manage_task",
-				details: { operation: "save_plan", name: "SI-8-frozen-task", frozen: true },
-			},
-		}];
+	it("restores a frozen identity from lifecycle tool results", async () => {
+		const branch = [{ type: "message", message: { role: "toolResult", toolName: "manage_task", details: { operation: "save_plan", name: "SI-8-frozen-task", frozen: true } } }];
 		const harness = makeHarness(cwd, { name: "SI-8-frozen-task", branch });
 		await harness.handlers.get("session_start")!(undefined, harness.ctx);
-		const rename = await harness.execute({ operation: "set_name", name: "new task name" });
-		expect(rename.isError).toBe(true);
+		expect((await harness.execute({ operation: "set_name", name: "new task" })).isError).toBe(true);
 	});
 
-	it("rejects checkpoints until an approved plan exists", async () => {
+	it("requires a checklist for todo plans", async () => {
 		const harness = makeHarness(cwd);
-		await harness.execute({ operation: "set_name", name: "resume continuity" });
-		const checkpoint = await harness.execute({
-			operation: "checkpoint",
-			status: "active",
-			nextAction: "Run the focused tests",
-		});
-		expect(checkpoint.isError).toBe(true);
-		expect(checkpoint.content[0].text).toContain("save an approved plan");
+		await harness.execute({ operation: "set_name", name: "missing checklist" });
+		const result = await harness.execute({ operation: "save_plan", plan: "# Goal" });
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toContain("unchecked checklist item");
 	});
 
-	it("requires a next action for active checkpoints", async () => {
+	it("supports todo to active to todo to active to done", async () => {
 		const harness = makeHarness(cwd);
-		await harness.execute({ operation: "set_name", name: "resume continuity" });
-		await harness.execute({ operation: "save_plan", plan: "# Approved plan" });
-		const checkpoint = await harness.execute({ operation: "checkpoint", status: "active" });
-		expect(checkpoint.isError).toBe(true);
-		expect(checkpoint.content[0].text).toContain("require a next action");
+		await harness.execute({ operation: "set_name", name: "slice lifecycle" });
+		await harness.execute({ operation: "save_plan", plan: todoPlan });
+		const active = await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
+		expect(active.details.path).toMatch(/\.active\.md$/);
+		await expect(access(join(cwd, ".pi", "plans", "SI-0000-slice-lifecycle.todo.md"))).rejects.toThrow();
+		const queued = await harness.execute({ operation: "update_plan", status: "todo", plan: todoPlan });
+		expect(queued.details.path).toMatch(/\.todo\.md$/);
+		await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
+		const done = await harness.execute({ operation: "update_plan", status: "done", plan: donePlan });
+		expect(done.details.path).toMatch(/\.done\.md$/);
+		expect(await readFile(done.details.path, "utf8")).toBe(donePlan);
 	});
 
-	it("rejects checkpoints when the approved plan path is not a readable file", async () => {
+	it("updates an interrupted active plan in place", async () => {
 		const harness = makeHarness(cwd);
-		await harness.execute({ operation: "set_name", name: "invalid plan state" });
-		await mkdir(join(cwd, ".pi", "plans", "SI-0000-invalid-plan-state.md"), { recursive: true });
-		const checkpoint = await harness.execute({
-			operation: "checkpoint",
-			status: "active",
-			nextAction: "Should not be saved",
-		});
-		expect(checkpoint.isError).toBe(true);
-		expect(checkpoint.content[0].text).toContain("could not read approved plan");
-		expect(harness.getName()).toBe("SI-0000-invalid-plan-state");
+		await harness.execute({ operation: "set_name", name: "interrupted slice" });
+		await harness.execute({ operation: "save_plan", plan: todoPlan });
+		await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
+		const revised = `${activePlan}\n## Session notes\n\nValidation remains.\n`;
+		const result = await harness.execute({ operation: "update_plan", status: "active", plan: revised });
+		expect(result.details.status).toBe("active");
+		expect(await readFile(result.details.path, "utf8")).toBe(revised);
 	});
 
-	it("rejects complete checkpoints with outstanding work", async () => {
+	it("rejects invalid transitions and incomplete done plans", async () => {
 		const harness = makeHarness(cwd);
-		await harness.execute({ operation: "set_name", name: "incomplete validation" });
-		await harness.execute({ operation: "save_plan", plan: "# Approved plan" });
-		for (const outstanding of [
-			{ nextAction: "Finish the smoke" },
-			{ remainingChecks: ["npm test"] },
-			{ openDecision: "Confirm the UI" },
-		]) {
-			const checkpoint = await harness.execute({ operation: "checkpoint", status: "complete", ...outstanding });
-			expect(checkpoint.isError).toBe(true);
-			expect(checkpoint.content[0].text).toContain("complete checkpoints cannot contain");
-		}
+		await harness.execute({ operation: "set_name", name: "invalid transition" });
+		await harness.execute({ operation: "save_plan", plan: todoPlan });
+		expect((await harness.execute({ operation: "update_plan", status: "done", plan: donePlan })).isError).toBe(true);
+		await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
+		const incomplete = await harness.execute({ operation: "update_plan", status: "done", plan: activePlan });
+		expect(incomplete.isError).toBe(true);
+		expect(incomplete.content[0].text).toContain("unchecked checklist items");
 	});
 
-	it("writes a compact checkpoint without changing the immutable plan", async () => {
-		const harness = makeHarness(cwd);
-		await harness.execute({ operation: "set_name", name: "resume continuity" });
-		await harness.execute({ operation: "save_plan", plan: "# Approved plan\n\n1. Change → `npm test`" });
-		const checkpoint = await harness.execute({
-			operation: "checkpoint",
-			status: "blocked",
-			lastCompletedStep: "1. Add checkpoint storage",
-			nextAction: "Wait for the API decision",
-			remainingChecks: ["npm test", "Headless smoke"],
-			openDecision: "Choose the public field name",
-		});
-		const planPath = join(cwd, ".pi", "plans", "SI-0000-resume-continuity.md");
-		const handoffPath = join(cwd, ".pi", "handoffs", "SI-0000-resume-continuity.md");
-		expect(checkpoint.isError).toBeUndefined();
-		expect(checkpoint.details).toMatchObject({ status: "blocked", handoffPath });
-		expect(await readFile(planPath, "utf8")).toBe("# Approved plan\n\n1. Change → `npm test`\n");
-		const handoff = await readFile(handoffPath, "utf8");
-		for (const expected of [
-			"Status: blocked",
-			"Last completed plan step: 1. Add checkpoint storage",
-			"Next action: Wait for the API decision",
-			"- npm test",
-			"Open decision: Choose the public field name",
-		]) expect(handoff).toContain(expected);
+	it("rejects ambiguous lifecycle files", async () => {
+		const harness = makeHarness(cwd, { name: "SI-3-ambiguous-state" });
+		const plans = join(cwd, ".pi", "plans");
+		await mkdir(plans, { recursive: true });
+		await writeFile(join(plans, "SI-3-ambiguous-state.todo.md"), todoPlan);
+		await writeFile(join(plans, "SI-3-ambiguous-state.active.md"), activePlan);
+		const result = await harness.execute({ operation: "resume" });
+		expect(result.isError).toBe(true);
+		expect(result.content[0].text).toContain("ambiguous lifecycle state");
 	});
 
-	it("resumes an active checkpoint in a fresh matching session", async () => {
+	it("resumes current lifecycle content with fresh-approval guidance", async () => {
 		const first = makeHarness(cwd);
 		await first.execute({ operation: "set_name", name: "SI-12 resume continuity" });
-		await first.execute({ operation: "save_plan", plan: "# Approved plan" });
-		await first.execute({
-			operation: "checkpoint",
-			status: "active",
-			lastCompletedStep: "Storage",
-			nextAction: "Add resume tests",
-			remainingChecks: ["npm test"],
-		});
-
+		await first.execute({ operation: "save_plan", plan: todoPlan });
+		await first.execute({ operation: "update_plan", status: "active", plan: activePlan });
 		const resumed = makeHarness(cwd, { name: "SI-12-resume-continuity" });
 		await resumed.handlers.get("session_start")!(undefined, resumed.ctx);
 		const result = await resumed.execute({ operation: "resume" });
-		expect(result.isError).toBeUndefined();
-		expect(result.details).toMatchObject({ name: "SI-12-resume-continuity", frozen: true, status: "active" });
-		expect(result.content[0].text).toContain("Current handoff hint");
-		expect(result.content[0].text).toContain("Next action: Add resume tests");
-		expect(result.content[0].text).toContain("Current evidence wins over stale handoff text");
+		expect(result.details).toMatchObject({ status: "active", frozen: true });
+		expect(result.content[0].text).toContain("Current slice");
+		expect(result.content[0].text).toContain("obtain fresh approval");
+		expect(result.content[0].text).toContain("Current evidence wins");
 	});
 
-	it("does not expose completed handoffs as active resume state", async () => {
+	it("treats done plans as terminal on resume", async () => {
 		const harness = makeHarness(cwd);
-		await harness.execute({ operation: "set_name", name: "completed continuity" });
-		await harness.execute({ operation: "save_plan", plan: "# Approved plan" });
-		await harness.execute({
-			operation: "checkpoint",
-			status: "complete",
-			lastCompletedStep: "Final validation",
-			remainingChecks: [],
-		});
+		await harness.execute({ operation: "set_name", name: "completed goal" });
+		await harness.execute({ operation: "save_plan", plan: todoPlan });
+		await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
+		await harness.execute({ operation: "update_plan", status: "done", plan: donePlan });
 		const result = await harness.execute({ operation: "resume" });
-		expect(result.details.status).toBe("complete");
-		expect(result.content[0].text).toContain("not active resume state");
-		expect(result.content[0].text).not.toContain("Last completed plan step");
-		await expect(access(join(cwd, ".pi", "handoffs", "SI-0000-completed-continuity.md"))).resolves.toBeUndefined();
+		expect(result.details.status).toBe("done");
+		expect(result.content[0].text).toContain("lifecycle is terminal");
+		expect(result.content[0].text).not.toContain("Select one committable slice");
+	});
+
+	it("ignores legacy unsuffixed plans and handoffs", async () => {
+		const harness = makeHarness(cwd);
+		await harness.execute({ operation: "set_name", name: "legacy state" });
+		await mkdir(join(cwd, ".pi", "plans"), { recursive: true });
+		await mkdir(join(cwd, ".pi", "handoffs"), { recursive: true });
+		await writeFile(join(cwd, ".pi", "plans", "SI-0000-legacy-state.md"), "# Legacy\n");
+		await writeFile(join(cwd, ".pi", "handoffs", "SI-0000-legacy-state.md"), "# Legacy handoff\n");
+		const saved = await harness.execute({ operation: "save_plan", plan: todoPlan });
+		expect(saved.isError).toBeUndefined();
+		await expect(access(join(cwd, ".pi", "plans", "SI-0000-legacy-state.md"))).resolves.toBeUndefined();
+		await expect(access(join(cwd, ".pi", "handoffs", "SI-0000-legacy-state.md"))).resolves.toBeUndefined();
 	});
 });

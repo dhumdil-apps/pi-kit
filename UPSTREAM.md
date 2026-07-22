@@ -35,7 +35,7 @@ guidance flow — see `docs/FLOW.md`.
 
 Removed from the bundle (2026-07-20): `pi-web-access` (Nico Bailon, npm
 `0.13.0`, MIT). The bundle now brainstorms from local reasoning and repository
-context by default; deliberate `curl` use is guarded by Permission Gate. Its
+context by default; deliberate `curl` use is guarded by Minimal Action Confirmation. Its
 archived license notice remains in `LICENSES/pi-web-access-MIT.txt`.
 
 Removed from the bundle (2026-07-20): `pi-ask-user` (npm `0.13.0`, MIT).
