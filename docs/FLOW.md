@@ -68,11 +68,7 @@ Pi explores read-only and keeps the user involved without modal pressure:
   unrelated behavioral changes. Boundary-change validation covers both the
   producer and consumer, not just types or one side of the contract.
 
-When direction is clear, Pi presents the plan in conversation ending with "Proceed or revise?". `Proceed`,
-`Approved`, or `Continue` approves only when it directly answers that plan.
-`Revise`, `Refine`, or `Check` means planning continues. Pi never treats
-silence, an unrelated acknowledgement, or an earlier approval as permission to
-start implementation.
+When direction is clear, Pi presents the plan in conversation ending with "Proceed or revise?", (proceed, yes, y, continue, approved, ...) approvals are only when it directly answers that plan, anything other then a clear confirmation means planning continues. Pi never treat earlier approval as permission to start implementation.
 
 ## IMPLEMENTATION (SHAPE → POLISH)
 

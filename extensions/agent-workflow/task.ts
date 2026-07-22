@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "@sinclair/typebox";
 
-const SESSION_NAME = /^(?:SI-(\d+)-)?([a-z0-9]+(?:-[a-z0-9]+)*)$/i;
-const TICKET_ID = /\bSI-(\d+)\b/i;
+const SESSION_NAME = /^(?:([a-z0-9]+-\d+)-)?([a-z0-9]+(?:-[a-z0-9]+)*)$/i;
+const TICKET_ID = /\b([a-z0-9]+-\d+)\b/i;
 const UNCHECKED_ITEM = /^\s*[-*]\s+\[ \]/m;
 const MAX_SLUG_WORDS = 4;
 const PLAN_STATUSES = ["todo", "active", "done"] as const;
@@ -24,7 +24,7 @@ const ManageTaskParams = Type.Object({
 		Type.Literal("update_plan"),
 		Type.Literal("resume"),
 	]),
-	name: Type.Optional(Type.String({ description: "A concise 2–4 meaningful-word task summary, optionally prefixed with SI-<ticket>." })),
+	name: Type.Optional(Type.String({ description: "A concise 2–4 meaningful-word task summary, optionally prefixed with a ticket ID (e.g. TEST-1234)." })),
 	plan: Type.Optional(Type.String({ description: "The complete lifecycle-plan Markdown. Required for save_plan and update_plan." })),
 	status: Type.Optional(Type.Union([
 		Type.Literal("todo"),
@@ -50,14 +50,14 @@ interface PlanState {
 }
 
 export function normalizeTaskName(summary: string, currentName?: string): string {
-	const suppliedTicket = summary.match(TICKET_ID)?.[1];
-	const currentTicket = currentName?.match(TICKET_ID)?.[1];
+	const suppliedTicket = summary.match(TICKET_ID)?.[1]?.toUpperCase();
+	const currentTicket = currentName?.match(TICKET_ID)?.[1]?.toUpperCase();
 	const ticket = suppliedTicket ?? currentTicket;
 	const words = summary
 		.normalize("NFKD")
 		.replace(/[\u0300-\u036f]/g, "")
 		.toLowerCase()
-		.replace(/\bsi-\d+\b/g, " ")
+		.replace(/\b[a-z0-9]+-\d+\b/g, " ")
 		.replace(/[^a-z0-9]+/g, " ")
 		.trim()
 		.split(/\s+/)
@@ -66,15 +66,15 @@ export function normalizeTaskName(summary: string, currentName?: string): string
 	if (words.length === 0) words.push("task", "summary");
 	if (words.length === 1) words.push("task");
 	const slug = words.join("-");
-	return ticket ? `SI-${ticket}-${slug}` : slug;
+	return ticket ? `${ticket}-${slug}` : slug;
 }
 
 function canonicalTaskName(name: string | undefined): string | undefined {
 	const match = name?.trim().match(SESSION_NAME);
 	if (!match) return undefined;
-	const ticket = match[1];
+	const ticket = match[1]?.toUpperCase();
 	const slug = match[2].toLowerCase();
-	return ticket ? `SI-${ticket}-${slug}` : slug;
+	return ticket ? `${ticket}-${slug}` : slug;
 }
 
 function taskPlanPath(cwd: string, name: string, status: PlanStatus): string {

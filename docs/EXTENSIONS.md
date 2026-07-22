@@ -45,10 +45,9 @@ These are the settings currently exposed through `/extension-settings`:
 | Status Bar | `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width` |
 
 Status Bar defaults place
-`session-name,git-branch,agent-stats,tokens,context-usage,cpu,ram,disk,net` on
+`git-branch,session-name,agent-stats,context-usage,tokens,cpu,ram,disk,net` on
 the left and `provider,model,sub-hourly,sub-weekly` on the right. Unnamed
-sessions receive `SI-<ticket>-<feature-short-desc>` from their first goal,
-defaulting a missing ticket to `SI-0000`. The local machine overrides
+sessions receive `<short-desc>` (or `<ticket>-<short-desc>` when a ticket is supplied). The local machine overrides
 separator, placement, bar style, and width; see
 [LOCAL_SETUP.md](LOCAL_SETUP.md#active-extension-settings).
 

@@ -30,9 +30,10 @@ describe("normalizeTaskName", () => {
 	it("uses a concise two-to-four word summary without fallback ticket", () => {
 		expect(normalizeTaskName("please reimagine this dashboard resource section to make it better")).toBe("reimagine-dashboard-resource-section");
 	});
-	it("preserves a supplied or current ticket", () => {
+	it("preserves a supplied or current ticket (SI-42, TEST-1234, JIRA-567)", () => {
 		expect(normalizeTaskName("SI-42 cache recovery")).toBe("SI-42-cache-recovery");
-		expect(normalizeTaskName("dashboard polish", "SI-91-existing-task")).toBe("SI-91-dashboard-polish");
+		expect(normalizeTaskName("TEST-1234 fix login bug")).toBe("TEST-1234-fix-login-bug");
+		expect(normalizeTaskName("dashboard polish", "JIRA-567-existing-task")).toBe("JIRA-567-dashboard-polish");
 	});
 	it("pads a one-word summary", () => expect(normalizeTaskName("dashboard")).toBe("dashboard-task"));
 });
