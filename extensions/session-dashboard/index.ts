@@ -308,7 +308,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			const contextInfo = chips.join(CONTEXT_SEP);
 
 			const welcomeText = renderWelcomeText({
-				welcome: "π **Measure twice, cut once.**",
+				welcome: ">π **Measure twice, cut once.**",
 				usageChart,
 				contextInfo,
 			});
