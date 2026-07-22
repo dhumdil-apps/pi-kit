@@ -12,7 +12,7 @@ included here from that declaration.
 | Pi Usage (Powerbar dependency) | `@juanibiapina/pi-usage` | npm `0.1.0` |
 | Usage Extension | `@tmustier/pi-usage-extension` | npm `0.9.1` |
 | Manage Todo List | `tintinweb/pi-manage-todo-list` | commit `b75c449aa85ce328e9a8b632f62bf642aed40359` |
-| Simplify review logic (vendored into `skills/simplify/`) | `pi-simplify` (Matt Devy) | npm `0.2.3` |
+| Review logic (vendored into `skills/review/`; deprecated alias at `skills/simplify/`) | `pi-simplify` (Matt Devy) | npm `0.2.3` |
 
 `pi-simplify` declares MIT in its npm manifest but its tarball contains no
 separate license file; its MIT notice in `LICENSES/` is reconstructed from
@@ -22,8 +22,8 @@ Removed from the bundle (2026-07-18): `pi-add-dir` (unused), `pi-memory-md`
 (replaced briefly by a bundle-local extension, then removed in favor of an
 optional user-owned `.pi/MEMORY.md`; this also removed the `nodejieba`/
 `node-pre-gyp` vulnerable `tar` install-time exposure), and the standalone `pi-simplify` extension (its
-review logic now lives in `skills/simplify/` and runs as the `/simplify`
-skill).
+review logic now lives in `skills/review/` and runs as `/review`; `/simplify`
+remains a deprecated compatibility alias).
 
 Removed from the bundle (2026-07-19): `pi-subagents` (Nico Bailon, npm
 `0.35.0`, MIT declared in its manifest with no separate license file in the

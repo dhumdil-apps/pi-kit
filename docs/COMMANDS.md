@@ -16,12 +16,15 @@ mode and no `/plan` command — the working flow is guidance, described in
 | `/retro` | Compact review and learning pass over the current session |
 | `/forensic [raw]` | Deep reconstructed session review; `raw` includes bounded annotated evidence |
 | `/improvements` | List and revalidate deferred project improvements |
+| `/review` | Review and fix clear in-scope correctness, safety, validation, operational, and maintainability findings in the relevant diff |
+| `/simplify` | Deprecated compatibility alias for `/review` |
 
 ## User-facing tools
 
 | Tool | Owner | Purpose |
 | --- | --- | --- |
 | `manage_todo_list` | Progress Tracker | Read/write local todos independently of the workflow phase |
+| `manage_task` | Agent Workflow | Set/freeze task identity, save an immutable approved plan, and checkpoint/resume a compact cross-session handoff |
 
 ## Shell and keyboard reminders
 

@@ -22,6 +22,6 @@
 ## Git
 
 - Never push unless I ask.
-- Never commit unless I ask — with one exception: on multi-phase work, ask once at build start whether to commit each completed step; my answer governs the rest of that task. Before any step commit, run all available checks plus a review/simplify pass over the step's diff.
+- Never commit unless I ask — with one exception: on multi-phase work, ask once at build start whether to commit each completed step; my answer governs the rest of that task. Before any step commit, run all available checks plus the canonical review pass over the step's diff.
 - Commit style: short imperative subject line, no trailing period, body only when the "why" isn't obvious.
 - Never use `--force` / `reset --hard` without asking.

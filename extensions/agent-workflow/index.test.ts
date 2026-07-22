@@ -80,6 +80,38 @@ describe("agent workflow lifecycle", () => {
 		expect(prompt.systemPrompt).toContain("state the conflict and selected resolution");
 	});
 
+	it("keeps plans verifiable and resumed handoffs subordinate to current evidence", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("implementation step as change → verification");
+		expect(guidance).toContain("name the specific manual acceptance check");
+		expect(guidance).toContain("never claim the user's acceptance on their behalf");
+		expect(guidance).toContain("public interfaces, persistence, dependencies, security, or migrations");
+		expect(guidance).toContain("only when pausing, becoming blocked, or completing");
+		expect(guidance).toContain("one resume pointer, not a copy of local todos");
+		expect(guidance).toContain("Treat a resumed handoff only as a hint");
+		expect(guidance).toContain("Current evidence and user feedback always win");
+		expect(guidance).toContain("Completed handoffs are retained for diagnosis but are not active resume state");
+	});
+
+	it("uses proportional evidence and the canonical review skill", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("external dependency, integration, or new abstraction");
+		expect(guidance).toContain("explicitly choose reuse, adapt, or build");
+		expect(guidance).toContain("observable invariant that must remain true");
+		expect(guidance).toContain("verify both producer and consumer behavior");
+		expect(guidance).toContain("cheapest relevant baseline check when feasible");
+		expect(guidance).toContain("do not misattribute them to the new change");
+		expect(guidance).toContain("rank plausible hypotheses with a falsification check for each");
+		expect(guidance).toContain("verify the root cause with evidence before fixing it");
+		expect(guidance).toContain("invoke the canonical review skill");
+		expect(guidance).toContain("blocking and important findings");
+		expect(guidance).toContain("require fresh Planning approval");
+	});
+
 	it("discusses tool-output pressure only when retrospective evidence marks it material", async () => {
 		const { handlers } = harness();
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });

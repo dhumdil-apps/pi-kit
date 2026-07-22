@@ -42,9 +42,9 @@ Start with the [documentation index](docs/README.md), then use the focused guide
 - **session-dashboard** — the interactive startup ruler, project/spend panel,
   and loaded-resource map.
 - **status-bar** (+ live quota via **usage-monitor**), **usage-history**
-  (`/usage` history), **simplify** skill, bundled `dark` and `github-dark`
-  themes, and `/init` prompt. Config templates for a new machine live in
-  [`setup/`](setup/).
+  (`/usage` history), the **review** skill (`/simplify` remains a deprecated
+  alias), bundled `dark` and `github-dark` themes, and `/init` prompt. Config
+  templates for a new machine live in [`setup/`](setup/).
 
 ## Install (local path)
 

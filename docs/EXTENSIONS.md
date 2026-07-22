@@ -22,7 +22,7 @@ extension.
 
 | Resource | Location | Purpose |
 | --- | --- | --- |
-| Simplify skill | `skills/simplify/` | Pre-commit review/simplify pass over a step's diff |
+| Review skill | `skills/review/` | Evidence-based review-and-fix pass over a step or full-task diff; `/simplify` is a deprecated alias |
 | Init prompt | `prompts/init.md` | Analyze a project and propose an `AGENTS.md` |
 | Bundled themes | `themes/dark.json`, `themes/github-dark.json` | Portable bundled themes; registered by the bundle, so `"theme": "github-dark"` works with no machine-local copy |
 
@@ -57,8 +57,8 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
 
 - `pi-add-dir`: removed because it did not fit the normal workflow.
 - `pi-memory-md`: removed; project memory is an optional user-owned `.pi/MEMORY.md` file, consulted by the workflow without an extension.
-- standalone `pi-simplify`: removed; the pre-commit simplify pass now lives in
-  `skills/simplify/` as flow guidance.
+- standalone `pi-simplify`: removed; its review logic now lives in the stronger
+  `skills/review/` flow skill. `skills/simplify/` is only a deprecated alias.
 - `pi-subagents`: removed (2026-07-19). The multi-agent orchestration
   (scout/planner/worker/reviewer, later a serial explorer/coder pair) proved
   unstable — dead-looped handoffs and flaky parallel/async runs.

@@ -14,12 +14,21 @@ practice. Safety gates remain in `minimal-action-confirmation`.
   evidence.
 - `/improvements` — list and revalidate deferred improvement records.
 - `manage_task` — set a concise `SI-<ticket>-<summary>` identity after
-  exploration, refine it during Planning, or save the approved plan and freeze
-  the name. Saved names are branch-ready; the tool never changes Git branches.
+  exploration, refine it during Planning, save the approved plan and freeze the
+  name, or persist/resume one compact cross-session handoff. Saved names are
+  branch-ready; the tool never changes Git branches.
 
 Approved repository plans are created once at `.pi/plans/<task-name>.md` and
 are never overwritten. Frozen task identity is recovered from session history
 or the matching plan on resume.
+
+Optional handoffs live at `.pi/handoffs/<task-name>.md`. A checkpoint records
+only status, the last completed plan step, the next action, remaining checks,
+and one open decision; it is written only when pausing, blocked, or complete and
+never mirrors local todos. `manage_task` with `operation=resume` returns the
+immutable plan plus an active/blocked handoff and requires comparison with the
+current request, Git state, diff, and validation evidence. Completed handoffs
+remain local for diagnosis but are not returned as active resume state.
 
 The extension also injects bounded current-session evidence for the reflection
 commands. That evidence measures session-lifetime tool-result text characters,

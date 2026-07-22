@@ -22,6 +22,9 @@ Pi explores read-only and keeps the user involved without modal pressure:
 - Identify the owning repository and inspect status plus relevant uncommitted
   changes before planning edits. Preserve prior work and surface conflicts with
   earlier decisions instead of silently absorbing or overwriting them.
+- Before adding an external dependency, integration, or new abstraction, check
+  repository and primary-documentation prior art and explicitly choose reuse,
+  adapt, or build. Routine changes do not acquire a mandatory research stage.
 - Ask related questions in conversational batches of two or three.
 - Give lettered options and keep the recommended answer at **A**.
 - Accept compact replies such as `1A 2C 3B` or normal prose.
@@ -37,6 +40,15 @@ Pi explores read-only and keeps the user involved without modal pressure:
   relevant ones explicitly: states and transitions, boundaries, timing,
   lifecycle and recovery, failure modes, accessibility or fallbacks, external
   interactions, and validation. Do not add irrelevant dimensions mechanically.
+- Express implementation steps as **change → verification**, preferring a
+  runnable command and otherwise naming a concrete manual acceptance check.
+  Separate mechanical verification from human acceptance for subjective or
+  interactive behavior. For changes to public interfaces, persistence,
+  dependencies, security, or migrations, add a concise callers/contracts and
+  blast-radius note; skip it for routine changes.
+- Refactor plans name the observable invariant that must remain true and exclude
+  unrelated behavioral changes. Boundary-change validation covers both the
+  producer and consumer, not just types or one side of the contract.
 
 When direction is clear, Pi presents the plan in conversation. `Proceed`,
 `Approved`, or `Continue` approves only when it directly answers that plan.
@@ -49,10 +61,26 @@ start implementation.
 After explicit approval, Pi saves repository implementation plans once at
 `.pi/plans/<task-name>.md`; this freezes the task identity across resume. The
 name can be used for a branch, but Pi does not create or switch branches unless
-asked. Pi then shapes the change, validates it, and polishes the result. The separate local todo list can track ordinary work while the global
-phase route stays on IMPLEMENTATION. Polish includes the full diff, tests, simplification,
-follow-up learnings, and documentation—not just a final review. Pushes still
-require an explicit request.
+asked. Before changing existing behavior, Pi runs the cheapest relevant baseline
+check when feasible and records pre-existing failures separately. For bugs, it
+reproduces, isolates, ranks hypotheses with falsification checks, and verifies
+the root cause before fixing it. Pi then shapes the change, validates it, and
+polishes the result. The separate local todo list can track ordinary work while
+the global phase route stays on IMPLEMENTATION. Polish invokes the canonical
+`review` skill on the full relevant diff, fixes clear in-scope blocking and
+important findings, reruns affected checks, and includes follow-up learning and
+documentation. Findings that change the approved outcome return to Planning for
+fresh approval. Pushes still require an explicit request.
+
+For a saved-plan task that pauses, becomes blocked, or completes, Pi may write
+one compact `.pi/handoffs/<task-name>.md` checkpoint through `manage_task`. It
+stores the status, last completed plan step, next action, remaining checks, and
+at most one open decision; it does not duplicate local todos. On a later
+matching session, `manage_task` `resume` returns the immutable plan and only an
+active/blocked handoff. Pi must compare that hint with the current request,
+`git status --short`, relevant diffs, and validation results before continuing.
+Completed handoffs are retained locally for diagnosis but are not active resume
+state.
 
 When Flash is off, ordinary IMPLEMENTATION feedback invalidates the earlier approval
 whenever it changes or challenges the approved outcome, requirements,
