@@ -4,24 +4,20 @@ Use this page as the navigation map for the `pi-kit` package and development rep
 
 ## Consumer & User Guides
 
-| Goal | Document |
-| --- | --- |
-| Installation, setup, & verification | [Install & Setup](../README.md#quick-start) |
-| Catalog of extensions, skills, & themes | [Extension & Resource Catalog](EXTENSIONS.md) |
-| Workflow, Flash mode, & safety gates | [The Working Flow](FLOW.md) |
-| Quick reference for commands & tools | [Commands & Tools](COMMANDS.md) |
-| Troubleshooting & diagnostic steps | [Troubleshooting](TROUBLESHOOTING.md) |
+- **[Install & Setup](../README.md#quick-start)** — Installation, setup, & verification
+- **[Extension & Resource Catalog](EXTENSIONS.md)** — Catalog of extensions, skills, & themes
+- **[The Working Flow](FLOW.md)** — Workflow, Flash mode, & safety gates
+- **[Commands & Tools](COMMANDS.md)** — Quick reference for commands & tools
+- **[Troubleshooting](TROUBLESHOOTING.md)** — Troubleshooting & diagnostic steps
 
 ## Maintainer & Developer Guides
 
-| Goal | Document |
-| --- | --- |
-| Local development, testing, & release | [Development & Maintenance](DEVELOPMENT.md) |
-| Upstream snapshots & license notices | [Upstream Inventory](../UPSTREAM.md) |
+- **[Development & Maintenance](DEVELOPMENT.md)** — Local development, testing, & release
+- **[Upstream Inventory](../UPSTREAM.md)** — Upstream snapshots & license notices
 
 ## Source-of-Truth Boundaries
 
 - **Git Repository**: Source for extensions, skills, prompts, themes, tests, and documentation.
 - **`~/.pi/agent/settings.json`**: Machine-local source for selected model, theme, and package source.
 - **`~/.pi/agent/settings-extensions.json`**: Global extension preferences configured via `/extension-settings`.
-- **Project Files**: User-owned `.pi/MEMORY.md`, project task plans, and local configuration.
+- **Project Files**: User-owned `.pi/MEMORY.md`, goals, and local configuration.

@@ -6,16 +6,14 @@ maintains a segment store, and renders three semantic rows with independent
 left/right alignment: identity, session/context, and system/quota. Producer
 sub-extensions each emit one or more segments:
 
-| Producer | Segment |
-| --- | --- |
-| `src/powerbar-session/` | `session-name` (mandatory ticket ID + short feature description) |
-| `src/powerbar-git/` | `git-branch` (+ dirty marker) |
-| `src/powerbar-model/` | `model` (name + thinking level) |
-| `src/powerbar-provider/` | `provider` |
-| `src/powerbar-tokens/` | `tokens`, `agent-stats` |
-| `src/powerbar-context/` | `context-usage` |
-| `src/powerbar-sub/` | `sub-hourly`, `sub-weekly` (from Usage Monitor events) |
-| `src/powerbar-os/` | `cpu`, `ram`, `disk`/SSD, `net` |
+- **`src/powerbar-session/`** — `session-name` (mandatory ticket ID + short feature description)
+- **`src/powerbar-git/`** — `git-branch` (+ dirty marker)
+- **`src/powerbar-model/`** — `model` (name + thinking level)
+- **`src/powerbar-provider/`** — `provider`
+- **`src/powerbar-tokens/`** — `tokens`, `agent-stats`
+- **`src/powerbar-context/`** — `context-usage`
+- **`src/powerbar-sub/`** — `sub-hourly`, `sub-weekly` (from Usage Monitor events)
+- **`src/powerbar-os/`** — `cpu`, `ram`, `disk`/SSD, `net`
 
 The Agent Workflow extension registers a transient `flash` segment. It renders
 `⚡ flash` only while Flash mode is active and does not need a configured slot.

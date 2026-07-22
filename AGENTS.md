@@ -9,6 +9,7 @@ Vendored Pi package repository. Active code lives under `extensions/` and `skill
 - **Task Start**: Read `.pi/MEMORY.md` when present in the target project before modifying code.
 - **Task Planning**: Follow [`docs/FLOW.md`](docs/FLOW.md) for conversational question batching and explicit plan approval.
 - **Commit Discipline**: Never commit or stash automatically. After completing a verified slice, inspect `git status` and propose a ready-to-use commit message.
+- **Documentation Style**: Avoid using markdown tables in `.md` files; prefer simple lists for better readability and cleaner diffs.
 
 ## Extension Architecture Rules
 

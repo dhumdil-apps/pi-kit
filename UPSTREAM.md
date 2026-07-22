@@ -3,14 +3,12 @@
 This repository vendors the following MIT-licensed Pi resources. Original license
 notices for vendored components are consolidated below under [Upstream License Notices](#upstream-license-notices).
 
-| Component | Upstream | Snapshot |
-| --- | --- | --- |
-| Extension Settings | `@juanibiapina/pi-extension-settings` | npm `0.8.0` |
-| Powerbar | `@juanibiapina/pi-powerbar` | npm `0.12.0` |
-| Pi Usage (Powerbar dependency) | `@juanibiapina/pi-usage` | npm `0.1.0` |
-| Usage Extension | `@tmustier/pi-usage-extension` | npm `0.9.1` |
-| Manage Todo List | `tintinweb/pi-manage-todo-list` | commit `b75c449aa85ce328e9a8b632f62bf642aed40359` |
-| Simplify review logic (vendored into `skills/simplify/`) | `pi-simplify` (Matt Devy) | npm `0.2.3` |
+- **Extension Settings** (`@juanibiapina/pi-extension-settings`) — npm `0.8.0`
+- **Powerbar** (`@juanibiapina/pi-powerbar`) — npm `0.12.0`
+- **Pi Usage (Powerbar dependency)** (`@juanibiapina/pi-usage`) — npm `0.1.0`
+- **Usage Extension** (`@tmustier/pi-usage-extension`) — npm `0.9.1`
+- **Manage Todo List** (`tintinweb/pi-manage-todo-list`) — commit `b75c449aa85ce328e9a8b632f62bf642aed40359`
+- **Simplify review logic** (vendored into `skills/simplify/`) — `pi-simplify` (Matt Devy), npm `0.2.3`
 
 Removed from the bundle (2026-07-18): `pi-add-dir` (unused), `pi-memory-md`
 (replaced briefly by a bundle-local extension, then removed in favor of an

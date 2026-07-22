@@ -6,26 +6,22 @@ extension.
 
 ## Active extensions
 
-| Extension | Purpose | User surface | Default decision |
-| --- | --- | --- | --- |
-| Extension Preferences | One global UI for registered extension settings | `/extension-settings` | Keep; settings are global and string-backed |
-| Interrupt Confirmation | Confirms interrupt keys before stopping a running agent | Red confirmation overlay | Always on in interactive TUI sessions |
-| Status Bar | Footer/status composition | configured through `/extension-settings` | On |
-| Usage Monitor | Live provider quota data for Status Bar | Status Bar segments | On |
-| Usage History | Historical token/cost reporting | `/usage` | On |
-| Progress Tracker | Global workflow route plus separate local todo widget | `manage_todo_list`, `/todos` | On |
-| Session Dashboard | Pi-glyph welcome, This-Week spend chart, and project-context line | Interactive startup message | Interactive parent sessions only |
-| Agent Workflow | Conversational workflow, Flash mode, and session learning | `/flash`, `/forensic` | On; see [FLOW.md](FLOW.md) |
-| Minimal Action Confirmation | Confirmation for destructive commands, outside-project writes, `curl`/web access, vendored-code reads, and recursive search/list rooted outside the project | Built-in Pi dialog | On; deliberately not a general approval gate |
+- **Extension Preferences** — One global UI for registered extension settings (`/extension-settings`)
+- **Interrupt Confirmation** — Confirms interrupt keys before stopping a running agent (Red confirmation overlay)
+- **Status Bar** — Footer/status composition (Configured through `/extension-settings`)
+- **Usage Monitor** — Live provider quota data for Status Bar
+- **Usage History** — Historical token/cost reporting (`/usage`)
+- **Progress Tracker** — Global workflow route plus separate local todo widget (`manage_todo_list`, `/todos`)
+- **Session Dashboard** — Pi-glyph welcome, This-Week spend chart, and project-context line
+- **Agent Workflow** — Conversational workflow, Flash mode, and session learning (`/flash`, `/forensic`; see [FLOW.md](FLOW.md))
+- **Minimal Action Confirmation** — Confirmation for destructive commands, outside-project writes, `curl`/web access, vendored-code reads, and recursive search/list rooted outside the project
 
 ## Supporting resources
 
-| Resource | Location | Purpose |
-| --- | --- | --- |
-| Review skill | `skills/review/` | Risk-adaptive, evidence-based correctness review that invokes the separate simplify pass once |
-| Simplify skill | `skills/simplify/` | Focused removal and clarification pass that does not change approved behavior |
-| Init prompt | `prompts/init.md` | Analyze a project and propose an `AGENTS.md` |
-| Bundled themes | `themes/dark.json`, `themes/github-dark.json` | Portable bundled themes; registered by the bundle, so `"theme": "github-dark"` works with no machine-local copy |
+- **Review skill** (`skills/review/`) — Risk-adaptive, evidence-based correctness review that invokes the separate simplify pass once
+- **Simplify skill** (`skills/simplify/`) — Focused removal and clarification pass that does not change approved behavior
+- **Init prompt** (`prompts/init.md`) — Analyze a project and propose an `AGENTS.md`
+- **Bundled themes** (`themes/dark.json`, `themes/github-dark.json`) — Portable bundled themes (`"theme": "github-dark"`)
 
 ## Single-agent policy
 
@@ -39,10 +35,8 @@ tool or child-process delegation.
 
 These are the settings currently exposed through `/extension-settings`:
 
-| Extension | Keys |
-| --- | --- |
-| Minimal Action Confirmation | `enabled` |
-| Status Bar | `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width` |
+- **Minimal Action Confirmation** — `enabled`
+- **Status Bar** — `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width`
 
 Status Bar defaults place
 `git-branch,session-name,agent-stats,context-usage,tokens,cpu,ram,disk,net` on
