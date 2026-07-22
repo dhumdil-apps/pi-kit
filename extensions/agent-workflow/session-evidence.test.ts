@@ -100,7 +100,7 @@ describe("buildSessionEvidence", () => {
 	});
 
 	it("keeps the newest entries and drops the oldest when truncating, not the reverse", () => {
-		// This evidence exists to answer "what just happened" for /retro and
+		// This evidence exists to answer "what just happened" for
 		// /forensic — dropping the most recent activity to keep ancient history
 		// would defeat the point.
 		const evidence = buildSessionEvidence(

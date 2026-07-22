@@ -18,9 +18,7 @@ export const HELP_COMMANDS: HelpEntry[] = [
 	{ name: "/todos", description: "Toggle the todo widget (`/todos clear` resets it)." },
 	{ name: "/extension-settings", description: "Configure any extension's settings." },
 	{ name: "/flash", description: "Run the current task autonomously with the recommended choices." },
-	{ name: "/retro", description: "Review and learn from the current session." },
 	{ name: "/forensic", description: "Deep current-session retrospective (`/forensic raw` for the timeline)." },
-	{ name: "/improvements", description: "Review deferred project improvements from `.pi/improvements`." },
 	{ name: "/init", description: "Analyze the repo and create or improve its AGENTS.md." },
 ];
 

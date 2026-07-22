@@ -190,7 +190,7 @@ export function buildSessionEvidence(
 	if (full.length <= maxCharacters) return full;
 
 	// Keep the newest entries, not the oldest: this evidence exists to answer
-	// "what just happened" for /retro and /forensic, so truncating from the
+	// "what just happened" for /forensic, so truncating from the
 	// end (dropping recent activity, keeping ancient history) is backwards.
 	const body = lines.join("\n");
 	const notice = "[earlier evidence omitted; report this limitation.]";

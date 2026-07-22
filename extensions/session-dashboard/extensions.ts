@@ -41,7 +41,7 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 	{
 		name: "agent-workflow",
 		group: "workflow",
-		description: "Guides the planning workflow with plan persistence; Flash, retrospectives, and improvements.",
+		description: "Guides the planning workflow with plan persistence; Flash, forensic reviews, and project memory.",
 	},
 	{
 		name: "progress-tracker",

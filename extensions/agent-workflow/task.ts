@@ -78,7 +78,7 @@ function canonicalTaskName(name: string | undefined): string | undefined {
 }
 
 function taskPlanPath(cwd: string, name: string, status: PlanStatus): string {
-	return join(cwd, CONFIG_DIR_NAME, "plans", `${name}.${status}.md`);
+	return join(cwd, CONFIG_DIR_NAME, "goal", `${name}.${status}.md`);
 }
 
 function findPlanStates(cwd: string, name: string): PlanState[] {
@@ -164,7 +164,7 @@ export function registerTaskManagement(pi: ExtensionAPI): void {
 				if (validationError) return taskError(params.operation, name, validationError);
 				const path = taskPlanPath(ctx.cwd, name, "todo");
 				try {
-					await mkdir(join(ctx.cwd, CONFIG_DIR_NAME, "plans"), { recursive: true });
+					await mkdir(join(ctx.cwd, CONFIG_DIR_NAME, "goal"), { recursive: true });
 					await writeFile(path, `${plan.trim()}\n`, { encoding: "utf8", flag: "wx" });
 				} catch (error) {
 					return taskError(params.operation, name, `could not save plan: ${(error as Error).message}`);

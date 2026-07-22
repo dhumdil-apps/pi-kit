@@ -3,7 +3,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import type { GraphModel } from "../usage-history/graph.js";
 import { TOTAL_SERIES_KEY } from "../usage-history/graph.js";
-import sessionDashboardExtension, { tildify, UsageChartCard } from "./index.js";
+import sessionDashboardExtension, { contextFileList, tildify, UsageChartCard } from "./index.js";
 
 describe("tildify", () => {
 	it("tildifies a path under the home directory", () => {
@@ -99,5 +99,10 @@ describe("session dashboard startup", () => {
 			expect.anything(),
 		);
 		expect(setWidget).toHaveBeenLastCalledWith("session-dashboard-loading", undefined);
+	});
+
+	it("formats context files cleanly", () => {
+		const files = contextFileList(process.cwd());
+		expect(Array.isArray(files)).toBe(true);
 	});
 });

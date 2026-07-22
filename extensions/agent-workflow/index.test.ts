@@ -59,11 +59,10 @@ describe("agent workflow lifecycle", () => {
 
 	it("injects bounded session evidence for reflection commands", async () => {
 		const { handlers, commands, messages } = harness();
+		expect(commands.has("retro")).toBe(false);
+		expect(commands.has("improvements")).toBe(false);
 		expect(handlers.has("tool_result")).toBe(false);
 		const ctx = { sessionManager: { getBranch: () => [] } };
-		await commands.get("retro")!.handler("", ctx);
-		expect(messages.at(-1)).toContain("[workflow-command:retro]");
-		expect(messages.at(-1)).toContain("<session_evidence>");
 		await commands.get("forensic")!.handler("raw", ctx);
 		expect(messages.at(-1)).toContain("[workflow-command:forensic:raw]");
 		expect(messages.at(-1)).toContain('raw="true"');
@@ -135,6 +134,18 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("one concrete bounded-output adjustment");
 		expect(guidance).toContain("Otherwise omit tool-output efficiency");
 		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
+	});
+
+	it("includes close-out guidance and ask-first memory policy", async () => {
+		const { handlers } = harness();
+		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
+		expect(guidance).toContain("Close out implementation with a concise outcome summary");
+		expect(guidance).toContain("List follow-ups or next steps only when genuine ones exist");
+		expect(guidance).toContain("Never update project memory unprompted");
+		expect(guidance).toContain("apply them only after the user confirms");
+		expect(guidance).toContain("treat project memory as temporary fallback state");
+		expect(guidance).toContain("fixed at the root cause");
 	});
 
 	it("requires fresh approval for any substantive IMPLEMENTATION feedback", async () => {

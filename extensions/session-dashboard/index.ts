@@ -165,11 +165,21 @@ function loadBundleResources(): BundleResources {
 }
 
 /** Context files exactly as pi core discovers them, formatted for display. */
-function contextFileList(cwd: string): string[] {
+export function contextFileList(cwd: string): string[] {
 	try {
 		return loadProjectContextFiles({ cwd, agentDir: getAgentDir() }).map((f) => {
 			const inProject = f.path.startsWith(`${cwd}/`);
-			return inProject ? `./${f.path.slice(cwd.length + 1)}` : tildify(f.path);
+			const displayPath = inProject ? `./${f.path.slice(cwd.length + 1)}` : tildify(f.path);
+			if (displayPath.endsWith("MEMORY.md")) {
+				try {
+					const content = readFileSync(f.path, "utf8");
+					const lines = content.split("\n").filter((line) => line.trim().length > 0).length;
+					return `${displayPath} (${lines} line${lines === 1 ? "" : "s"} · workarounds)`;
+				} catch {
+					return displayPath;
+				}
+			}
+			return displayPath;
 		});
 	} catch {
 		return [];

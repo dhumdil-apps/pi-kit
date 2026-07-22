@@ -48,7 +48,7 @@ describe("task lifecycle plans", () => {
 		await harness.execute({ operation: "set_name", name: "dashboard resources" });
 		await harness.execute({ operation: "set_name", name: "SI-7 dashboard polish" });
 		const saved = await harness.execute({ operation: "save_plan", plan: todoPlan });
-		const path = join(cwd, ".pi", "plans", "SI-7-dashboard-polish.todo.md");
+		const path = join(cwd, ".pi", "goal", "SI-7-dashboard-polish.todo.md");
 		expect(saved.details).toMatchObject({ status: "todo", path, frozen: true });
 		expect(await readFile(path, "utf8")).toBe(todoPlan);
 		expect((await harness.execute({ operation: "set_name", name: "other work" })).isError).toBe(true);
@@ -76,7 +76,7 @@ describe("task lifecycle plans", () => {
 		await harness.execute({ operation: "save_plan", plan: todoPlan });
 		const active = await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
 		expect(active.details.path).toMatch(/\.active\.md$/);
-		await expect(access(join(cwd, ".pi", "plans", "SI-0000-slice-lifecycle.todo.md"))).rejects.toThrow();
+		await expect(access(join(cwd, ".pi", "goal", "SI-0000-slice-lifecycle.todo.md"))).rejects.toThrow();
 		const queued = await harness.execute({ operation: "update_plan", status: "todo", plan: todoPlan });
 		expect(queued.details.path).toMatch(/\.todo\.md$/);
 		await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
@@ -109,7 +109,7 @@ describe("task lifecycle plans", () => {
 
 	it("rejects ambiguous lifecycle files", async () => {
 		const harness = makeHarness(cwd, { name: "SI-3-ambiguous-state" });
-		const plans = join(cwd, ".pi", "plans");
+		const plans = join(cwd, ".pi", "goal");
 		await mkdir(plans, { recursive: true });
 		await writeFile(join(plans, "SI-3-ambiguous-state.todo.md"), todoPlan);
 		await writeFile(join(plans, "SI-3-ambiguous-state.active.md"), activePlan);
@@ -147,13 +147,13 @@ describe("task lifecycle plans", () => {
 	it("ignores legacy unsuffixed plans and handoffs", async () => {
 		const harness = makeHarness(cwd);
 		await harness.execute({ operation: "set_name", name: "legacy state" });
-		await mkdir(join(cwd, ".pi", "plans"), { recursive: true });
+		await mkdir(join(cwd, ".pi", "goal"), { recursive: true });
 		await mkdir(join(cwd, ".pi", "handoffs"), { recursive: true });
-		await writeFile(join(cwd, ".pi", "plans", "SI-0000-legacy-state.md"), "# Legacy\n");
+		await writeFile(join(cwd, ".pi", "goal", "SI-0000-legacy-state.md"), "# Legacy\n");
 		await writeFile(join(cwd, ".pi", "handoffs", "SI-0000-legacy-state.md"), "# Legacy handoff\n");
 		const saved = await harness.execute({ operation: "save_plan", plan: todoPlan });
 		expect(saved.isError).toBeUndefined();
-		await expect(access(join(cwd, ".pi", "plans", "SI-0000-legacy-state.md"))).resolves.toBeUndefined();
+		await expect(access(join(cwd, ".pi", "goal", "SI-0000-legacy-state.md"))).resolves.toBeUndefined();
 		await expect(access(join(cwd, ".pi", "handoffs", "SI-0000-legacy-state.md"))).resolves.toBeUndefined();
 	});
 });

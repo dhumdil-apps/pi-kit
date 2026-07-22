@@ -46,7 +46,7 @@ error as a regression or compatibility issue to fix.
 
 - Project memory is an optional user-owned `.pi/MEMORY.md` file.
 - The workflow checks for and reads it at the start of every task when present.
-- Only explicit `/retro` and `/forensic` reflection may maintain it. Those
-  commands preserve manual content while deduplicating or replacing stale
-  durable lessons.
+- Project memory is maintained with user confirmation during implementation close-out
+  or via `/forensic`. Those steps preserve manual content while deduplicating or
+  replacing stale durable lessons.
 - `.pi/` is ignored by default; projects may customize that Git policy.

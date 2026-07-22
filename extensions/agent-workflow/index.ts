@@ -25,8 +25,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     At task start set progress with manage_todo_list operation=phase phase=goal.
 
     PLANNING is the read-only learning and planning phase:
-    - Resolve project memory exactly as <session-cwd>/.pi/MEMORY.md. Repeated .pi path
-      components are valid; never collapse them. Check optional files exist before read.
+    - Read project .pi/MEMORY.md when present at task start.
     - For repository work, identify the owning repository, run git status --short, and
       inspect relevant diffs before planning. Classify uncommitted work: matching the
       requested goal is a continuation to revalidate; separate completed work must be
@@ -91,7 +90,13 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     slice. Update the active plan with verification evidence and concise session notes. After
     a validated slice, use status=todo when unchecked slices remain or status=done when all
     slices and final validation are complete. If interrupted, leave status=active with the
-    latest evidence. Do not create a separate handoff.
+    latest evidence. Do not create a separate handoff. Close out implementation with a
+    concise outcome summary and honest verification results. List follow-ups or next steps
+    only when genuine ones exist. When a durable takeaway surfaces, propose recording it in
+    .pi/MEMORY.md and ask first — treat project memory as temporary fallback state, keeping it
+    minimal and cleaning up entries once fixed at the root cause in code or AGENTS.md. Never update
+    project memory unprompted, and skip the question on routine tasks. A one-off event is not
+    durable; only a recurring pattern or one confirmed by the user is durable.
 
     When Flash is off, ordinary user feedback during IMPLEMENTATION invalidates prior implementation
     approval whenever it changes or challenges the approved outcome, requirements,
@@ -123,34 +128,24 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
     visible trace before continuing; do not pause for ordinary confirmation.
   </flash>
 
-  <retrospectives>
-    A [workflow-command:retro] request reviews the current session evidence, produces a
-    compact scorecard (outcome, decisions, errors, retries, friction, validation gaps,
-    usage), then asks 2-3 conversational follow-up questions before finalizing lessons.
+  <reflection>
     A [workflow-command:forensic] request reconstructs a causal timeline with evidence;
     raw mode additionally annotates the supplied raw timeline and reports truncation.
     The evidence includes session-lifetime tool-output measurements in text characters,
     not tokens or current context occupancy. Only when tool_output_metrics material=true,
     include one concise finding naming the dominant tool and one concrete bounded-output
     adjustment. Otherwise omit tool-output efficiency from the visible retrospective.
-    Never turn a single large result into project memory or a deferred improvement;
+    Never turn a single large result into project memory;
     only a recurring pattern or one confirmed by the user is durable.
-    During retro/forensic only, maintain .pi/MEMORY.md: preserve valid manual content,
-    deduplicate, replace stale guidance, and store only concise durable knowledge — never
-    secrets, raw transcripts, or temporary status. Create or merge every actionable finding
-    at .pi/improvements/<slug>.md with status, priority, source session, problem, evidence,
-    and proposed fix. Archive resolved/rejected items under .pi/improvements/archive/ with
-    resolution and validation. Finish with a concise lesson and created/updated paths; do
-    not pressure the user to address them now.
-
-    [workflow-command:improvements] lists open items, lets the user choose one, revalidates
-    it against current code, and takes it through normal Planning and approval before Implementation.
-  </retrospectives>
+    At implementation close-out or during /forensic, propose concise .pi/MEMORY.md updates
+    and apply them only after the user confirms. Treat project memory as a temporary fallback for
+    unaddressed takeaways: keep it minimal, and clean up entries once fixed at the root cause.
+  </reflection>
 
   <project_state>
     When first creating project .pi state, add .pi/ to the root .gitignore by default.
     Respect projects that deliberately track or customize .pi; never commit it automatically.
-    Lifecycle plans live at .pi/plans/<task-name>.<status>.md and survive restarts: todo waits
+    Lifecycle plans live at .pi/goal/<task-name>.<status>.md and survive restarts: todo waits
     for its next slice, active records the one approved slice underway, and done means every
     checklist item and final validation completed. The plan holds the goal, big picture,
     durable decisions, committable checklist, current slice when active, verification evidence,
@@ -182,8 +177,7 @@ const AGENT_WORKFLOW_PROMPT = `<pi_workflow>
       user review and commit; stashing always requires explicit user authorization.
       Follow the repository's commit convention; when none exists, use a short imperative
       subject without a trailing period.
-    - Final normal task responses include a brief reminder: /retro reflects on this session;
-      /forensic performs the deep review. Do not add that reminder recursively to retros.
+    - When a session encounters notable friction worth a causal review, point to /forensic as the deep review path.
   </engineering>
 </pi_workflow>`;
 
@@ -232,27 +226,12 @@ export default function createExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	pi.registerCommand("retro", {
-		description: "Review and learn from the current session",
-		handler: async (_args, ctx) => {
-			const evidence = buildSessionEvidence(ctx.sessionManager.getBranch());
-			pi.sendUserMessage(`[workflow-command:retro]\nReview this current session. Use the evidence packet below, then follow the retrospective protocol.\n\n<session_evidence>\n${evidence}\n</session_evidence>`);
-		},
-	});
-
 	pi.registerCommand("forensic", {
 		description: "Perform a deep current-session retrospective (/forensic raw for raw timeline)",
 		handler: async (args, ctx) => {
 			const raw = args.trim().toLowerCase() === "raw";
 			const evidence = buildSessionEvidence(ctx.sessionManager.getBranch(), { raw });
 			pi.sendUserMessage(`[workflow-command:forensic${raw ? ":raw" : ""}]\nPerform a deep forensic review of this current session. Reconstruct cause and effect, cite the supplied events, and follow the forensic protocol.\n\n<session_evidence raw="${raw}">\n${evidence}\n</session_evidence>`);
-		},
-	});
-
-	pi.registerCommand("improvements", {
-		description: "Review deferred project improvements",
-		handler: async () => {
-			pi.sendUserMessage("[workflow-command:improvements] Inspect .pi/improvements for open items, summarize them concisely, and help me choose one. Revalidate the selected item against current code before planning implementation.");
 		},
 	});
 }

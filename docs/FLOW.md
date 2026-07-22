@@ -73,7 +73,7 @@ When direction is clear, Pi presents the plan in conversation ending with "Proce
 ## IMPLEMENTATION
 
 After explicit approval, Pi saves the big picture and checklist at
-`.pi/plans/<task-name>.todo.md`, then activates the single approved slice by
+`.pi/goal/<task-name>.todo.md`, then activates the single approved slice by
 renaming it to `<task-name>.active.md`; this freezes the task identity. The name
 can be used for a branch, but Pi does not create or switch branches unless asked.
 Before changing existing behavior, Pi runs the cheapest relevant baseline
@@ -130,24 +130,22 @@ instead of stopping for routine input and continues through completion.
 
 ## Reflection and durable learning
 
-- `/retro` reviews the current session compactly and ends with a `/forensic`
-  reminder.
-- `/forensic` reconstructs a deeper current-session timeline.
-- `/forensic raw` includes bounded, annotated raw evidence.
-- `/improvements` lists and revalidates deferred project improvements.
+- Implementation close-out naturally concludes every task with a concise outcome
+  summary, verification results, optional genuine follow-ups, and — when a durable,
+  non-obvious lesson surfaced — an offer to record it.
+- `/forensic` performs a deep current-session review with a causal timeline and
+  evidence citations (`/forensic raw` includes bounded raw evidence).
 
-Reflection evidence measures tool-result text characters on demand while it
-already traverses the in-memory session branch. It stores no additional state
-and produces no live alerts. `/retro` and `/forensic` mention output efficiency
-only when a result is materially large or one tool materially dominates the
-session, and a one-off result is not durable project memory by itself.
+Forensic evidence measures tool-result text characters on demand while traversing
+the in-memory session branch. It stores no additional state and produces no live
+alerts. Implementation close-out and `/forensic` mention output efficiency only when a
+result is materially large or one tool materially dominates the session, and a
+one-off result is not durable project memory by itself.
 
-Only `/retro` and `/forensic` may maintain `.pi/MEMORY.md`. They write concise,
-durable, deduplicated lessons, replace stale contradictions, and preserve manual
-content. Actionable deferred findings go to `.pi/improvements/<slug>.md` with
-status, priority, source, problem, evidence, and fix; completed or rejected
-items are archived. Project `.pi/` state is local by default, and each project
-may choose a different Git policy.
+Project memory (`.pi/MEMORY.md`) is a temporary fallback for unaddressed takeaways (keep
+it minimal and clean up entries once fixed at the root cause in code or `AGENTS.md`). Updates
+are proposed at task close-out or during `/forensic` and applied only after user confirmation.
+Project `.pi/` state is local by default, and each project may choose a different Git policy.
 
 ## Safety confirmations
 
