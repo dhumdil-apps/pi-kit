@@ -1,75 +1,63 @@
 # pi-kit
 
-Guidance over rules.
+> π Measure twice, cut once.
 
 A single, vendored [Pi](https://pi.dev) package maintained by `dhumdil-apps`.
-It includes the active extensions and skills previously installed as separate
-packages.
+It bundles productivity extensions, workflow automation, status indicators, and skills into one cohesive toolkit for your Pi coding sessions.
 
-## Documentation
+## Quick Start
 
-Start with the [documentation index](docs/README.md), then use the focused guide:
+### Prerequisites
 
-- [Clean-machine setup](docs/SETUP.md)
-- [Extension and resource catalog](docs/EXTENSIONS.md)
-- [The working flow](docs/FLOW.md)
-- [Commands and tools](docs/COMMANDS.md)
-- [Development and maintenance](docs/DEVELOPMENT.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-- [Vendored upstream inventory](UPSTREAM.md)
+- Node LTS + npm and Git.
+- Install Pi CLI: `npm install -g @earendil-works/pi` (see [pi.dev](https://pi.dev) for details).
 
-## Features
+### Installation
 
-- **agent-workflow** — the visible **GOAL (VISION) → PLANNING (DISCOVER) →
-  IMPLEMENTATION (SHAPE → POLISH)** flow, conversational question batches and plan
-  approval, `/flash` cruise control, and `/retro`, `/forensic`, and
-  `/improvements` learning commands. See
-  [docs/FLOW.md](docs/FLOW.md).
-- **minimal-action-confirmation** — the enforced guardrails: destructive commands, writes
-  outside the project, web access (`curl` plus any externally supplied web
-  tools), reads into vendored code (`node_modules`, `vendor`,
-  `.venv`), and recursive search/list (`find`, `grep -r`, `rg`, `tree`,
-  `ls -R`) rooted outside the project. Every gate confirms on every call through
-  Pi's built-in Proceed/Deny/Deny-with-guidance dialog—no session or per-kind
-  approval.
-- **project memory** — optional, user-owned `.pi/MEMORY.md`. The workflow reads
-  it at task start; only explicit `/retro` and `/forensic` reflection may
-  maintain concise, durable, deduplicated lessons.
-- **progress-tracker** — a global GOAL → PLANNING → IMPLEMENTATION route,
-  shown after the first prompt or `/todos`; local todos remain independent and
-  `/todos` toggles their separate widget.
-- **session-dashboard** — the interactive Pi-glyph welcome, This-Week spend chart,
-  and concise project-context line.
-- **status-bar** (+ live quota via **usage-monitor**), **usage-history**
-  (`/usage` history), separate **review** and **simplify** skills, bundled `dark`
-  and `github-dark` themes, and `/init` prompt.
-
-## Install
-
-Consumers install the public Git package and let Pi manage its runtime copy:
+Install the package directly into Pi:
 
 ```bash
 pi install https://github.com/dhumdil-apps/pi-kit
 ```
 
-Refresh it after a release with `pi update --extensions`. For a fresh machine,
-follow [docs/SETUP.md](docs/SETUP.md).
-
-Maintainers use a separate editable checkout; see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Test
-unpublished changes directly from that checkout:
+Pi manages the package installation automatically. To update to the latest release at any time, run:
 
 ```bash
-pi -ne -e .
+pi update --extensions
 ```
 
-## Development
+### Configuration & Preferences
 
-Edit the source under `extensions/` or `skills/`. Keep upstream provenance in
-[`UPSTREAM.md`](UPSTREAM.md) when importing updates.
+- **Provider & Model**: Configured through Pi or in `~/.pi/agent/settings.json`.
+- **Extension Settings**: Managed via `/extension-settings` in your chat session.
+- **Project Memory**: Optionally create a `.pi/MEMORY.md` in your project for persistent agent takeaways.
+
+### Verification
+
+Verify the package is loaded cleanly in your Pi installation:
 
 ```bash
-npm test
-npm run typecheck
+pi list
 ```
 
-`npm run typecheck` checks every vendored extension and is expected to pass.
+## Included Features
+
+- **agent-workflow** — Guidance-driven development: **GOAL → PLANNING → IMPLEMENTATION**, conversational question batches, `/flash` cruise control, and `/retro`, `/forensic`, `/improvements` learning commands. See [docs/FLOW.md](docs/FLOW.md).
+- **minimal-action-confirmation** — Enforced safety guardrails: confirms destructive shell commands, out-of-project writes, web requests, reading vendored dependencies, and recursive search.
+- **project-memory** — Optional project-level `.pi/MEMORY.md` consulted at task start and maintained via `/retro`.
+- **progress-tracker** — Global workflow status route and interactive `/todos` checklist widget.
+- **session-dashboard** — Interactive welcome banner, spend visualization chart, and context indicators (`/help`).
+- **status-bar & usage-monitor** — Real-time quota and usage metrics in the status bar (`/usage`).
+- **bundled skills & themes** — `/review` and `/simplify` skills, plus `dark` and `github-dark` themes.
+
+## Documentation
+
+- [Extension and resource catalog](docs/EXTENSIONS.md)
+- [The working flow](docs/FLOW.md)
+- [Commands and tools](docs/COMMANDS.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Vendored upstream inventory](UPSTREAM.md)
+
+## Contributing & Maintenance
+
+If you want to modify, test, or contribute to `pi-kit` locally, see the [Development & Maintenance Guide](docs/DEVELOPMENT.md).

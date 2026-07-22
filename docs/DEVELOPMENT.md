@@ -1,13 +1,31 @@
 # Development and maintenance
 
-## Working model
+Guide for maintainers developing, testing, and updating `pi-kit`.
 
-This repository is a personal vendored bundle. Preserve upstream license and
-snapshot information, but optimize local behavior for the documented workflow.
-Pi loads the working copy directly, so incomplete edits can affect the next Pi
-session.
+## Maintainer Setup
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/dhumdil-apps/pi-kit.git
+cd pi-kit
+npm install
+```
+
+## Working Model
+
+Consumers install `pi-kit` via `pi install` and run the managed copy in `~/.pi/agent/git/`.
+Maintainers work from an editable clone of this repository.
+
+To test unpublished working-copy code directly without altering your global Pi installation:
+
+```bash
+pi -ne -e .
+```
 
 ## Verification
+
+Run typecheck and test suite before committing:
 
 ```bash
 npm test
@@ -15,46 +33,26 @@ npm run typecheck
 git diff --check
 ```
 
-`npm run typecheck` checks every vendored TypeScript extension and must exit
-zero.
+`npm run typecheck` checks every vendored TypeScript extension and must exit zero.
 
-Headless load smoke:
+Run headless load smoke test:
 
 ```bash
 pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
 ```
 
-Interactive checks still matter for Status Bar rendering, the dashboard,
-workflow questions, Flash lifecycle, and safety dialogs.
+Interactive checks should be performed when making visual or lifecycle changes to Status Bar rendering, session dashboard, workflow questions, or action confirmation dialogs.
 
 ## Change checklist
 
-1. Identify the owning repository, run `git status --short`, inspect relevant
-   diffs, and classify matching continuation versus separate completed or
-   unfinished work before planning changes.
+1. Identify the owning repository, run `git status --short`, inspect relevant diffs, and classify matching continuation versus separate completed or unfinished work before planning changes.
 2. Read the relevant focused guide and upstream README/source.
-3. Resolve separate work before implementation: the user commits completed work;
-   unfinished work is finished or explicitly planned and stashed.
-4. Keep extension imports compatible with the active
-   `@earendil-works/pi-*` packages.
-5. Add focused tests for extracted state/persistence/safety logic.
-6. Update the matching document when behavior, commands, settings, paths, or
-   ownership rules change.
-7. Run focused tests/typecheck, headless load, and relevant interactive smoke.
-8. Never commit or stash automatically. After one committable slice, inspect its
-   diff, verify status, propose the commit message, and never include secrets or
-   runtime state.
-9. Update `UPSTREAM.md` and license material when importing a new snapshot.
-
-## Documentation ownership
-
-- Root `README.md`: landing page and fastest start.
-- `docs/EXTENSIONS.md`: what is loaded and why.
-- `docs/FLOW.md`: the working flow (guidance) and the enforced gates.
-- `docs/COMMANDS.md`: user-facing reference.
-- `docs/TROUBLESHOOTING.md`: symptoms and recovery.
-- `AGENTS.md`: short repository instructions for coding agents.
-- `UPSTREAM.md`: provenance, removals, and compatibility patches.
+3. Keep extension imports compatible with the active `@earendil-works/pi-*` packages.
+4. Add focused tests for extracted state/persistence/safety logic.
+5. Update documentation whenever behavior, commands, settings, or paths change.
+6. Run full verification (`npm test`, `npm run typecheck`, headless load).
+7. Propose clear, concise commit messages. Do not commit secrets or runtime session data.
+8. Update `UPSTREAM.md` when importing or updating vendored components.
 
 ## Updating vendored components
 
@@ -67,7 +65,4 @@ Treat an upstream update as a merge, not a blind overwrite:
 5. Run the component's checks plus bundle tests and load smoke.
 6. Update its snapshot in `UPSTREAM.md`.
 
-High-risk local behavior to preserve includes Flash cancellation, explicit plan
-approval, retrospective evidence bounds, and Minimal Action Confirmation's denylist
-scope (destructive commands, outside-project writes, per-call `curl`/web
-access, and vendored-code reads).
+High-risk local behavior to preserve includes Flash cancellation, explicit plan approval, retrospective evidence bounds, and Minimal Action Confirmation's denylist scope.
