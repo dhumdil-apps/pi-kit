@@ -29,7 +29,7 @@
       "./extensions/extension-preferences/index.ts",
       "./extensions/interrupt-confirmation/index.ts",
       "./extensions/agent-workflow/index.ts",
-      "./extensions/status-bar/src",
+      "./extensions/status-bar/index.ts",
       "./extensions/usage-monitor/index.ts",
       "./extensions/usage-history/index.ts",
       "./extensions/progress-tracker/index.ts",

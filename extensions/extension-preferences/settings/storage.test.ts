@@ -13,9 +13,11 @@ const SETTINGS_FILE = "settings-extensions.json";
 
 beforeEach(() => {
 	agentDir = mkdtempSync(join(tmpdir(), "extension-preferences-"));
+	vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	rmSync(agentDir, { recursive: true, force: true });
 });
 

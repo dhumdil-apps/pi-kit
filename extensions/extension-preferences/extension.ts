@@ -64,7 +64,7 @@ export default function piLibExtension(pi: ExtensionAPI) {
 
 					// Add each setting
 					for (const setting of settings) {
-						const currentValue = getSetting(extName, setting.id, setting.defaultValue);
+						const currentValue = getSetting(extName, setting.id, setting.defaultValue) ?? setting.defaultValue ?? "";
 
 						if (setting.options && setting.options.length > 0) {
 							// Ordered multi-select: opens a submenu
