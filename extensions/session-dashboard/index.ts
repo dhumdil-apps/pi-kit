@@ -321,6 +321,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				welcome: "> π Measure twice, cut once.",
 				usageChart,
 				contextInfo,
+				tip: "*⚡ Raw Pi: `pi --no-extensions`*",
 			});
 
 			pi.sendMessage(

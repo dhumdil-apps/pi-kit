@@ -7,12 +7,15 @@ export interface WelcomeParts {
 	usageChart?: string;
 	/** Slim dir + loaded context-files + workflow-command lines, plain markdown. */
 	contextInfo?: string;
+	/** Short de-emphasised footer hint, plain markdown, appended last. */
+	tip?: string;
 }
 
 /** Assemble the interactive welcome message from its (already-styled) pieces. */
-export function renderWelcomeText({ welcome, usageChart, contextInfo }: WelcomeParts): string {
+export function renderWelcomeText({ welcome, usageChart, contextInfo, tip }: WelcomeParts): string {
 	const sections = [welcome];
 	if (usageChart) sections.push(`${USAGE_CHART_START}\n${usageChart}\n${USAGE_CHART_END}`);
 	if (contextInfo) sections.push(contextInfo);
+	if (tip) sections.push(tip);
 	return sections.filter(Boolean).join("\n\n").trim();
 }

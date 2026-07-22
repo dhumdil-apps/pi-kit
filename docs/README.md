@@ -6,8 +6,9 @@ Use this page as the navigation map for the `pi-kit` package and development rep
 
 - **[Install & Setup](../README.md#quick-start)** — Installation, setup, & verification
 - **[Extension & Resource Catalog](EXTENSIONS.md)** — Catalog of extensions, skills, & themes
-- **[The Working Flow](FLOW.md)** — Workflow, Flash mode, & safety gates
+- **[The Working Flow](FLOW.md)** — Workflow, autonomous runs, & safety gates
 - **[Commands & Tools](COMMANDS.md)** — Quick reference for commands & tools
+- **[Recipes](RECIPES.md)** — One-off tasks you can ask Pi to do
 - **[Troubleshooting](TROUBLESHOOTING.md)** — Troubleshooting & diagnostic steps
 
 ## Maintainer & Developer Guides

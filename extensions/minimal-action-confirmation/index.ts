@@ -30,10 +30,11 @@
  * Toggle via /extension-settings → Minimal Action Confirmation (stored as permission-gate) → enabled.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { existsSync, realpathSync } from "fs";
+import { appendFile, mkdir } from "fs/promises";
 import { homedir } from "os";
-import { dirname, isAbsolute, resolve } from "path";
+import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { getSetting } from "../extension-preferences/index.js";
 
@@ -82,6 +83,31 @@ export async function confirmGatedAction(
 		"Optional guidance...",
 	) as string | undefined;
 	return { approved: false, guidance: guidance?.trim() || undefined };
+}
+
+/**
+ * Append one line per gated call to a per-session confirmation log, reviewed at
+ * close-out per the agent-workflow reflection policy. Best-effort telemetry in
+ * gitignored .pi/: a logging failure must never change the gate decision, and no
+ * session id (e.g. in unit tests) means no write. The full reason is flattened to
+ * one line so the triggering command survives (its category is line 1, command line 3).
+ */
+async function recordConfirmation(
+	ctx: { cwd: string; sessionManager?: { getSessionId?: () => string | undefined } },
+	reason: string,
+	outcome: string,
+): Promise<void> {
+	try {
+		const sessionId = ctx.sessionManager?.getSessionId?.();
+		if (!sessionId) return;
+		const dir = join(ctx.cwd, CONFIG_DIR_NAME, "confirmations");
+		await mkdir(dir, { recursive: true });
+		const flat = reason.replace(/\s+/g, " ").trim();
+		const line = `- ${new Date().toISOString()} · ${outcome} · ${flat}\n`;
+		await appendFile(join(dir, `${sessionId}.md`), line, "utf8");
+	} catch {
+		// Best-effort: never let a logging failure affect the gate decision.
+	}
 }
 
 function splitSegments(command: string): string[] {
@@ -377,6 +403,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 
 		if (!ctx.hasUI) {
 			// Headless/RPC: never hang on a modal — block with a visible notice.
+			await recordConfirmation(ctx, gate.reason, "Blocked (no UI)");
 			pi.sendMessage(
 				{
 					customType: "permission-gate",
@@ -389,15 +416,20 @@ export default function createExtension(pi: ExtensionAPI): void {
 		}
 
 		const decision = await confirmGatedAction(ctx, gate.reason);
-		if (decision.approved) return undefined;
+		if (decision.approved) {
+			await recordConfirmation(ctx, gate.reason, "Proceeded");
+			return undefined;
+		}
 
 		if (decision.guidance) {
+			await recordConfirmation(ctx, gate.reason, "Denied with guidance");
 			return {
 				block: true,
 				reason: `Denied by user via minimal action confirmation. User guidance for next time: ${decision.guidance}`,
 			};
 		}
 
+		await recordConfirmation(ctx, gate.reason, "Denied");
 		return { block: true, reason: "Denied by user via minimal action confirmation." };
 	});
 }

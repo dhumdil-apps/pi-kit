@@ -31,12 +31,6 @@ need interactive confirmation. Headless runs have no UI, so gated calls are
 blocked with a notice rather than hanging. Disable the gate only if you accept
 ungated web access.
 
-## Flash mode will not stay active
-
-This is intentional when an ordinary user message arrives: Flash behaves like
-cruise control and that message is the brake. Run `/flash` again to reactivate
-it. Safety dialogs do not cancel Flash, and Flash never bypasses them.
-
 ## Full typecheck fails
 
 Run `npm run typecheck`; the bundle expects a zero exit. Treat every reported
@@ -46,7 +40,7 @@ error as a regression or compatibility issue to fix.
 
 - Project memory is an optional user-owned `.pi/MEMORY.md` file.
 - The workflow checks for and reads it at the start of every task when present.
-- Project memory is maintained with user confirmation during implementation close-out
-  or via `/forensic`. Those steps preserve manual content while deduplicating or
-  replacing stale durable lessons.
+- Project memory is maintained with user confirmation during implementation close-out.
+  That step preserves manual content while deduplicating or replacing stale durable
+  lessons.
 - `.pi/` is ignored by default; projects may customize that Git policy.

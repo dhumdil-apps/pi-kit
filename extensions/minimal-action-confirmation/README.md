@@ -34,6 +34,20 @@ appearing in a filter expression. `find` predicates and pruning patterns,
 therefore do not prompt; using a dependency directory as a search root or file
 argument still does.
 
+Headless/RPC sessions (no dialog-capable UI) block gated calls instead of
+hanging, with a visible chat notice.
+
+## Confirmation log
+
+Every gated call appends one line to `.pi/confirmations/<session-id>.md` in the
+project (gitignored by the bundle's default), recording the timestamp, the
+outcome (`Proceeded`, `Denied`, `Denied with guidance`, or `Blocked (no UI)`),
+and the flattened reason (including the triggering command). This is best-effort
+telemetry — a write failure never changes the gate decision, and a session with
+no id (e.g. under unit tests) writes nothing. The agent-workflow reflection
+policy reviews this log at close-out and may propose an ask-first `.pi/MEMORY.md`
+note when a pattern recurs.
+
 ## Known limits
 
 Denylist-based: `bash -c "..."`, scripts, and aliases can smuggle destructive

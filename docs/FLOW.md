@@ -59,30 +59,25 @@ require an explicit request.
 Ordinary feedback that changes or challenges the approved outcome returns the
 task to PLANNING for a complete revised plan and fresh explicit approval.
 
-## Flash mode
+## Autonomous runs
 
-`/flash` is explicit cruise control: the same visible workflow, but Pi chooses
-its recommended option instead of stopping for routine input and continues
-through completion. Any ordinary user message brakes it immediately; it never
-bypasses safety confirmations or broadens the user's authority, and phrases like
-"proceed and don't stop" do not activate it — Pi explains how to opt in.
+There is no managed autonomous mode. To run Pi without this bundle — no workflow
+guidance and **no safety guardrails** — start it with `pi --no-extensions`
+(`-ne`). This is raw Pi, deliberately not a supervised "keep going" mode.
 
 ## Reflection and durable learning
 
 Close-out ends with a concise outcome summary and, when a durable non-obvious
-lesson surfaced, an offer to record it. `/forensic` performs a deep
-current-session review with a causal timeline and evidence citations
-(`/forensic raw` includes bounded raw evidence); output efficiency is mentioned
-only when one result or tool materially dominates. Project memory
+lesson surfaced, an offer to record it. For a deeper manual review, ask Pi to
+reconstruct a causal timeline of the session (see
+[RECIPES.md](RECIPES.md#deep-session-retrospective)). Project memory
 (`.pi/MEMORY.md`) is a temporary fallback for unaddressed takeaways — minimal,
 updated only with user confirmation, cleaned up once fixed at the root cause in
 code or `AGENTS.md`.
 
-## Safety confirmations
-
-The built-in Pi dialog asks **Proceed**, **Deny**, or **Deny with guidance** on
-every gated call: destructive shell commands, writes outside the project, web
-access, reads into vendored code, and recursive search/list rooted outside the
-project. Headless sessions block gated calls instead of hanging. For an
-already-authorized gated action, that dialog is the sole confirmation — Pi never
-asks once in chat and again in the gate.
+Safety confirmations are a reflection input, not a separate doctrine: the
+`minimal-action-confirmation` gate logs each gated call to
+`.pi/confirmations/<session>.md`, and close-out reviews that log — a recurring
+gate pattern may become an ask-first `.pi/MEMORY.md` note. The gate mechanics
+(what is gated, Proceed/Deny/Deny-with-guidance, headless blocking) live in that
+extension's [README](../extensions/minimal-action-confirmation/README.md).

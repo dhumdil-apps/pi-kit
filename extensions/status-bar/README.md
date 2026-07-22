@@ -15,9 +15,9 @@ sub-extensions each emit one or more segments:
 - **`src/powerbar-sub/`** — `sub-hourly`, `sub-weekly` (from Usage Monitor events)
 - **`src/powerbar-os/`** — `cpu`, `ram`, `disk`/SSD, `net`
 
-The Agent Workflow extension registers a transient `flash` segment. It renders
-`⚡ flash` only while Flash mode is active and does not need a configured slot.
-Workflow phase is deliberately outside Status Bar; Progress Tracker renders it
+Any extension may register a transient segment via powerbar events: it renders
+only while active and does not need a configured slot. Workflow phase is
+deliberately outside Status Bar; Progress Tracker renders it
 as a persistent phase-aware working indicator above the editor.
 
 All Status Bar progress bars use the theme accent normally, changing to warning

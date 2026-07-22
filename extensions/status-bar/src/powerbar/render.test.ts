@@ -21,9 +21,9 @@ describe("status bar transient segments", () => {
 		const segments = new Map<string, Segment>([
 			["branch", { id: "branch", text: "main" }],
 			["model", { id: "model", text: "sonnet" }],
-			["flash", { id: "flash", text: "flash", icon: "⚡", transient: true }],
+			["notice", { id: "notice", text: "notice", icon: "⚡", transient: true }],
 		]);
-		expect(renderBar(segments, settings, theme, 80)[0]).toContain("sonnet | ⚡ flash");
+		expect(renderBar(segments, settings, theme, 80)[0]).toContain("sonnet | ⚡ notice");
 	});
 
 	it("does not show an unconfigured non-transient segment", () => {

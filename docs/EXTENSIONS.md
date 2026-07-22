@@ -13,7 +13,7 @@ extension.
 - **Usage History** — Historical token/cost reporting (`/usage`)
 - **Progress Tracker** — Global workflow route plus separate local todo widget (`manage_todo_list`, `/todos`)
 - **Session Dashboard** — Pi-glyph welcome, This-Week spend chart, and project-context line
-- **Agent Workflow** — Conversational workflow, Flash mode, and session learning (`/flash`, `/forensic`; see [FLOW.md](FLOW.md))
+- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`; see [FLOW.md](FLOW.md))
 - **Minimal Action Confirmation** — Confirmation for destructive commands, outside-project writes, `curl`/web access, vendored-code reads, and recursive search/list rooted outside the project
 
 ## Supporting resources
@@ -62,6 +62,12 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
   rules, gates only where content is genuinely dangerous.
 - `interactive-prompt` and `skills/ask-user`: removed (2026-07-20).
   Planning is conversational; only safety confirmations use Pi's built-in dialog.
+- `/flash`: removed (2026-07-22). The managed "cruise control" autonomous mode
+  and its `⚡ flash` status segment are gone. To run Pi unsupervised, start raw Pi
+  with `pi --no-extensions` — which drops all bundle guidance *and* guardrails.
+- `/forensic`: removed (2026-07-22). The deep session retrospective is now a manual
+  request; see [RECIPES.md](RECIPES.md#deep-session-retrospective). The bounded
+  session-evidence packet it injected is gone with it.
 - old Git package clones under `~/.pi/agent/git/...`: removed; Pi loads this
   local working copy directly.
 

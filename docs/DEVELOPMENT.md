@@ -65,4 +65,4 @@ Treat an upstream update as a merge, not a blind overwrite:
 5. Run the component's checks plus bundle tests and load smoke.
 6. Update its snapshot in `UPSTREAM.md`.
 
-High-risk local behavior to preserve includes Flash cancellation, explicit plan approval, retrospective evidence bounds, and Minimal Action Confirmation's denylist scope.
+High-risk local behavior to preserve includes explicit plan approval, the ask-first project-memory policy, and Minimal Action Confirmation's denylist scope.

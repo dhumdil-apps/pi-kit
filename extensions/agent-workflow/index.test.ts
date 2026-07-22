@@ -21,59 +21,32 @@ function harness() {
 }
 
 describe("agent workflow lifecycle", () => {
-	it("activates Flash, exposes runtime guidance, and brakes on ordinary input", async () => {
-		const { handlers, commands, emitted, messages } = harness();
-		await commands.get("flash")!.handler("", {});
-		expect(messages.at(-1)).toContain("[workflow-command:flash]");
-		expect(emitted.at(-1)?.[1]).toMatchObject({ id: "flash", text: "flash", transient: true });
-
-		const active = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
-		expect(active.systemPrompt).toContain('flash="active"');
-		handlers.get("input")!({ source: "user" });
-		expect(emitted.at(-1)?.[1]).toEqual({ id: "flash", text: undefined });
-		const stopped = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
-		expect(stopped.systemPrompt).toContain('flash="off"');
-	});
-
-	it("does not brake Flash for extension-authored input and clears it once the agent settles", async () => {
-		const { handlers, commands, emitted } = harness();
-		await commands.get("flash")!.handler("", {});
-		handlers.get("input")!({ source: "extension" });
-		const active = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
-		expect(active.systemPrompt).toContain('flash="active"');
-		handlers.get("agent_settled")!();
-		expect(emitted.at(-1)?.[1]).toEqual({ id: "flash", text: undefined });
-	});
-
-	it("does not clear Flash on a plain agent_end (pi may still auto-retry/auto-compact)", async () => {
-		const { handlers, commands, emitted } = harness();
-		await commands.get("flash")!.handler("", {});
-		const before = emitted.length;
-		handlers.get("agent_end")?.();
-		// agent_end has no registered handler in this extension at all — Flash
-		// state is untouched by it.
-		expect(emitted.length).toBe(before);
-		const active = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
-		expect(active.systemPrompt).toContain('flash="active"');
-	});
-
-	it("injects bounded session evidence for reflection commands", async () => {
-		const { handlers, commands, messages } = harness();
-		expect(commands.has("retro")).toBe(false);
-		expect(commands.has("improvements")).toBe(false);
+	it("registers no autonomy or retrospective commands and no runtime lifecycle hooks", async () => {
+		const { handlers, commands } = harness();
+		// Flash, /forensic, and the legacy /retro + /improvements are all retired;
+		// guard against reintroduction. The only registered event hook is the
+		// system-prompt injector.
+		for (const gone of ["flash", "forensic", "retro", "improvements"]) {
+			expect(commands.has(gone)).toBe(false);
+		}
+		expect(handlers.has("input")).toBe(false);
+		expect(handlers.has("agent_settled")).toBe(false);
 		expect(handlers.has("tool_result")).toBe(false);
-		const ctx = { sessionManager: { getBranch: () => [] } };
-		await commands.get("forensic")!.handler("raw", ctx);
-		expect(messages.at(-1)).toContain("[workflow-command:forensic:raw]");
-		expect(messages.at(-1)).toContain('raw="true"');
+	});
+
+	it("injects the workflow prompt on every turn with no Flash runtime block", async () => {
+		const { handlers } = harness();
+		const result = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
+		expect(result.systemPrompt).toContain("<pi_workflow>");
+		expect(result.systemPrompt).not.toContain("workflow_runtime");
+		expect(result.systemPrompt).not.toContain("flash");
 	});
 
 	it("injects universal communication and commit-message defaults", async () => {
 		const { handlers } = harness();
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
 		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
-		expect(guidance).toContain("summarize the diff or show focused snippets");
-		expect(guidance).toContain("instead of pasting whole files unless the user requests them");
+		expect(guidance).toContain("Concise and direct. Never fabricate tool results, tests, or file contents");
 		expect(guidance).toContain("Follow the repository's commit convention");
 		expect(guidance).toContain("short imperative subject without a trailing period");
 	});
@@ -89,7 +62,6 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("separate unfinished work must be finished");
 		expect(guidance).toContain("Never commit or stash automatically");
 		expect(guidance).toContain("never absorb unrelated work merely because");
-		expect(guidance).toContain("state the conflict and selected resolution");
 	});
 
 	it("keeps lifecycle plans small, verifiable, and subordinate to current evidence", async () => {
@@ -126,16 +98,6 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("require fresh Planning approval");
 	});
 
-	it("discusses tool-output pressure only when retrospective evidence marks it material", async () => {
-		const { handlers } = harness();
-		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
-		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
-		expect(guidance).toContain("tool_output_metrics material=true");
-		expect(guidance).toContain("one concrete bounded-output adjustment");
-		expect(guidance).toContain("Otherwise omit tool-output efficiency");
-		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
-	});
-
 	it("includes close-out guidance and ask-first memory policy", async () => {
 		const { handlers } = harness();
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
@@ -146,6 +108,10 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("apply them only after the user confirms");
 		expect(guidance).toContain("treat project memory as temporary fallback state");
 		expect(guidance).toContain("fixed at the root cause");
+		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
+		// Safety confirmations are reviewed at close-out from the session log, ask-first.
+		expect(guidance).toContain("when a .pi/confirmations/<session>.md log exists");
+		expect(guidance).toContain("propose a .pi/MEMORY.md entry the same ask-first way; never auto-write it");
 	});
 
 	it("scales questioning to the task without ever skipping exploration", async () => {
@@ -170,7 +136,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("read it and its immediate callers or tests");
 		expect(guidance).toContain("Never weaken a test, assertion, or check to make it pass");
 		expect(guidance).toContain("a failing check is information about the change");
-		expect(guidance).toContain("say so and propose how to verify instead of guessing");
+		expect(guidance).toContain("When unsure, say so instead of guessing");
 	});
 
 	it("requires fresh approval for any substantive IMPLEMENTATION feedback", async () => {
@@ -178,7 +144,7 @@ describe("agent workflow lifecycle", () => {
 		const prompt = await handlers.get("before_agent_start")!({ systemPrompt: "base" });
 		const guidance = (prompt.systemPrompt as string).replace(/\s+/g, " ");
 		const feedbackRule = guidance.slice(
-			guidance.indexOf("When Flash is off"),
+			guidance.indexOf("Ordinary user feedback during IMPLEMENTATION"),
 			guidance.indexOf("There is no hard pre-approval execution gate"),
 		);
 
@@ -200,8 +166,6 @@ describe("agent workflow lifecycle", () => {
 		expect(feedbackRule).toContain("do not edit or use other state-changing implementation tools");
 		expect(feedbackRule).toContain("even with zero questions");
 		expect(feedbackRule).toContain("Earlier approval does not carry forward");
-		// Flash braking is stated once, in <flash>, not duplicated in the feedback rule.
-		expect(guidance).toContain("brakes Flash immediately");
 
 		for (const planningDimension of [
 			"states and transitions",
@@ -217,7 +181,7 @@ describe("agent workflow lifecycle", () => {
 		}
 		expect(guidance).toContain("Do not mechanically include dimensions that do not apply");
 
-		const feedback = guidance.indexOf("ordinary user feedback during IMPLEMENTATION");
+		const feedback = guidance.indexOf("Ordinary user feedback during IMPLEMENTATION");
 		const planning = guidance.indexOf("Return to PLANNING", feedback);
 		const investigate = guidance.indexOf("investigate read-only", planning);
 		const changed = guidance.indexOf("identify what changed", investigate);

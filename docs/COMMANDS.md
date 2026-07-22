@@ -10,8 +10,6 @@ mode and no `/plan` command — the working flow is guidance, described in
 - **`/todos`** — Reveal workflow progress and toggle the independent local todo widget
 - **`/extension-settings`** — Edit registered global extension settings
 - **`/usage`** — Show historical token/cost usage
-- **`/flash`** — Activate autonomous recommended-choice cruise control until completion or the next ordinary user message
-- **`/forensic [raw]`** — Deep reconstructed session review; `raw` includes bounded annotated evidence
 - **`/review`** — Run the risk-adaptive correctness pipeline, fix supported in-scope findings, invoke simplify once, and revalidate the relevant diff
 - **`/simplify`** — Remove unnecessary complexity and development residue without changing approved behavior
 

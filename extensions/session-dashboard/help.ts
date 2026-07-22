@@ -17,8 +17,6 @@ export const HELP_COMMANDS: HelpEntry[] = [
 	{ name: "/usage-refresh", description: "Refresh subscription-quota usage from the provider." },
 	{ name: "/todos", description: "Toggle the todo widget (`/todos clear` resets it)." },
 	{ name: "/extension-settings", description: "Configure any extension's settings." },
-	{ name: "/flash", description: "Run the current task autonomously with the recommended choices." },
-	{ name: "/forensic", description: "Deep current-session retrospective (`/forensic raw` for the timeline)." },
 	{ name: "/init", description: "Analyze the repo and create or improve its AGENTS.md." },
 ];
 
@@ -52,5 +50,7 @@ export function renderHelp(activeExtensionNames: readonly string[]): string {
 		entryLines(HELP_SHORTCUTS),
 		`## Extensions (${active.size})`,
 		extensionBlocks.join("\n\n"),
+		"## Running raw Pi",
+		"To run Pi without this bundle start it with `pi --no-extensions` (`-ne`).",
 	].join("\n\n");
 }

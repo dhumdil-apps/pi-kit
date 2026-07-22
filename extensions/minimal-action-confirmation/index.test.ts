@@ -1,4 +1,4 @@
-import { mkdtempSync, symlinkSync } from "fs";
+import { existsSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, expect, it, vi } from "vitest";
@@ -232,5 +232,66 @@ describe("gate bypass regressions", () => {
 				{ cwd: process.cwd(), hasUI: false },
 			),
 		).resolves.toBeUndefined();
+	});
+});
+
+describe("confirmation log", () => {
+	function logCtx(overrides: Record<string, unknown> = {}) {
+		const cwd = mkdtempSync(join(tmpdir(), "gate-log-"));
+		return {
+			cwd,
+			hasUI: false,
+			sessionManager: { getSessionId: () => "sess-1" },
+			logPath: join(cwd, ".pi", "confirmations", "sess-1.md"),
+			...overrides,
+		};
+	}
+
+	it("records a headless block with the flattened reason and outcome on one line", async () => {
+		const { toolCall } = makeGate();
+		const ctx = logCtx();
+		await toolCall({ toolName: "bash", input: { command: "rm -rf ./data" } }, ctx);
+		const log = readFileSync(ctx.logPath as string, "utf8");
+		expect(log).toContain("Blocked (no UI)");
+		expect(log).toContain("rm -rf ./data");
+		expect(log.trim().split("\n")).toHaveLength(1);
+	});
+
+	it("records Proceeded and Denied outcomes for interactive decisions", async () => {
+		const { toolCall } = makeGate();
+		const proceed = logCtx({ hasUI: true, ui: { select: vi.fn().mockResolvedValue("Proceed"), input: vi.fn() } });
+		await toolCall({ toolName: "bash", input: { command: "curl https://example.com" } }, proceed);
+		expect(readFileSync(proceed.logPath as string, "utf8")).toContain("Proceeded");
+
+		const deny = logCtx({ hasUI: true, ui: { select: vi.fn().mockResolvedValue("Deny"), input: vi.fn() } });
+		await toolCall({ toolName: "bash", input: { command: "curl https://example.com" } }, deny);
+		expect(readFileSync(deny.logPath as string, "utf8")).toContain("Denied");
+	});
+
+	it("writes nothing for a non-gated call", async () => {
+		const { toolCall } = makeGate();
+		const ctx = logCtx();
+		await toolCall({ toolName: "bash", input: { command: "ls -la" } }, ctx);
+		expect(existsSync(ctx.logPath as string)).toBe(false);
+	});
+
+	it("writes nothing when there is no session id", async () => {
+		const { toolCall } = makeGate();
+		const cwd = mkdtempSync(join(tmpdir(), "gate-log-"));
+		await toolCall({ toolName: "bash", input: { command: "rm -rf ./data" } }, { cwd, hasUI: false });
+		expect(existsSync(join(cwd, ".pi"))).toBe(false);
+	});
+
+	it("still blocks when the log write fails", async () => {
+		const { toolCall } = makeGate();
+		// cwd points at a file, so mkdir of .pi/confirmations underneath it fails (ENOTDIR).
+		const file = join(mkdtempSync(join(tmpdir(), "gate-log-")), "not-a-dir");
+		writeFileSync(file, "x");
+		await expect(
+			toolCall(
+				{ toolName: "bash", input: { command: "rm -rf ./data" } },
+				{ cwd: file, hasUI: false, sessionManager: { getSessionId: () => "sess-1" } },
+			),
+		).resolves.toMatchObject({ block: true });
 	});
 });
