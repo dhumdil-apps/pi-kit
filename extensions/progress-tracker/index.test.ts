@@ -37,10 +37,10 @@ describe("progress tracker workflow mode", () => {
     };
 
     await handlers.get("session_start")![0]({}, ctx);
-    listeners.get(MODE_UPDATE_EVENT)![0]("review");
+    listeners.get(MODE_UPDATE_EVENT)![0]("implement");
 
     const [, factory] = widgets.findLast(([id]) => id === "workflow-phase")!;
     const component = factory({ requestRender: () => {} }, { fg: (color: string, text: string) => `[${color}]${text}` });
-    expect(component.render(80)).toEqual(["[accent]● REVIEW · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M"]);
+    expect(component.render(80)).toEqual(["[accent]● IMPLEMENT · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M"]);
   });
 });

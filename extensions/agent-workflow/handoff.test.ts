@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openHandoffSession, resolveHandoffTask } from "./handoff.js";
-import { MODE_ENTRY_TYPE, type WorkflowMode } from "./mode.js";
+import { MODE_ENTRY_TYPE } from "./mode.js";
 
-const plan = "# Goal\n\n## Checklist\n\n- [ ] Implement slice → verify it\n";
+const plan = "## Current state\n\nA.\n\n## Desired state\n\nB.\n\n## Approach\n\nC.\n\n## Quirks\n\nD.\n";
 
 interface CtxOptions { sessionName?: string; hasUI?: boolean }
 
@@ -46,14 +46,13 @@ function makeHarness(cwd: string, options: CtxOptions = {}) {
 		},
 	};
 
-	const open = (mode: WorkflowMode, taskName?: string, options?: { approved?: boolean }) =>
-		openHandoffSession(pi as never, ctx as never, mode, taskName, options);
+	const open = (taskName?: string) => openHandoffSession(pi as never, ctx as never, taskName);
 	return { open, notify, sent, newSession, next, seeded };
 }
 
-async function seedPlan(cwd: string, name: string, status = "todo") {
-	await mkdir(join(cwd, ".pi", "goal"), { recursive: true });
-	await writeFile(join(cwd, ".pi", "goal", `${name}.${status}.md`), plan);
+async function seedPlan(cwd: string, name: string) {
+	await mkdir(join(cwd, ".pi", "plan"), { recursive: true });
+	await writeFile(join(cwd, ".pi", "plan", `${name}.md`), plan);
 }
 
 describe("handoff task resolution", () => {
@@ -61,55 +60,38 @@ describe("handoff task resolution", () => {
 	beforeEach(async () => { cwd = await mkdtemp(join(tmpdir(), "pi-handoff-")); });
 	afterEach(async () => { await rm(cwd, { recursive: true, force: true }); });
 
-	it("resolves the single pending plan when nothing is named", async () => {
+	it("resolves the single plan when nothing is named", async () => {
 		await seedPlan(cwd, "dashboard-polish");
-		expect(resolveHandoffTask(cwd, "implement", undefined, undefined).task).toMatchObject({
+		expect(resolveHandoffTask(cwd, undefined, undefined).task).toEqual({
 			name: "dashboard-polish",
-			status: "todo",
-			planPath: ".pi/goal/dashboard-polish.todo.md",
-			discoveryPath: ".pi/goal/dashboard-polish.discovery.md",
+			planPath: ".pi/plan/dashboard-polish.md",
 		});
 	});
 
 	it("prefers an explicitly named task and canonicalizes it", async () => {
 		await seedPlan(cwd, "dashboard-polish");
-		await seedPlan(cwd, "SI-7-cache-recovery", "active");
-		expect(resolveHandoffTask(cwd, "implement", "si-7-cache-recovery", undefined).task).toMatchObject({
-			name: "SI-7-cache-recovery",
-			status: "active",
-		});
-		expect(resolveHandoffTask(cwd, "implement", "no-such-task", undefined).error).toContain("No lifecycle plan for no-such-task");
+		await seedPlan(cwd, "SI-7-cache-recovery");
+		expect(resolveHandoffTask(cwd, "si-7-cache-recovery", undefined).task?.name).toBe("SI-7-cache-recovery");
+		expect(resolveHandoffTask(cwd, "no-such-task", undefined).error).toContain("No plan for no-such-task");
 	});
 
-	it("falls back to the frozen session name before scanning", async () => {
+	it("falls back to the session name before the lone-file pick", async () => {
 		await seedPlan(cwd, "dashboard-polish");
 		await seedPlan(cwd, "cache-recovery");
-		expect(resolveHandoffTask(cwd, "implement", undefined, "cache-recovery").task?.name).toBe("cache-recovery");
+		expect(resolveHandoffTask(cwd, undefined, "cache-recovery").task?.name).toBe("cache-recovery");
 	});
 
-	it("asks which task when several plans are pending", async () => {
+	it("asks which task when several plans exist", async () => {
 		await seedPlan(cwd, "dashboard-polish");
-		await seedPlan(cwd, "cache-recovery", "active");
-		const { task, error } = resolveHandoffTask(cwd, "implement", undefined, undefined);
+		await seedPlan(cwd, "cache-recovery");
+		const { task, error } = resolveHandoffTask(cwd, undefined, undefined);
 		expect(task).toBeUndefined();
 		expect(error).toContain("cache-recovery, dashboard-polish");
-		expect(error).toContain("/mode implement fresh <task-name>");
+		expect(error).toContain("/handoff <task-name>");
 	});
 
-	it("reviews a finished task but never implements one", async () => {
-		await seedPlan(cwd, "shipped-goal", "done");
-		expect(resolveHandoffTask(cwd, "review", undefined, undefined).task).toMatchObject({ name: "shipped-goal", status: "done" });
-		expect(resolveHandoffTask(cwd, "implement", undefined, undefined).error).toContain("run a Plan session first");
-	});
-
-	it("allows a fresh plan session with no task at all", () => {
-		expect(resolveHandoffTask(cwd, "plan", undefined, undefined)).toEqual({});
-	});
-
-	it("reports an ambiguous lifecycle state instead of guessing", async () => {
-		await seedPlan(cwd, "dashboard-polish");
-		await seedPlan(cwd, "dashboard-polish", "active");
-		expect(resolveHandoffTask(cwd, "implement", undefined, undefined).error).toContain("Ambiguous lifecycle state");
+	it("errors when no plan exists", () => {
+		expect(resolveHandoffTask(cwd, undefined, undefined).error).toContain("plan first");
 	});
 });
 
@@ -118,34 +100,34 @@ describe("openHandoffSession", () => {
 	beforeEach(async () => { cwd = await mkdtemp(join(tmpdir(), "pi-handoff-cmd-")); });
 	afterEach(async () => { await rm(cwd, { recursive: true, force: true }); });
 
-	it("seeds the new session with the mode marker, task name, and a kickoff carrying real paths", async () => {
+	it("seeds the new session with the implement marker, task name, and an auto-approved kickoff", async () => {
 		await seedPlan(cwd, "dashboard-polish");
 		const { open, newSession, seeded, next } = makeHarness(cwd);
-		await open("implement");
+		await open();
 
 		expect(newSession).toHaveBeenCalledWith(expect.objectContaining({ parentSession: "/sessions/current.jsonl" }));
 		expect(seeded.entries).toEqual([
-			{ customType: MODE_ENTRY_TYPE, content: "Workflow mode: implement.", display: false, details: { mode: "implement", origin: "boundary", approved: false } },
+			{ customType: MODE_ENTRY_TYPE, content: "Workflow mode: implement.", display: false, details: { mode: "implement" } },
 		]);
 		expect(seeded.names).toEqual(["dashboard-polish"]);
 		const [kickoff] = next.sendUserMessage.mock.calls[0];
-		expect(kickoff).toContain(".pi/goal/dashboard-polish.todo.md");
-		expect(kickoff).toContain(".pi/goal/dashboard-polish.discovery.md");
-		expect(kickoff).toContain("execute the next slice");
+		expect(kickoff).toContain(".pi/plan/dashboard-polish.md");
+		expect(kickoff).toContain("do not ask for approval again");
+		expect(kickoff).toContain("stop and report");
 	});
 
 	it("waits for the kickoff turn only when the new session has no UI", async () => {
 		await seedPlan(cwd, "dashboard-polish");
 		const interactive = makeHarness(cwd);
 		// next.sendUserMessage never resolves; an interactive handoff still returns.
-		await interactive.open("implement");
+		await interactive.open();
 
 		const headless = makeHarness(cwd);
 		headless.next.hasUI = false;
 		let settled = false;
 		let finishTurn = () => {};
 		headless.next.sendUserMessage.mockImplementation(() => new Promise<void>((resolve) => { finishTurn = resolve; }));
-		const pending = headless.open("implement").then(() => { settled = true; });
+		const pending = headless.open().then(() => { settled = true; });
 		await vi.waitFor(() => expect(headless.next.sendUserMessage).toHaveBeenCalled());
 		expect(settled).toBe(false);
 		finishTurn();
@@ -153,61 +135,17 @@ describe("openHandoffSession", () => {
 		expect(settled).toBe(true);
 	});
 
-	it("kicks off review and re-plan sessions with their own framing", async () => {
-		await seedPlan(cwd, "dashboard-polish", "active");
-		const review = makeHarness(cwd);
-		await review.open("review", "dashboard-polish");
-		expect(review.next.sendUserMessage.mock.calls[0][0]).toContain("Review the task dashboard-polish");
-
-		const replan = makeHarness(cwd);
-		await replan.open("plan", "dashboard-polish");
-		expect(replan.next.sendUserMessage.mock.calls[0][0]).toContain("Re-plan the task dashboard-polish");
-	});
-
-	it("carries an approved plan into the implement session instead of re-asking", async () => {
-		await seedPlan(cwd, "dashboard-polish");
-		const { open, seeded, next } = makeHarness(cwd);
-		await open("implement", undefined, { approved: true });
-		expect(seeded.entries[0].details).toEqual({ mode: "implement", origin: "boundary", approved: true });
-		expect(next.sendUserMessage.mock.calls[0][0]).toContain("do not ask for approval again");
-	});
-
-	it("never marks a review session approved — review has no approval gate", async () => {
-		await seedPlan(cwd, "dashboard-polish", "active");
-		const { open, seeded } = makeHarness(cwd);
-		await open("review", undefined, { approved: true });
-		expect(seeded.entries[0].details).toEqual({ mode: "review", origin: "boundary", approved: false });
-	});
-
-	it("widens a done plan's review to the whole task, not just the working tree", async () => {
-		await seedPlan(cwd, "shipped-goal", "done");
-		const { open, next } = makeHarness(cwd);
-		await open("review");
-		const [kickoff] = next.sendUserMessage.mock.calls[0];
-		expect(kickoff).toContain("full task diff against the task's base");
-		expect(kickoff).toContain("already committed");
-	});
-
-	it("opens an empty plan session when there is no task to carry over", async () => {
-		const { open, seeded, next } = makeHarness(cwd);
-		await open("plan");
-		expect(seeded.entries[0].details).toEqual({ mode: "plan", origin: "boundary", approved: false });
-		expect(seeded.names).toEqual([]);
-		expect(next.sendUserMessage).not.toHaveBeenCalled();
-		expect(next.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Describe the goal"), "info");
-	});
-
 	it("notifies the resolution error and spawns nothing when no plan exists", async () => {
 		const { open, notify, newSession } = makeHarness(cwd);
-		await open("implement");
-		expect(notify).toHaveBeenCalledWith(expect.stringContaining("run a Plan session first"), "warning");
+		await open();
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("plan first"), "warning");
 		expect(newSession).not.toHaveBeenCalled();
 	});
 
 	it("falls back to a displayed message when the session has no UI", async () => {
 		const { open, sent, newSession } = makeHarness(cwd, { hasUI: false });
-		await open("implement");
-		expect(sent[0]).toMatchObject({ display: true, content: expect.stringContaining("run a Plan session first") });
+		await open();
+		expect(sent[0]).toMatchObject({ display: true, content: expect.stringContaining("plan first") });
 		expect(newSession).not.toHaveBeenCalled();
 	});
 });

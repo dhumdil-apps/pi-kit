@@ -1,11 +1,10 @@
 /**
  * Session mode management for the Agent Workflow extension.
  *
- * Each session runs in exactly one mode — plan (default), implement, or
- * review — selected by a human through the /mode command: switchInPlace here
- * reuses the running session, and openHandoffSession (handoff.ts) spawns a
- * fresh seeded one. The model cannot switch modes: mode is a session-boundary
- * decision that preserves fresh-context discipline (measure twice, cut once).
+ * Each session runs in exactly one mode — plan (the default) or implement.
+ * Plan flips to implement either in place (the Proceed choice of the approval
+ * prompt) or across a session boundary (/handoff, handoff.ts). The model
+ * cannot switch modes.
  *
  * A hidden custom-message marker in the branch is the single source of truth,
  * so the mode survives reload/fork and also applies to a handoff-seeded session
@@ -16,32 +15,19 @@
 
 import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 
-export const WORKFLOW_MODES = ["plan", "implement", "review"] as const;
+export const WORKFLOW_MODES = ["plan", "implement"] as const;
 export type WorkflowMode = (typeof WORKFLOW_MODES)[number];
-
-/**
- * Where the active mode came from: a session boundary (restored marker or a
- * handoff-seeded session) or an in-place switch mid-session.
- */
-export type ModeOrigin = "boundary" | "inplace";
 
 export interface ModeState {
 	mode: WorkflowMode;
-	origin: ModeOrigin;
-	/**
-	 * The user approved this plan in the session that produced this mode, so the
-	 * Implement flow must not re-request approval for the first slice.
-	 */
-	approved?: boolean;
 }
 
 export const MODE_ENTRY_TYPE = "agent-workflow:mode";
 
 export const MODE_UPDATE_EVENT = "agent-workflow:mode-update";
 export const MODE_DESCRIPTIONS: Record<WorkflowMode, string> = {
-	plan: "Plan mode: explore and produce an approved lifecycle plan plus discovery handoff; no implementation",
-	implement: "Implement mode: resume a saved plan in a fresh context and execute one approved slice",
-	review: "Review mode: fresh-eyes review of the task diff against the saved plan; no new work",
+	plan: "Plan mode: explore and present a plan for approval; no implementation",
+	implement: "Implement mode: execute the approved plan and summarize honestly",
 };
 
 export function isWorkflowMode(value: unknown): value is WorkflowMode {
@@ -53,21 +39,19 @@ export function isWorkflowMode(value: unknown): value is WorkflowMode {
  * pi.sendMessage is a top-level custom_message entry — not a message entry
  * with a custom role.
  */
-function markerDetails(entry: SessionEntry): { mode?: unknown; origin?: unknown; approved?: unknown } | undefined {
+function markerDetails(entry: SessionEntry): { mode?: unknown } | undefined {
 	if (entry.type !== "custom_message" || entry.customType !== MODE_ENTRY_TYPE) return undefined;
-	return entry.details as { mode?: unknown; origin?: unknown; approved?: unknown } | undefined;
+	return entry.details as { mode?: unknown } | undefined;
 }
 
 function restoredState(ctx: ExtensionContext): ModeState {
-	let state: ModeState = { mode: "plan", origin: "boundary" };
+	let state: ModeState = { mode: "plan" };
 	for (const entry of ctx.sessionManager.getBranch()) {
 		const details = markerDetails(entry);
+		// Legacy markers (e.g. the retired review mode) fail this guard and the
+		// session falls back to plan.
 		if (!isWorkflowMode(details?.mode)) continue;
-		state = {
-			mode: details.mode,
-			origin: details.origin === "inplace" ? "inplace" : "boundary",
-			approved: details.approved === true,
-		};
+		state = { mode: details.mode };
 	}
 	return state;
 }
@@ -77,16 +61,16 @@ export interface ModeManagement {
 	/** Re-derive the mode from the branch marker; publishes only on change. */
 	syncFromBranch: (ctx: ExtensionContext) => ModeState;
 	/**
-	 * Switch mode inside the running session: persist the in-place marker,
-	 * publish the change, and either kick off the mode's first turn (when a
-	 * kickoff is given, so the flow starts immediately) or surface a notice.
-	 * This is the same-session half of /mode; a fresh session opens via handoff.
+	 * Switch mode inside the running session: persist the marker, publish the
+	 * change, and either kick off the mode's first turn (when a kickoff is
+	 * given, so the flow starts immediately) or surface a notice. A fresh
+	 * session opens via handoff.ts instead.
 	 */
-	switchInPlace: (ctx: ExtensionContext, mode: WorkflowMode, options?: { kickoff?: string; approved?: boolean }) => void;
+	switchInPlace: (ctx: ExtensionContext, mode: WorkflowMode, kickoff?: string) => void;
 }
 
 export function registerModeManagement(pi: ExtensionAPI): ModeManagement {
-	let current: ModeState = { mode: "plan", origin: "boundary" };
+	let current: ModeState = { mode: "plan" };
 
 	const emitMode = () => pi.events.emit(MODE_UPDATE_EVENT, current.mode);
 
@@ -105,8 +89,8 @@ export function registerModeManagement(pi: ExtensionAPI): ModeManagement {
 	pi.on("session_start", reconstruct);
 	pi.on("session_tree", reconstruct);
 
-	const switchInPlace = (ctx: ExtensionContext, mode: WorkflowMode, options: { kickoff?: string; approved?: boolean } = {}): void => {
-		current = { mode, origin: "inplace", approved: options.approved === true };
+	const switchInPlace = (ctx: ExtensionContext, mode: WorkflowMode, kickoff?: string): void => {
+		current = { mode };
 		pi.sendMessage(
 			{ customType: MODE_ENTRY_TYPE, content: `Workflow mode: ${mode}.`, display: false, details: current },
 			{ triggerTurn: false },
@@ -114,8 +98,8 @@ export function registerModeManagement(pi: ExtensionAPI): ModeManagement {
 		emitMode();
 		// A kickoff message triggers the next turn itself, so the flow starts
 		// without a separate notice; a bare switch just announces the new mode.
-		if (options.kickoff) {
-			pi.sendUserMessage(options.kickoff);
+		if (kickoff) {
+			pi.sendUserMessage(kickoff);
 			return;
 		}
 		const note = `Workflow mode: ${mode}. ${MODE_DESCRIPTIONS[mode]}.`;

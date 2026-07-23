@@ -1,30 +1,26 @@
 /**
- * openHandoffSession — the "fresh session" half of /mode.
+ * openHandoffSession — the /handoff command's implementation.
  *
- * The in-place switch (mode.switchInPlace) reuses the running session, which is
- * right for small tasks. A handoff is the session boundary: it spawns a new
- * session, seeds the mode marker and the task name before the first turn, and
- * sends a kickoff message carrying the concrete lifecycle-plan and discovery
- * paths, so the next mode starts with a lean context and nothing to retype.
- * Only a command handler can spawn a session, so /mode owns this entry point.
+ * The approval prompt's Proceed choice reuses the running session
+ * (mode.switchInPlace); a handoff is the session boundary: it spawns a new
+ * session, seeds the implement-mode marker and the task name before the first
+ * turn, and sends a kickoff message carrying the concrete plan path, so
+ * implementation starts with a lean context and nothing to retype. Only a
+ * command handler can spawn a session, so /handoff owns this entry point.
  */
 
-import { readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { MODE_ENTRY_TYPE, WORKFLOW_MODES, type WorkflowMode } from "./mode.js";
-import { canonicalTaskName, findPlanStates, type PlanStatus } from "./task.js";
+import { MODE_ENTRY_TYPE } from "./mode.js";
+import { canonicalTaskName, listPlanNames, planPath } from "./task.js";
 
 const HANDOFF_NOTICE_TYPE = "agent-workflow:handoff-notice";
-const PLAN_FILE = /^(.+)\.(todo|active|done)\.md$/;
-const PENDING_STATUSES: readonly PlanStatus[] = ["todo", "active"];
-const USAGE = `Usage: /mode <${WORKFLOW_MODES.join("|")}> [continue|fresh] [task-name].`;
+const USAGE = "Usage: /handoff [task-name].";
 
 interface HandoffTask {
 	name: string;
-	status: PlanStatus;
 	planPath: string;
-	discoveryPath: string;
 }
 
 interface Resolution {
@@ -32,125 +28,76 @@ interface Resolution {
 	error?: string;
 }
 
-function relativePlanPath(name: string, status: PlanStatus): string {
-	return `${CONFIG_DIR_NAME}/goal/${name}.${status}.md`;
+function relativePlanPath(name: string): string {
+	return `${CONFIG_DIR_NAME}/plan/${name}.md`;
 }
 
-/** Unique canonical task names that own a plan in one of the given statuses. */
-function listTaskNames(cwd: string, statuses: readonly PlanStatus[]): string[] {
-	let files: string[];
-	try {
-		files = readdirSync(join(cwd, CONFIG_DIR_NAME, "goal"));
-	} catch {
-		return [];
-	}
-	const names = new Set<string>();
-	for (const file of files) {
-		const match = file.match(PLAN_FILE);
-		if (!match || !statuses.includes(match[2] as PlanStatus)) continue;
-		const name = canonicalTaskName(match[1]);
-		if (name) names.add(name);
-	}
-	return [...names].sort();
-}
-
-/** Load the single lifecycle plan for a task name, mirroring manage_task's ambiguity rule. */
 function taskFor(cwd: string, name: string): Resolution {
-	const states = findPlanStates(cwd, name);
-	if (states.length === 0) return { error: `No lifecycle plan for ${name} under ${CONFIG_DIR_NAME}/goal/.` };
-	if (states.length > 1) {
-		return { error: `Ambiguous lifecycle state for ${name}; found ${states.map(({ status }) => status).join(", ")}.` };
+	if (!existsSync(planPath(cwd, name))) {
+		return { error: `No plan for ${name} under ${CONFIG_DIR_NAME}/plan/.` };
 	}
-	return {
-		task: {
-			name,
-			status: states[0].status,
-			planPath: relativePlanPath(name, states[0].status),
-			discoveryPath: `${CONFIG_DIR_NAME}/goal/${name}.discovery.md`,
-		},
-	};
+	return { task: { name, planPath: relativePlanPath(name) } };
 }
 
-export function resolveHandoffTask(cwd: string, mode: WorkflowMode, requested: string | undefined, sessionName: string | undefined): Resolution {
+/**
+ * .pi/plan/ accumulates (plan files are never deleted by the agent), so
+ * resolution never assumes a single file: the explicit name wins, then the
+ * session name, and only a lone remaining file is picked implicitly.
+ */
+export function resolveHandoffTask(cwd: string, requested: string | undefined, sessionName: string | undefined): Resolution {
 	if (requested) {
 		const name = canonicalTaskName(requested);
 		if (!name) return { error: `"${requested}" is not a task name. ${USAGE}` };
 		return taskFor(cwd, name);
 	}
 
-	// The session name is the task name once a lifecycle plan froze it.
+	// The session name is the task name once save_plan named it.
 	const current = canonicalTaskName(sessionName);
-	if (current && findPlanStates(cwd, current).length > 0) return taskFor(cwd, current);
+	if (current && existsSync(planPath(cwd, current))) return taskFor(cwd, current);
 
-	let names = listTaskNames(cwd, PENDING_STATUSES);
-	// Reviewing a finished task is legitimate; implementing one is not.
-	if (names.length === 0 && mode === "review") names = listTaskNames(cwd, ["done"]);
+	const names = listPlanNames(cwd);
 	if (names.length === 1) return taskFor(cwd, names[0]);
-	if (names.length > 1) return { error: `Several plans under ${CONFIG_DIR_NAME}/goal/: ${names.join(", ")} — run /mode ${mode} fresh <task-name>.` };
-	if (mode === "plan") return {};
-	return { error: `No lifecycle plan under ${CONFIG_DIR_NAME}/goal/ — run a Plan session first.` };
+	if (names.length > 1) return { error: `Several plans under ${CONFIG_DIR_NAME}/plan/: ${names.join(", ")} — run /handoff <task-name>.` };
+	return { error: `No plan under ${CONFIG_DIR_NAME}/plan/ — plan first.` };
 }
 
-export function handoffKickoff(mode: WorkflowMode, task: HandoffTask | undefined, options: { approved?: boolean } = {}): string | undefined {
-	if (!task) return undefined;
-	switch (mode) {
-		case "implement":
-			return options.approved
-				? `Execute the next slice of the approved lifecycle plan at ${task.planPath}. The user approved this plan in the session that handed off to this one, so do not ask for approval again — state the slice you are executing and start. Read ${task.discoveryPath} first when present.`
-				: `Resume the lifecycle plan at ${task.planPath} and execute the next slice. Read ${task.discoveryPath} first when present.`;
-		case "review":
-			// A done plan means every slice landed, so the review covers the whole task —
-			// including slices already committed — not just whatever is still uncommitted.
-			return task.status === "done"
-				? `Review the completed task ${task.name}: plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}. The plan is closed as done, so review the full task diff against the task's base — every slice, including the ones already committed — not only the working tree.`
-				: `Review the task ${task.name}: plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}.`;
-		case "plan":
-			return `Re-plan the task ${task.name}: existing plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}.`;
-	}
+/** Executing from a handoff is auto-approved: the user approved the plan in the session that handed off. */
+export function handoffKickoff(task: HandoffTask): string {
+	return `Execute the approved plan at ${task.planPath}. The user approved it in the session that handed off to this one, so do not ask for approval again. If the repository state diverges from the plan, stop and report instead of guessing.`;
 }
 
 /**
- * Spawn a fresh session in `mode`, seeded with the resolved task's plan. On a
+ * Spawn a fresh implement session seeded with the resolved task's plan. On a
  * resolution error it notifies and spawns nothing. Callable only with a command
  * context, since session spawning is gated to command handlers.
  */
 export async function openHandoffSession(
 	pi: ExtensionAPI,
 	ctx: ExtensionCommandContext,
-	mode: WorkflowMode,
 	taskName?: string,
-	options: { approved?: boolean } = {},
 ): Promise<void> {
 	const notify = (message: string, type: "info" | "warning") => {
 		if (ctx.hasUI) ctx.ui.notify(message, type);
 		else pi.sendMessage({ customType: HANDOFF_NOTICE_TYPE, content: message, display: true }, { triggerTurn: false });
 	};
 
-	const { task, error } = resolveHandoffTask(ctx.cwd, mode, taskName, ctx.sessionManager.getSessionName());
-	if (error) {
-		notify(error, "warning");
+	const { task, error } = resolveHandoffTask(ctx.cwd, taskName, ctx.sessionManager.getSessionName());
+	if (error || !task) {
+		notify(error ?? USAGE, "warning");
 		return;
 	}
 
-	// Approval only carries into implementation; review has no approval gate.
-	const approved = options.approved === true && mode === "implement";
-	const kickoff = handoffKickoff(mode, task, { approved });
+	const kickoff = handoffKickoff(task);
 	await ctx.waitForIdle();
 	await ctx.newSession({
 		parentSession: ctx.sessionManager.getSessionFile(),
 		// session_start fires before this, so the marker is what the new
 		// session's extension instance derives its mode from.
 		setup: async (sessionManager) => {
-			sessionManager.appendCustomMessageEntry(MODE_ENTRY_TYPE, `Workflow mode: ${mode}.`, false, { mode, origin: "boundary", approved });
-			if (task) sessionManager.appendSessionInfo(task.name);
+			sessionManager.appendCustomMessageEntry(MODE_ENTRY_TYPE, "Workflow mode: implement.", false, { mode: "implement" });
+			sessionManager.appendSessionInfo(task.name);
 		},
 		withSession: async (next) => {
-			if (!kickoff) {
-				const message = `Plan session ready. Describe the goal.`;
-				if (next.hasUI) next.ui.notify(message, "info");
-				else await next.sendMessage({ customType: HANDOFF_NOTICE_TYPE, content: message, display: true }, { triggerTurn: false });
-				return;
-			}
 			// sendUserMessage resolves only when the triggered turn ends: an
 			// interactive session must not block on it, while a headless run
 			// would otherwise exit mid-turn.

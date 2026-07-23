@@ -8,7 +8,7 @@ describe("phase indicator", () => {
 	it.each([
 		["goal", "plan", "accent", "● PLAN"],
 		["planning", "implement", "accent", "● IMPLEMENT · PLANNING"],
-		["implementation", "review", "accent", "● REVIEW · IMPLEMENTATION"],
+		["implementation", "implement", "accent", "● IMPLEMENT · IMPLEMENTATION"],
 	] as const)("renders the idle %s phase with %s mode persistently", (phase, mode, color, expected) => {
 		let factory: any;
 		const ctx = {
@@ -80,7 +80,6 @@ describe("phase indicator", () => {
 	it.each([
 		["plan", ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"]],
 		["implement", ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"]],
-		["review", ["Auditing…", "Probing…", "Verifying…", "Inspecting…", "Challenging…", "Confirming…"]],
 	] as const)("changes the active %s activity every 10 seconds without repeating it", (mode, messages) => {
 		vi.useFakeTimers();
 		vi.spyOn(Math, "random").mockReturnValue(0);

@@ -27,7 +27,6 @@ const PHASE_DISPLAY: Record<WorkflowPhase, { label?: string; color: ThemeColor }
 const MODE_DISPLAY: Record<WorkflowMode, { label: string; messages: string[] }> = {
   plan: { label: "PLAN", messages: ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"] },
   implement: { label: "IMPLEMENT", messages: ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"] },
-  review: { label: "REVIEW", messages: ["Auditing…", "Probing…", "Verifying…", "Inspecting…", "Challenging…", "Confirming…"] },
 };
 
 /** Status icons for each todo state */
