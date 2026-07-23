@@ -12,24 +12,14 @@
 
 The local-first flow is guidance, not enforcement (see [FLOW.md](FLOW.md)).
 Say so in chat — "we haven't agreed on an approach yet" — and the agent should
-return to exploration. The hard gates only cover destructive commands, web
-access, and vendored-code reads.
+return to exploration. There are no hard gates — the bundle ships no permission
+gate, so nothing intercepts a tool call.
 
-## Minimal Action Confirmation did not prompt
+## Nothing prompts before destructive commands
 
-It is intentionally denylist-based, not a general approval system. It prompts
-for recognized destructive commands, edit/write outside the project, `curl`
-or externally supplied web search/fetch tools, and vendored-code reads. It does not normally prompt for
-installs, pushes without force, mkdir, redirects, or other reversible work.
-See source comments in `extensions/minimal-action-confirmation/index.ts` for known matcher
-limits.
-
-## Web access is blocked in headless runs
-
-Intentional: `curl`, externally supplied web tools, and vendored-code reads
-need interactive confirmation. Headless runs have no UI, so gated calls are
-blocked with a notice rather than hanging. Disable the gate only if you accept
-ungated web access.
+Expected. The permission gate was removed on 2026-07-23; agent tool calls run
+ungated. If you want confirmation prompts back, use Pi's own permission
+configuration or run with a sandbox — this bundle no longer provides one.
 
 ## Full typecheck fails
 

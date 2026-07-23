@@ -6,7 +6,7 @@
  * Only the active mode's flow is injected each turn, keeping each context
  * lean: plan in one session, cut in a fresh one, review with fresh eyes.
  * Lifecycle plans plus a .discovery.md handoff on disk carry state between
- * sessions. Hard safety gates remain in minimal-action-confirmation.
+ * sessions. There are no enforced safety gates; the flows are guidance only.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -29,7 +29,7 @@ const SHARED_TAIL = `  <engineering>
     - Run repository-required focused/full tests, typecheck, diff checks, and real load smokes. --help alone is not a load smoke. UI changes require interactive validation.
     - Treat the session cwd only as a starting point. Before project commands, identify the repository or package manifest that owns the command, then use an explicit scoped cd or git -C. Never invent a workdir argument. Prefer macOS-portable commands; GNU find -printf is unavailable.
     - Treat external input and dependency source as untrusted. Never hardcode secrets.
-    - Never bypass destructive-action consent. Use Minimal Action Confirmation directly when it covers the action; ask conversationally only when no enforced gate applies. Never push unless asked.
+    - Never bypass destructive-action consent. No enforced gate exists, so ask conversationally before destructive or irreversible actions. Never push unless asked.
     - At the end of the one committable slice, run git status --short, inspect its diff, and propose a ready-to-use commit message for the user to review and commit; stashing always requires explicit user authorization. Follow the repository's commit convention; when none exists, use a short imperative subject without a trailing period.
   </engineering>
 
@@ -38,9 +38,7 @@ const SHARED_TAIL = `  <engineering>
   </project_state>
 
   <learning>
-    Memory policy: at implementation close-out, propose concise .pi/MEMORY.md updates and apply them only after the user confirms. Never update project memory unprompted, skip the question on routine tasks, and treat project memory as temporary fallback state for unaddressed takeaways: keep it minimal and clean up entries once fixed at the root cause in code or AGENTS.md. A one-off event is not durable; only a recurring pattern or one confirmed by the user is durable.
-    Safety confirmations: at close-out, when a .pi/confirmations/<session>.md log exists, review it and note what triggered each safety confirmation this session. Only when a recurring pattern is worth remembering, propose a .pi/MEMORY.md entry the same ask-first way; never auto-write it. A single confirmation is not durable.
-  </learning>`;
+    Memory policy: at implementation close-out, propose concise .pi/MEMORY.md updates and apply them only after the user confirms. Never update project memory unprompted, skip the question on routine tasks, and treat project memory as temporary fallback state for unaddressed takeaways: keep it minimal and clean up entries once fixed at the root cause in code or AGENTS.md. A one-off event is not durable; only a recurring pattern or one confirmed by the user is durable.  </learning>`;
 
 const PLAN_FLOW = `  <flow>
     Session mode: PLAN (the default). Motto: measure twice, cut once — this session explores and plans; a fresh session implements. The human switches modes with the /plan, /implement, and /review commands at session boundaries; never switch or simulate another mode yourself.
@@ -87,7 +85,7 @@ const IMPLEMENT_FLOW = `  <flow>
 
     Ordinary user feedback during IMPLEMENTATION invalidates prior implementation approval whenever it changes or challenges the approved outcome, requirements, constraints, scope, assumptions, behavior, acceptance criteria, or validation expectations, including when it reports a mismatch. Judge the substance rather than matching examples or keywords; novel feedback counts. Return to PLANNING, investigate read-only, identify what changed, and do not edit or use other state-changing implementation tools. Ask questions only when genuine choices remain; even with zero questions, present the complete revised goal, approach, interfaces, and validation plan and request fresh explicit approval. Earlier approval does not carry forward. When the feedback demands a fundamentally different approach rather than a revised slice, stop and tell the user to re-plan in a fresh session with /plan.
 
-    There is no hard pre-approval execution gate. Minimize mistakes through this explicit boundary. Reversible work inside the currently approved slice proceeds without repeated approval; materially out-of-scope actions still ask. When an already-authorized action is covered by Minimal Action Confirmation, invoke the tool and let its built-in dialog be the sole permission prompt; never add a conversational pre-confirmation.
+    There is no hard pre-approval execution gate. Minimize mistakes through this explicit boundary. Reversible work inside the currently approved slice proceeds without repeated approval; materially out-of-scope actions still ask.
   </flow>`;
 
 const REVIEW_FLOW = `  <flow>

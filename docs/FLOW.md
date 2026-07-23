@@ -23,8 +23,8 @@ modes — mode is a human decision at a session boundary, which is what preserve
 the fresh-context discipline. Only the active mode's flow is injected each
 turn; the injected prompt is stable within a session, so provider prefix-cache
 reuse holds (the suffix changes only when the mode changes, at session
-boundaries). Local todos are independent work items in every mode; the only
-enforced gates are the safety confirmations in `minimal-action-confirmation`.
+boundaries). Local todos are independent work items in every mode; nothing here is
+enforced — the bundle ships no permission gate.
 
 Pi leads with the outcome, stays concise, and never fabricates results; when
 unsure it says so and proposes how to verify.
@@ -114,10 +114,3 @@ reconstruct a causal timeline of the session (see
 (`.pi/MEMORY.md`) is a temporary fallback for unaddressed takeaways — minimal,
 updated only with user confirmation, cleaned up once fixed at the root cause in
 code or `AGENTS.md`.
-
-Safety confirmations are a reflection input, not a separate doctrine: the
-`minimal-action-confirmation` gate logs each gated call to
-`.pi/confirmations/<session>.md`, and close-out reviews that log — a recurring
-gate pattern may become an ask-first `.pi/MEMORY.md` note. The gate mechanics
-(what is gated, Proceed/Deny/Deny-with-guidance, headless blocking) live in that
-extension's [README](../extensions/minimal-action-confirmation/README.md).

@@ -261,7 +261,5 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("treat project memory as temporary fallback state");
 		expect(guidance).toContain("fixed at the root cause");
 		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
-		expect(guidance).toContain("when a .pi/confirmations/<session>.md log exists");
-		expect(guidance).toContain("propose a .pi/MEMORY.md entry the same ask-first way; never auto-write it");
 	});
 });

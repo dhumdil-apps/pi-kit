@@ -27,19 +27,21 @@ guidance flow — see `docs/FLOW.md`.
 
 Removed from the bundle (2026-07-20): `pi-web-access` (Nico Bailon, npm
 `0.13.0`, MIT). The bundle now brainstorms from local reasoning and repository
-context by default; deliberate `curl` use is guarded by Minimal Action Confirmation.
+context by default; `curl` is available but ungated.
 
 Removed from the bundle (2026-07-20): `pi-ask-user` (npm `0.13.0`, MIT).
-Discovery and plan approval now use ordinary conversational turns; safety
-confirmation uses Pi's built-in dialogs.
+Discovery and plan approval now use ordinary conversational turns.
+
+Removed from the bundle (2026-07-23): `minimal-action-confirmation`
+(bundle-local). The denylist permission gate, its confirmation log, and its
+`permission-gate` setting are gone — the bundle now runs ungated ("yolo"),
+with destructive-action consent handled conversationally by the workflow flows.
 
 ## Local compatibility changes
 
 - Powerbar imports the vendored Extension Settings module by relative path.
 - Manage Todo List imports the current `@earendil-works/pi-*` package scope in place of its legacy `@mariozechner/pi-*` scope.
-- Headless safeguards keep Session Dashboard and safety confirmation from hijacking or blocking non-interactive processes.
-- Minimal Action Confirmation is denylist-scoped, uses Pi's built-in dialogs,
-  and retains its on/off toggle in Extension Settings.
+- Headless safeguards keep Session Dashboard from hijacking non-interactive processes.
 
 ## Upstream License Notices
 

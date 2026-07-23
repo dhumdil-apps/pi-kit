@@ -49,11 +49,6 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 		description: "Persists workflow phase and todos in sessions; provides `manage_todo_list` and `/todos`.",
 	},
 	{
-		name: "minimal-action-confirmation",
-		group: "guardrails",
-		description: "Intercepts guarded tool calls and confirms destructive commands, external writes, web access, and vendored reads.",
-	},
-	{
 		name: "interrupt-confirmation",
 		group: "guardrails",
 		description: "Confirms an interrupt before it stops a running agent.",

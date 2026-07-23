@@ -37,8 +37,7 @@
       "./extensions/usage-monitor/index.ts",
       "./extensions/usage-history/index.ts",
       "./extensions/progress-tracker/index.ts",
-      "./extensions/session-dashboard/index.ts",
-      "./extensions/minimal-action-confirmation/index.ts"
+      "./extensions/session-dashboard/index.ts"
     ],
     "prompts": [
       "./prompts"

@@ -5,7 +5,7 @@ Vendored Pi package repository. Active code lives under `extensions/` and `skill
 ## Operating Model & Workflow
 
 - **Single Agent**: Single-agent execution with guidance in `extensions/agent-workflow/` (see [`docs/FLOW.md`](docs/FLOW.md)).
-- **Safety**: Enforced guardrails live in `extensions/minimal-action-confirmation/`.
+- **Safety**: No enforced guardrails — the bundle runs ungated; destructive-action consent is conversational, per the workflow flows.
 - **Task Start**: Read `.pi/MEMORY.md` when present in the target project before modifying code.
 - **Task Planning**: Follow [`docs/FLOW.md`](docs/FLOW.md) for conversational question batching and explicit plan approval.
 - **Commit Discipline**: Never commit or stash automatically. After completing a verified slice, inspect `git status` and propose a ready-to-use commit message.
@@ -31,6 +31,6 @@ pi -p --no-session --tools '' "Reply exactly HEADLESS_OK" # Headless load smoke 
 
 ## Safety & Secrets
 
-- Preserve Minimal Action Confirmation denylist gates (destructive commands, out-of-project writes, web requests, reading vendored dependencies, recursive search).
+- The bundle ships no permission gate: tool calls are not intercepted. Ask before destructive or irreversible actions rather than relying on a dialog.
 - Never commit `~/.pi/agent/auth.json`, session histories, caches, or runtime `.pi/` state.
 - Update [`UPSTREAM.md`](UPSTREAM.md) whenever importing or updating vendored components.

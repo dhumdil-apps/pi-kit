@@ -14,7 +14,6 @@ extension.
 - **Progress Tracker** — Global workflow route plus separate local todo widget (`manage_todo_list`, `/todos`)
 - **Session Dashboard** — Pi-glyph welcome, This-Week spend chart, and project-context line
 - **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`; see [FLOW.md](FLOW.md))
-- **Minimal Action Confirmation** — Confirmation for destructive commands, outside-project writes, `curl`/web access, vendored-code reads, and recursive search/list rooted outside the project
 
 ## Supporting resources
 
@@ -39,7 +38,6 @@ single-agent policy stands (see the earlier `pi-subagents` removal below).
 
 These are the settings currently exposed through `/extension-settings`:
 
-- **Minimal Action Confirmation** — `enabled`
 - **Status Bar** — `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width`
 
 Status Bar defaults place
@@ -65,17 +63,20 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
   (scout/planner/worker/reviewer, later a serial explorer/coder pair) proved
   unstable — dead-looped handoffs and flaky parallel/async runs.
 - `pi-web-access`: removed (2026-07-20). Brainstorming and repository context
-  are local-first; deliberate shell web access through `curl` is consent-gated.
+  are local-first; shell web access through `curl` remains available and ungated.
 - `plan-mode`: removed (2026-07-19). The phase/state machine, triage, ledger,
   gates, and its `/plan` commands were replaced by the guidance flow in
-  [FLOW.md](FLOW.md) plus the global Minimal Action Confirmation rules — guidance over
-  rules, gates only where content is genuinely dangerous. (The current `/plan`
+  [FLOW.md](FLOW.md) — guidance over rules. (The current `/plan`
   command is unrelated: a human-only session-mode selector, not a state machine.)
 - `interactive-prompt` and `skills/ask-user`: removed (2026-07-20).
-  Planning is conversational; only safety confirmations use Pi's built-in dialog.
+  Planning is conversational.
+- `minimal-action-confirmation`: removed (2026-07-23). The denylist permission
+  gate, its `.pi/confirmations/` log, and its `permission-gate` setting are gone;
+  the bundle runs ungated and relies on conversational consent before destructive
+  actions.
 - `/flash`: removed (2026-07-22). The managed "cruise control" autonomous mode
   and its `⚡ flash` status segment are gone. To run Pi unsupervised, start raw Pi
-  with `pi --no-extensions` — which drops all bundle guidance *and* guardrails.
+  with `pi --no-extensions` — which drops all bundle guidance.
 - `/forensic`: removed (2026-07-22). The deep session retrospective is now a manual
   request; see [RECIPES.md](RECIPES.md#deep-session-retrospective). The bounded
   session-evidence packet it injected is gone with it.

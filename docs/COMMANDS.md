@@ -24,9 +24,7 @@ there is no enforced state machine.
   keys first open a red confirmation overlay: Enter confirms cancellation, while
   Esc or **Keep running** dismisses the overlay without stopping the agent.
 - Planning questions appear in the conversation and accept compact answers such
-  as `1A 2C 3B`; safety confirmations continue to use Pi's built-in dialog.
+  as `1A 2C 3B`.
 - `Ctrl+C` clears/cancels; `Ctrl+D` exits from an empty prompt.
-- Minimal Action Confirmation applies to agent tool calls, not arbitrary shell
-  commands you intentionally execute yourself.
-- Agent-issued `curl` calls require Minimal Action Confirmation every time and
-  are blocked in headless sessions.
+- The bundle intercepts no tool calls: agent-issued commands, writes, and `curl`
+  run without a permission prompt.

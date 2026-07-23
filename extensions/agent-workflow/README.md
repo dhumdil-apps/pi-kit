@@ -5,7 +5,7 @@ Review — plus shared tone/engineering/state/learning guidance into every turn.
 Motto: measure twice, cut once — plan in one session, implement in a fresh one,
 review with fresh eyes. The human switches modes with the `/plan`,
 `/implement`, and `/review` commands (the model cannot); the current mode shows
-in the status bar. Safety gates remain in `minimal-action-confirmation`.
+in the status bar. The flows are guidance only; nothing here is enforced.
 
 [`docs/FLOW.md`](../../docs/FLOW.md) is the canonical human-readable behavior
 contract; this extension's injected prompt is its operational mirror and the
