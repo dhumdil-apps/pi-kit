@@ -5,10 +5,9 @@ Use this page as the navigation map for the `pi-kit` package and development rep
 ## Consumer & User Guides
 
 - **[Install & Setup](../README.md#quick-start)** — Installation, setup, & verification
-- **[Extension & Resource Catalog](EXTENSIONS.md)** — Catalog of extensions, skills, & themes
-- **[The Working Flow](FLOW.md)** — Workflow, autonomous runs, & safety gates
+- **[Extension & Resource Catalog](EXTENSIONS.md)** — Catalog of extensions, prompts, & themes
+- **[The Working Flow](FLOW.md)** — Session modes, handoffs, & autonomous runs
 - **[Commands & Tools](COMMANDS.md)** — Quick reference for commands & tools
-- **[Recipes](RECIPES.md)** — One-off tasks you can ask Pi to do
 - **[Troubleshooting](TROUBLESHOOTING.md)** — Troubleshooting & diagnostic steps
 
 ## Maintainer & Developer Guides
@@ -18,7 +17,7 @@ Use this page as the navigation map for the `pi-kit` package and development rep
 
 ## Source-of-Truth Boundaries
 
-- **Git Repository**: Source for extensions, skills, prompts, themes, tests, and documentation.
+- **Git Repository**: Source for extensions, prompts, themes, tests, and documentation.
 - **`~/.pi/agent/settings.json`**: Machine-local source for selected model, theme, and package source.
 - **`~/.pi/agent/settings-extensions.json`**: Global extension preferences configured via `/extension-settings`.
 - **Project Files**: User-owned `.pi/MEMORY.md`, goals, and local configuration.

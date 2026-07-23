@@ -10,8 +10,9 @@ there is no enforced state machine.
 - **`/plan`**, **`/implement`**, **`/review`** — Human-only session-mode selectors (Plan is the default); each flips which flow is injected **in the current session** and updates the above-editor workflow indicator
 - **`/handoff <plan|implement|review> [task-name]`** — Human-only session boundary: opens a fresh session in that mode, seeded with the task name and a kickoff message carrying the plan and discovery paths. Without a task name it uses the current task, or the single pending plan under `.pi/goal/`; with several it asks which one
 - **`/todos`** — Reveal workflow progress and toggle the independent local todo widget
+- **`/help`** — Full reference: commands, shortcuts, and every active extension
 - **`/extension-settings`** — Edit registered global extension settings
-- **`/usage`** — Show historical token/cost usage
+- **`/usage`** — Show historical token/cost usage (`/usage-refresh` forces a quota fetch)
 
 ## User-facing tools
 

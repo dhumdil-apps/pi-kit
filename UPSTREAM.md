@@ -32,10 +32,22 @@ context by default; `curl` is available but ungated.
 Removed from the bundle (2026-07-20): `pi-ask-user` (npm `0.13.0`, MIT).
 Discovery and plan approval now use ordinary conversational turns.
 
+Removed from the bundle (2026-07-22, bundle-local): the `/flash` autonomous
+"cruise control" mode with its `⚡ flash` status segment (run raw Pi with
+`pi --no-extensions` instead), and `/forensic`, whose bounded session-evidence
+packet is gone — the deep retrospective is now a plain request, see
+[FLOW.md](docs/FLOW.md).
+
 Removed from the bundle (2026-07-23): `minimal-action-confirmation`
 (bundle-local). The denylist permission gate, its confirmation log, and its
 `permission-gate` setting are gone — the bundle now runs ungated, with
 destructive-action consent handled conversationally by the workflow flows.
+
+Removed from the bundle (2026-07-23, bundle-local): `skills/review` and
+`skills/simplify`, and with them the `pi.skills` manifest entry. The bundle is
+skill-free: the review procedure is baked into the Review mode flow and the
+simplification checklist into the end of the Implement mode flow, so neither
+depends on the model invoking a skill.
 
 ## Local compatibility changes
 

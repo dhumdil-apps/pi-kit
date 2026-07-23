@@ -22,17 +22,12 @@ extension.
 
 ## Single-agent policy
 
-The bundle runs as one agent, not an orchestrator with children: it reads and
-explores inline, proposes the plan itself, implements each step inline,
-validates after each step, then reviews inline. Only the parent agent owns
-user interaction, todos, commits, and final acceptance — there is no subagent
-tool or child-process delegation.
-
-The Plan / Implement / Review session-mode split (2026-07-23, see
-[FLOW.md](FLOW.md)) does not change this: each mode is still the one agent in
-one session, with the disk (lifecycle plan + `discovery.md`) as the handoff.
-Delegating phases to child processes was considered and rejected — the
-single-agent policy stands (see the earlier `pi-subagents` removal below).
+The bundle runs as one agent, not an orchestrator with children: there is no
+subagent tool and no child-process delegation, and the one agent owns user
+interaction, todos, commits, and final acceptance. The Plan / Implement /
+Review split (see [FLOW.md](FLOW.md)) does not change this — each mode is the
+same single agent in its own session, with the disk (lifecycle plan +
+`discovery.md`) as the handoff.
 
 ## Extension Preferences registry
 
@@ -48,44 +43,19 @@ sessions receive `<short-desc>` (or `<ticket>-<short-desc>` when a ticket is sup
 
 Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
 
-## Removed or folded-in components
+## Deliberately absent
 
-- `skills/review` and `skills/simplify`: removed (2026-07-23). The bundle is
-  fully skill-free — the review procedure now lives minimized inside the Review
-  mode flow (always injected in `/review` sessions, so there is no invocation
-  step to forget), and the simplification checklist lives inline at the end of
-  the Implement mode flow, run once by the author on the slice diff.
-- Status Bar's `context-usage` segment: removed (2026-07-23). Context usage is
-  now part of the Progress Tracker indicator above the editor, with the token
-  counts spelled out — one home per fact.
-- `pi-add-dir`: removed because it did not fit the normal workflow.
-- `pi-memory-md`: removed; project memory is an optional user-owned `.pi/MEMORY.md` file, consulted by the workflow without an extension.
-- standalone `pi-simplify`: removed; its focused cleanup logic lived on in
-  `skills/simplify/` until 2026-07-23 and is now the inline simplification pass
-  in the Implement mode flow.
-- `pi-subagents`: removed (2026-07-19). The multi-agent orchestration
-  (scout/planner/worker/reviewer, later a serial explorer/coder pair) proved
-  unstable — dead-looped handoffs and flaky parallel/async runs.
-- `pi-web-access`: removed (2026-07-20). Brainstorming and repository context
-  are local-first; shell web access through `curl` remains available and ungated.
-- `plan-mode`: removed (2026-07-19). The phase/state machine, triage, ledger,
-  gates, and its `/plan` commands were replaced by the guidance flow in
-  [FLOW.md](FLOW.md) — guidance over rules. (The current `/plan`
-  command is unrelated: a human-only session-mode selector, not a state machine.)
-- `interactive-prompt` and `skills/ask-user`: removed (2026-07-20).
-  Planning is conversational.
-- `minimal-action-confirmation`: removed (2026-07-23). The denylist permission
-  gate, its `.pi/confirmations/` log, and its `permission-gate` setting are gone;
-  the bundle runs ungated and relies on conversational consent before destructive
-  actions.
-- `/flash`: removed (2026-07-22). The managed "cruise control" autonomous mode
-  and its `⚡ flash` status segment are gone. To run Pi unsupervised, start raw Pi
-  with `pi --no-extensions` — which drops all bundle guidance.
-- `/forensic`: removed (2026-07-22). The deep session retrospective is now a manual
-  request; see [RECIPES.md](RECIPES.md#deep-session-retrospective). The bounded
-  session-evidence packet it injected is gone with it.
-- old Git package clones under `~/.pi/agent/git/...`: removed; Pi loads this
-  local working copy directly.
+- **No skills.** The review procedure lives inside the Review mode flow and the
+  simplification checklist at the end of the Implement mode flow, so neither
+  depends on the model remembering to invoke anything.
+- **No permission gate.** Tool calls are never intercepted; destructive-action
+  consent is conversational (see [FLOW.md](FLOW.md)).
+- **No managed autonomous mode.** To run Pi unsupervised, start raw Pi with
+  `pi --no-extensions` — which drops all bundle guidance.
+- **No subagents and no state machine.** Single-agent by policy, guidance over
+  rules; `/plan` is a human-only mode selector, not a phase machine.
+- **No context segment in the status bar.** Context usage lives in the Progress
+  Tracker indicator above the editor, with token counts spelled out.
 
-See [UPSTREAM.md](../UPSTREAM.md) for versions, licenses, and compatibility
-changes.
+[UPSTREAM.md](../UPSTREAM.md) records what was vendored, what was removed and
+when, plus versions and licenses.

@@ -45,7 +45,7 @@ approval for one committable slice. Legacy unsuffixed plans and
 
 The agent, not the extension, maintains `.pi/MEMORY.md` according to the workflow
 protocol with explicit user confirmation. For a deep manual session
-retrospective, see [docs/RECIPES.md](../../docs/RECIPES.md).
+retrospective, see [docs/FLOW.md](../../docs/FLOW.md#reflection-and-durable-learning).
 
 ## Notes
 

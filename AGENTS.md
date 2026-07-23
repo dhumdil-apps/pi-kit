@@ -1,6 +1,6 @@
 # AGENTS.md — pi-kit repository instructions
 
-Vendored Pi package repository. Active code lives under `extensions/` and `skills/`, declared in `package.json` (`pi.extensions`, `pi.skills`, `pi.prompts`, `pi.themes`).
+Vendored Pi package repository. Active code lives under `extensions/`, declared in `package.json` (`pi.extensions`, `pi.prompts`, `pi.themes`). The bundle ships no skills.
 
 ## Operating Model & Workflow
 
@@ -13,12 +13,11 @@ Vendored Pi package repository. Active code lives under `extensions/` and `skill
 
 ## Extension Architecture Rules
 
-1. **New Plans**: Reset local memory state to `undefined` before creating a new plan to prevent stale state leaks.
-2. **Resuming Blocked Plans**: Preserve existing todo items when resuming from a `blocked` phase.
-3. **User Options**: Use built-in Pi dialogs or conversational turns instead of `ctx.ui.select`.
-4. **Event Updates**: Emit `powerbar:update` and status events unconditionally (never gate behind `ctx.hasUI`).
-5. **Headless Fallback**: When `ctx.hasUI` is false, fall back to `pi.sendMessage` so non-interactive sessions receive status messages.
-6. **Imports**: Use relative `.js` specifiers for local TypeScript imports (`import ... from "./foo.js"`).
+1. **User Options**: Use built-in Pi dialogs or conversational turns instead of `ctx.ui.select`.
+2. **Event Updates**: Emit `powerbar:update` and status events unconditionally (never gate behind `ctx.hasUI`).
+3. **Headless Fallback**: When `ctx.hasUI` is false, fall back to `pi.sendMessage` so non-interactive sessions receive status messages.
+4. **Imports**: Use relative `.js` specifiers for local TypeScript imports (`import ... from "./foo.js"`).
+5. **Session Entries**: `sessionManager.getBranch()` returns raw entries — a `pi.sendMessage` marker is `{type: "custom_message", customType, details}`, while tool results are `{type: "message", message: {role: "toolResult"}}`. Check a real session JSONL before writing a matcher.
 
 ## Verification
 

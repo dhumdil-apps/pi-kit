@@ -3,7 +3,7 @@
 > π Measure twice, cut once.
 
 A single, vendored [Pi](https://pi.dev) package maintained by `dhumdil-apps`.
-It bundles productivity extensions, workflow automation, status indicators, and skills into one cohesive toolkit for your Pi coding sessions.
+It bundles productivity extensions, workflow guidance, status indicators, prompts, and themes into one cohesive toolkit for your Pi coding sessions.
 
 ## Quick Start
 
@@ -43,18 +43,16 @@ pi list
 ## Included Features
 
 - **agent-workflow** — Guidance-driven development across three session modes — **Plan → Implement → Review** — switched in place with `/plan`, `/implement`, `/review` or handed to a fresh seeded session with `/handoff <mode>`, with conversational question batches, plan + discovery-handoff persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
-- **project-memory** — Optional project-level `.pi/MEMORY.md` consulted at task start and maintained with your confirmation at task close-out.
-- **progress-tracker** — Global workflow status route and interactive `/todos` checklist widget.
+- **progress-tracker** — Workflow mode, phase, and context-usage indicator plus the interactive `/todos` checklist widget.
 - **session-dashboard** — Interactive welcome banner, spend visualization chart, and context indicators (`/help`).
 - **status-bar & usage-monitor** — Real-time quota and usage metrics in the status bar (`/usage`).
-- **bundled themes** — `dark` and `github-dark` themes (the review and simplify procedures live inside the workflow flows, not as skills).
+- **bundled themes** — `dark` and `github-dark`.
 
 ## Documentation
 
 - [Extension and resource catalog](docs/EXTENSIONS.md)
 - [The working flow](docs/FLOW.md)
 - [Commands and tools](docs/COMMANDS.md)
-- [Recipes — things you can ask Pi to do](docs/RECIPES.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Vendored upstream inventory](UPSTREAM.md)
 

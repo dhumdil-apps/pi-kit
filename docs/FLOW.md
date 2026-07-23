@@ -130,9 +130,18 @@ guidance and **no safety guardrails** — start it with `pi --no-extensions`
 ## Reflection and durable learning
 
 Close-out ends with a concise outcome summary and, when a durable non-obvious
-lesson surfaced, an offer to record it. For a deeper manual review, ask Pi to
-reconstruct a causal timeline of the session (see
-[RECIPES.md](RECIPES.md#deep-session-retrospective)). Project memory
-(`.pi/MEMORY.md`) is a temporary fallback for unaddressed takeaways — minimal,
-updated only with user confirmation, cleaned up once fixed at the root cause in
-code or `AGENTS.md`.
+lesson surfaced, an offer to record it. Project memory (`.pi/MEMORY.md`) is a
+temporary fallback for unaddressed takeaways — minimal, updated only with user
+confirmation, cleaned up once fixed at the root cause in code or `AGENTS.md`.
+
+For a deeper review, ask for one in plain chat — no command or extension is
+involved:
+
+> Reconstruct a causal timeline of this session: what I asked, what you did,
+> where friction or rework happened, and why. Cite the specific turns and tool
+> calls you can see, then surface any durable takeaway worth recording in
+> `.pi/MEMORY.md` (ask before writing).
+
+Pi reasons over the session it can see in context, so this is a qualitative
+reconstruction, not an instrumented report. Keep takeaways honest: a one-off
+event is not durable.
