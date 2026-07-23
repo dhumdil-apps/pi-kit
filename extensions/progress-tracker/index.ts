@@ -30,6 +30,17 @@ export default function (pi: ExtensionAPI) {
     // refreshStatus runs, so reading it here keeps the render pure.
     updatePhaseIndicator(state.getPhase(), currentMode, currentCtx, working, currentCtx.getContextUsage());
     updateTodoWidget(state, currentCtx, todosVisible);
+    const usage = currentCtx.getContextUsage();
+    pi.events.emit?.("agent-status:update", {
+      phase: state.getPhase(),
+      mode: currentMode,
+      working,
+      todos: state.read(),
+      currentTodoId: state.read().find((todo) => todo.status === "in-progress")?.id,
+      contextUsed: usage?.tokens ?? undefined,
+      contextMax: usage?.contextWindow ?? undefined,
+      cwd: currentCtx.cwd,
+    });
   };
 
   // --- Reconstruct state from session on load/switch/fork/tree ---

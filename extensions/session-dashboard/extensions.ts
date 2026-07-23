@@ -49,6 +49,11 @@ export const EXTENSION_PRESENTATIONS: readonly ExtensionPresentation[] = [
 		description: "Persists workflow phase and todos in sessions; provides `manage_todo_list` and `/todos`.",
 	},
 	{
+		name: "agent-status-bridge",
+		group: "workflow",
+		description: "Optionally reports display-only workflow status to a configured local observer.",
+	},
+	{
 		name: "interrupt-confirmation",
 		group: "guardrails",
 		description: "Confirms an interrupt before it stops a running agent.",
