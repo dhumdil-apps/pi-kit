@@ -24,11 +24,11 @@ describe("phase indicator", () => {
 	});
 
 	it.each([
-		[{ tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 }, "[accent]ctx [accent]▰[dim]▱▱▱ [accent]8% (84.0k / 1.0M)"],
-		[{ tokens: 940, contextWindow: 200_000, percent: 0.47 }, "[accent]ctx [accent]▰[dim]▱▱▱ [accent]0% (940 / 200.0k)"],
-		[{ tokens: 0, contextWindow: 200_000, percent: 0 }, "[accent]ctx [accent][dim]▱▱▱▱ [accent]0% (0 / 200.0k)"],
-		[{ tokens: 140_000, contextWindow: 200_000, percent: 70 }, "[warning]ctx [warning]▰▰▰[dim]▱ [warning]70% (140.0k / 200.0k)"],
-		[{ tokens: 180_000, contextWindow: 200_000, percent: 90 }, "[error]ctx [error]▰▰▰▰[dim] [error]90% (180.0k / 200.0k)"],
+		[{ tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 }, "[accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M"],
+		[{ tokens: 940, contextWindow: 200_000, percent: 0.47 }, "[accent]ctx [accent]█[dim]░░░ [accent]940 / 200.0k"],
+		[{ tokens: 0, contextWindow: 200_000, percent: 0 }, "[accent]ctx [accent][dim]░░░░ [accent]0 / 200.0k"],
+		[{ tokens: 140_000, contextWindow: 200_000, percent: 70 }, "[warning]ctx [warning]███[dim]░ [warning]140.0k / 200.0k"],
+		[{ tokens: 180_000, contextWindow: 200_000, percent: 90 }, "[error]ctx [error]████[dim] [error]180.0k / 200.0k"],
 	])("renders the context readout with a usage-colored bar (%o)", (usage, expected) => {
 		expect(contextUsageText(usage as any, theme)).toBe(expected);
 	});
@@ -50,7 +50,7 @@ describe("phase indicator", () => {
 
 		updatePhaseIndicator("planning", "implement", ctx, false, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
 		expect(factory({ requestRender: () => {} }, theme).render(120)).toEqual([
-			"[accent]● IMPLEMENT · PLANNING · [accent]ctx [accent]▰[dim]▱▱▱ [accent]8% (84.0k / 1.0M)",
+			"[accent]● IMPLEMENT · PLANNING · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M",
 		]);
 
 		// The goal phase stays label-free, and the working row is unchanged.

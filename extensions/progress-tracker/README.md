@@ -12,9 +12,10 @@ todos remain a separate widget and may track work in any phase.
   `goal`, `planning`, or `implementation` (one todo in progress at a time).
 - Persistent workflow indicator — idle `goal` states show `<MODE>`; later
   phases show `<MODE> · <PHASE>`. Both are followed by the context readout
-  `ctx ▰▱▱▱ 8% (84.0k / 1.0M)`, refreshed at turn boundaries and colored
+  `ctx █░░░ 84.0k / 1.0M`, refreshed at turn boundaries and colored
   accent / warning / error above 60% and 80% (this is the bundle's only context
-  indicator — Status Bar no longer ships one). Active agent runs choose a
+  indicator — Status Bar no longer ships one). The bar carries the proportion,
+  so the percentage is not printed. Active agent runs choose a
   concise mode-specific activity and randomly change it every 10 seconds
   without immediately repeating it, in the default blue accent color.
 - `/todos` command — report the phase indicator location and toggle the

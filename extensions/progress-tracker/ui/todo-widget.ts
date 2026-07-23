@@ -16,6 +16,8 @@ const TODO_WIDGET_ID = "todo-list";
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const ACTIVITY_ROTATION_MS = 10_000;
 // Four blocks regardless of context-window size, so the readout stays stable across models.
+// Bars use Block Elements (█ ░) rather than Geometric Shapes (▰ ▱): terminals draw these
+// themselves, so the bar never falls back to a foreign font face that breaks the cell rhythm.
 const CONTEXT_BAR_SEGMENTS = 4;
 const PHASE_DISPLAY: Record<WorkflowPhase, { label?: string; color: ThemeColor }> = {
   goal: { color: "accent" },
@@ -38,7 +40,7 @@ export const STATUS_ICONS: Record<string, string> = {
 /** Render a compact semantic-theme progress bar. */
 export function progressBar(completed: number, total: number, theme: Theme, width = 8): string {
   const filled = total === 0 ? 0 : Math.round((completed / total) * width);
-  return theme.fg("success", "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(width - filled));
+  return theme.fg("success", "█".repeat(filled)) + theme.fg("dim", "░".repeat(width - filled));
 }
 
 /** Compact token count: 940, 84.0k, 1.0M. */
@@ -49,7 +51,8 @@ function formatTokens(tokens: number): string {
 }
 
 /**
- * Context readout in the powerbar idiom — `ctx ▰▱▱▱ 8% (84.0k / 1.0M)`.
+ * Context readout in the powerbar idiom — `ctx █░░░ 84.0k / 1.0M`.
+ * The bar carries the proportion, so the percentage survives only as the readout color.
  * Returns undefined while the token count is unknown (e.g. right after compaction).
  */
 export function contextUsageText(usage: ContextUsage | undefined, theme: Theme): string | undefined {
@@ -58,8 +61,8 @@ export function contextUsageText(usage: ContextUsage | undefined, theme: Theme):
   const color: ThemeColor = percent > 80 ? "error" : percent > 60 ? "warning" : "accent";
   // Ceil, so any context in use shows at least one block rather than an empty track.
   const filled = Math.min(CONTEXT_BAR_SEGMENTS, Math.max(0, Math.ceil((usage.tokens / usage.contextWindow) * CONTEXT_BAR_SEGMENTS)));
-  const bar = theme.fg(color, "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(CONTEXT_BAR_SEGMENTS - filled));
-  const readout = `${percent}% (${formatTokens(usage.tokens)} / ${formatTokens(usage.contextWindow)})`;
+  const bar = theme.fg(color, "█".repeat(filled)) + theme.fg("dim", "░".repeat(CONTEXT_BAR_SEGMENTS - filled));
+  const readout = `${formatTokens(usage.tokens)} / ${formatTokens(usage.contextWindow)}`;
   return `${theme.fg(color, "ctx")} ${bar} ${theme.fg(color, readout)}`;
 }
 
