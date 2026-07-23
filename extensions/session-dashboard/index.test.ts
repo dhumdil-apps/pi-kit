@@ -118,9 +118,10 @@ describe("session dashboard startup", () => {
 		await startup;
 
 		const content = sendMessage.mock.calls[0]?.[0].content as string;
-		expect(content).toContain("π Measure twice, cut once. What’s your goal?");
-		expect(content.indexOf("⚡ Raw Pi")).toBeLessThan(content.indexOf("π Measure twice, cut once."));
-		expect(content.endsWith("π Measure twice, cut once. What’s your goal?")).toBe(true);
+		expect(content).toContain("⌘ Workflow: `/plan` · `/implement` · `/review` · `/handoff`");
+		expect(content.indexOf("⌘ Workflow")).toBeLessThan(content.indexOf("⚡ Raw Pi"));
+		expect(content).not.toContain("π Measure twice, cut once. What’s your goal?");
+		expect(content.endsWith("*⚡ Raw Pi: `pi --no-extensions`*")).toBe(true);
 		expect(setWidget).toHaveBeenLastCalledWith("session-dashboard-loading", undefined);
 	});
 
@@ -161,8 +162,8 @@ describe("session dashboard startup", () => {
 		const json = content.match(/<!-- session-dashboard-usage-chart -->\n(.+)\n<!-- \/session-dashboard-usage-chart -->/)?.[1];
 		const graph = JSON.parse(json ?? "") as GraphModel;
 		expect(content.indexOf("<!-- session-dashboard-usage-chart -->")).toBeLessThan(content.indexOf("❓ `/help`"));
-		expect(content.indexOf("❓ `/help`")).toBeLessThan(content.indexOf("⚡ Raw Pi"));
-		expect(content.indexOf("⚡ Raw Pi")).toBeLessThan(content.indexOf("π Measure twice, cut once."));
+		expect(content.indexOf("❓ `/help`")).toBeLessThan(content.indexOf("⌘ Workflow"));
+		expect(content.indexOf("⌘ Workflow")).toBeLessThan(content.indexOf("⚡ Raw Pi"));
 		expect(graph).toMatchObject({ domainStartMs: start, domainEndMs: now, bucketMs: day });
 		expect(graph.bucketStarts).toHaveLength(30);
 		expect(graph.series.map((series) => series.key)).toEqual([TOTAL_SERIES_KEY, "gpt-5-mini", "gpt-5"]);

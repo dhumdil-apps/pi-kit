@@ -2,8 +2,7 @@
 
 Startup banner for interactive parent sessions.
 
-The dashboard ends with `π Measure twice, cut once. What’s your goal?` — a
-static, theme-rendered invitation that keeps startup focused. `extensions.ts`
+The dashboard ends with its compact workflow and Raw Pi hints. `extensions.ts`
 still supplies the grouped metadata and descriptions for `/help`; its focused test
 requires an exact one-to-one match with the active extension manifest.
 
@@ -20,11 +19,11 @@ The chart is followed by one concise, plain-markdown context line, chips separat
 by ` · `: the working directory and loaded context files (`📜 …`, italic /
 de-emphasised, from pi core's `loadProjectContextFiles`) then `❓ /help`, rendered
 as code so it pops. Git branch/status are intentionally not repeated here — the
-status bar already shows them persistently. The Raw Pi hint follows, before the
-final invitation.
+status bar already shows them persistently. A compact workflow hint follows with
+`/plan`, `/implement`, `/review`, and `/handoff`, then the Raw Pi hint.
 
-`❓ /help` is the single pointer the banner needs: it prints a full reference —
-commands, shortcuts, and every active extension with its complete description.
+`❓ /help` remains the full reference for commands, shortcuts, and every active
+extension with its complete description.
 The help document is built by `help.ts` from the same
 `EXTENSION_PRESENTATIONS` manifest and rendered in the banner's themed box.
 
@@ -32,8 +31,8 @@ The dashboard does not duplicate the Progress Tracker phase ribbon.
 
 ## User surface
 
-Automatic on interactive session start. Provides `/help` — a reference of the
-bundle's commands, shortcuts, and extensions.
+Automatic on interactive session start. Shows the core workflow commands and
+provides `/help` — a reference of the bundle's commands, shortcuts, and extensions.
 
 ## Origin
 

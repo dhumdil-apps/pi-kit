@@ -8,7 +8,7 @@ import {
 	presentationCoverageErrors,
 	renderExtensionDeck,
 } from "./extensions.js";
-import { renderWelcomeText } from "./welcome.js";
+import { USAGE_CHART_END, USAGE_CHART_START, renderWelcomeText } from "./welcome.js";
 
 const BUNDLE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -40,28 +40,26 @@ describe("session dashboard extension metadata", () => {
 		expect(deck.indexOf("**Workflow**")).toBeLessThan(deck.indexOf("**Config**"));
 	});
 
-	it("renders context and hints before the Pi-glyph footer", () => {
+	it("renders context and hints without a footer when omitted", () => {
 		const welcome = renderWelcomeText({
-			welcome: "π **Measure twice, cut once.**",
 			contextInfo: "~/work\n📜 AGENTS.md\n❓ `/help`",
-			tip: "⚡ Raw Pi",
+			tip: "⌘ Workflow\n⚡ Raw Pi",
 		});
 		expect(welcome.startsWith("~/work")).toBe(true);
-		expect(welcome.indexOf("❓ `/help`")).toBeLessThan(welcome.indexOf("⚡ Raw Pi"));
-		expect(welcome.indexOf("⚡ Raw Pi")).toBeLessThan(welcome.indexOf("Measure twice"));
-		expect(welcome.trimEnd().endsWith("π **Measure twice, cut once.**")).toBe(true);
+		expect(welcome.indexOf("❓ `/help`")).toBeLessThan(welcome.indexOf("⌘ Workflow"));
+		expect(welcome.indexOf("⌘ Workflow")).toBeLessThan(welcome.indexOf("⚡ Raw Pi"));
+		expect(welcome.trimEnd()).toBe("~/work\n📜 AGENTS.md\n❓ `/help`\n\n⌘ Workflow\n⚡ Raw Pi");
 		expect(welcome).not.toContain("🧩 **Extensions**");
 		expect(welcome).not.toContain("Session context");
 		expect(welcome).not.toContain("Quick reference");
 	});
 
-	it("places the usage chart before the context and Pi-glyph footer", () => {
+	it("places the usage chart before the context without a footer", () => {
 		const welcome = renderWelcomeText({
-			welcome: "π **Measure twice, cut once.**",
 			contextInfo: "~/work",
 			usageChart: '{"model":true}',
 		});
 		expect(welcome.indexOf('{"model":true}')).toBeLessThan(welcome.indexOf("~/work"));
-		expect(welcome.indexOf("~/work")).toBeLessThan(welcome.indexOf("Measure twice"));
+		expect(welcome.trimEnd()).toBe(`${USAGE_CHART_START}\n{"model":true}\n${USAGE_CHART_END}\n\n~/work`);
 	});
 });

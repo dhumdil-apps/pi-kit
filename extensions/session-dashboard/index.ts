@@ -318,8 +318,8 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			}
 
 			// One concise markdown line: working directory + loaded files (italic /
-			// de-emphasised) then `/help` as code so it pops — `/help` lists every
-			// other command, so it is the only pointer the banner needs.
+			// de-emphasised) then `/help` as code so it pops. The core workflow
+			// commands and Raw Pi escape hatch follow as two compact hint lines.
 			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
 			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
@@ -327,10 +327,9 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			const contextInfo = chips.join(CONTEXT_SEP);
 
 			const welcomeText = renderWelcomeText({
-				welcome: "π Measure twice, cut once. What’s your goal?",
 				usageChart,
 				contextInfo,
-				tip: "*⚡ Raw Pi: `pi --no-extensions`*",
+				tip: "*⌘ Workflow: `/plan` · `/implement` · `/review` · `/handoff`*\n*⚡ Raw Pi: `pi --no-extensions`*",
 			});
 
 			pi.sendMessage(
