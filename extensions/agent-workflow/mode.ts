@@ -48,7 +48,7 @@ export function registerModeManagement(pi: ExtensionAPI): () => WorkflowMode {
 
 	const emitMode = () => {
 		const style = MODE_STYLE[currentMode];
-		pi.events.emit("powerbar:update", { id: SEGMENT_ID, text: style.text, color: style.color, row: 1 });
+		pi.events.emit("powerbar:update", { id: SEGMENT_ID, text: style.text, color: style.color, row: 1, transient: true });
 	};
 
 	// Emit segment registration on session_start, not at module init:

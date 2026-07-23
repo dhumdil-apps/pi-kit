@@ -55,6 +55,7 @@ describe("workflow mode management", () => {
 		expect(options).toEqual({ triggerTurn: false });
 		const update = emitted.find(([name, value]) => name === "powerbar:update" && value.id === "workflow-mode");
 		expect(update?.[1].text).toBe("IMPLEMENT");
+		expect(update?.[1].transient).toBe(true);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("implement"), "info");
 
 		await commands.get("review")!.handler("", uiCtx());
