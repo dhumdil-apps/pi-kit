@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import createExtension from "./index.js";
-import { MODE_ENTRY_TYPE } from "./mode.js";
+import { MODE_ENTRY_TYPE, MODE_UPDATE_EVENT } from "./mode.js";
 
 type Mode = "plan" | "implement" | "review";
 
@@ -11,6 +11,8 @@ function harness() {
 	const branch: any[] = [];
 	const notify = vi.fn();
 	let sessionName: string | undefined;
+	const userMessages: string[] = [];
+	const messages: any[] = [];
 	const pi = {
 		on: vi.fn((name: string, handler: (event?: any, ctx?: any) => any) => {
 			handlers.set(name, [...(handlers.get(name) ?? []), handler]);
@@ -22,14 +24,31 @@ function harness() {
 		// Hidden markers are what the mode is derived from, so mirror them into the
 		// branch in the shape getBranch() really returns.
 		sendMessage: vi.fn((message: any) => {
+			messages.push(message);
 			if (message.display === false) {
 				branch.push({ type: "custom_message", customType: message.customType, display: false, content: message.content, details: message.details });
 			}
 		}),
+		sendUserMessage: vi.fn((content: string) => userMessages.push(content)),
 		events: { emit: vi.fn((name: string, value: unknown) => emitted.push([name, value])), on: vi.fn() },
 	};
 	createExtension(pi as any);
-	const ctx = { hasUI: true, ui: { notify }, sessionManager: { getBranch: () => branch } };
+	const newSession = vi.fn(async () => ({ cancelled: false }));
+	// cwd points at a directory with no .pi/goal, so a continue switch resolves no
+	// kickoff and stays a bare in-place switch — enough to exercise the flow.
+	const ctx = {
+		hasUI: true,
+		ui: { notify },
+		cwd: "/pi-kit-index-test-nonexistent",
+		getContextUsage: () => undefined,
+		waitForIdle: vi.fn(async () => {}),
+		newSession,
+		sessionManager: {
+			getBranch: () => branch,
+			getSessionName: () => sessionName,
+			getSessionFile: () => "/sessions/current.jsonl",
+		},
+	};
 
 	const inject = async (): Promise<string> => {
 		const injectors = handlers.get("before_agent_start")!;
@@ -43,31 +62,33 @@ function harness() {
 		return inject();
 	};
 
-	/** Switch the mode in place through its command, then inject. */
+	/** Switch the mode in place through /mode <mode> continue, then inject. */
 	const promptAfterCommand = async (mode: Mode): Promise<string> => {
-		await commands.get(mode)!.handler("", ctx);
+		await commands.get("mode")!.handler(`${mode} continue`, ctx);
 		return inject();
 	};
 
-	return { handlers, commands, emitted, notify, promptFor, promptAfterCommand };
+	const runMode = (args: string) => commands.get("mode")!.handler(args, ctx);
+	return { handlers, commands, emitted, notify, userMessages, messages, promptFor, promptAfterCommand, ctx, runMode };
 }
 
 describe("agent workflow lifecycle", () => {
-	it("registers only the human-driven commands and no agent-observing hooks", async () => {
+	it("registers a single /mode command and no agent-observing hooks", async () => {
 		const { handlers, commands } = harness();
 		// Flash, /forensic, and the legacy /retro + /improvements are all retired;
-		// guard against reintroduction. The only commands are the human-only mode
-		// selectors plus /handoff; the only turn-time hooks are the system-prompt
-		// injector and the deliberate post-save_plan hint.
-		for (const gone of ["flash", "forensic", "retro", "improvements"]) {
+		// guard against reintroduction. The former per-mode selectors and /handoff
+		// are folded into one /mode command.
+		for (const gone of ["flash", "forensic", "retro", "improvements", "plan", "implement", "review", "handoff"]) {
 			expect(commands.has(gone)).toBe(false);
 		}
-		for (const command of ["plan", "implement", "review", "handoff"]) {
-			expect(commands.has(command)).toBe(true);
-		}
+		expect(commands.has("mode")).toBe(true);
+		// The only turn-time hooks are the system-prompt injector and the
+		// post-save_plan offer (tool_execution_end arms it, agent_settled delivers
+		// it). No input/tool_result/agent_start observers survive.
 		expect(handlers.has("input")).toBe(false);
-		expect(handlers.has("agent_settled")).toBe(false);
 		expect(handlers.has("tool_result")).toBe(false);
+		expect(handlers.has("agent_start")).toBe(false);
+		expect(handlers.has("agent_settled")).toBe(true);
 	});
 
 	it("injects the workflow prompt on every turn with no Flash runtime block", async () => {
@@ -118,7 +139,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("operation=save_plan");
 		expect(guidance).toContain(".pi/goal/<task-name>.discovery.md");
 		expect(guidance).toContain("This session does not implement");
-		expect(guidance).toContain("start a fresh session and run /implement");
+		expect(guidance).toContain("run /mode implement to execute the first slice");
 		expect(guidance).toContain("current evidence wins over stale discovery");
 		expect(guidance).toContain("never switch or simulate another mode yourself");
 		// The old single-flow glue that continued straight into implementation is gone.
@@ -190,7 +211,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("Close out with a concise outcome summary");
 		expect(guidance).toContain("List follow-ups or next steps only when genuine ones exist");
 		expect(guidance).toContain("reporting every skipped or failed check");
-		expect(guidance).toContain("re-plan in a fresh session with /plan");
+		expect(guidance).toContain("re-plan with /mode plan in a fresh session");
 	});
 
 	it("implement mode ends with one inline simplification pass and points review at /review", async () => {
@@ -204,7 +225,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("temporary scaffolding that is not a requirement");
 		expect(guidance).toContain("must not change approved observable behavior");
 		expect(guidance).toContain("rerun affected checks after it");
-		expect(guidance).toContain("recommend starting a fresh session with /review");
+		expect(guidance).toContain("recommend running /mode review in a fresh session");
 		// The review pass is skill-free and lives in Review mode only.
 		expect(guidance).not.toContain("review skill");
 	});
@@ -285,7 +306,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("instead of save_plan");
 		expect(guidance).toContain("operation=update_plan status=todo with the complete revised plan");
 		expect(guidance).toContain("Do not transition the plan out of todo");
-		expect(guidance).toContain("/handoff implement");
+		expect(guidance).toContain("/mode implement");
 	});
 
 	it("never lets implement mode pick between several pending plans silently", async () => {
@@ -327,20 +348,54 @@ describe("agent workflow lifecycle", () => {
 		expect(await harness().promptAfterCommand("plan")).not.toContain("in_place_switch");
 	});
 
-	it("hints the next step only after a successful save_plan", async () => {
-		const { handlers, notify } = harness();
-		const hint = handlers.get("tool_execution_end")![0];
-		const ctx = { hasUI: true, ui: { notify } };
+	it("primes /mode implement in the editor after a successful save_plan", async () => {
+		const { handlers } = harness();
+		const arm = handlers.get("tool_execution_end")![0];
+		const deliver = handlers.get("agent_settled")![0];
+		const setEditorText = vi.fn();
+		const notify = vi.fn();
+		const ctx = { hasUI: true, ui: { notify, setEditorText, getEditorText: () => "" } };
 
-		await hint({ toolName: "manage_task", isError: false, result: { details: { operation: "save_plan" } } }, ctx);
-		expect(notify).toHaveBeenCalledWith(expect.stringContaining("/handoff implement"), "info");
+		await arm({ toolName: "manage_task", isError: false, result: { details: { operation: "save_plan" } } });
+		await deliver({}, ctx);
+		expect(setEditorText).toHaveBeenCalledWith("/mode implement");
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("Plan saved"), "info");
 
+		// The offer is one-shot: a second settle with nothing armed does nothing.
+		setEditorText.mockClear();
 		notify.mockClear();
-		await hint({ toolName: "manage_task", isError: true, result: { details: { operation: "save_plan" } } }, ctx);
-		await hint({ toolName: "manage_task", isError: false, result: { details: { operation: "update_plan" } } }, ctx);
-		await hint({ toolName: "manage_todo_list", isError: false, result: { details: { operation: "save_plan" } } }, ctx);
-		await hint({ toolName: "manage_task", isError: false, result: undefined }, ctx);
+		await deliver({}, ctx);
+		expect(setEditorText).not.toHaveBeenCalled();
 		expect(notify).not.toHaveBeenCalled();
+	});
+
+	it("does not prime after a failed save_plan, an update_plan, or another tool", async () => {
+		const { handlers } = harness();
+		const arm = handlers.get("tool_execution_end")![0];
+		const deliver = handlers.get("agent_settled")![0];
+		const setEditorText = vi.fn();
+		const ctx = { hasUI: true, ui: { notify: vi.fn(), setEditorText, getEditorText: () => "" } };
+
+		await arm({ toolName: "manage_task", isError: true, result: { details: { operation: "save_plan" } } });
+		await arm({ toolName: "manage_task", isError: false, result: { details: { operation: "update_plan" } } });
+		await arm({ toolName: "manage_todo_list", isError: false, result: { details: { operation: "save_plan" } } });
+		await arm({ toolName: "manage_task", isError: false, result: undefined });
+		await deliver({}, ctx);
+		expect(setEditorText).not.toHaveBeenCalled();
+	});
+
+	it("leaves a non-empty editor untouched but still announces the saved plan", async () => {
+		const { handlers } = harness();
+		const arm = handlers.get("tool_execution_end")![0];
+		const deliver = handlers.get("agent_settled")![0];
+		const setEditorText = vi.fn();
+		const notify = vi.fn();
+		const ctx = { hasUI: true, ui: { notify, setEditorText, getEditorText: () => "already typing" } };
+
+		await arm({ toolName: "manage_task", isError: false, result: { details: { operation: "save_plan" } } });
+		await deliver({}, ctx);
+		expect(setEditorText).not.toHaveBeenCalled();
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("Plan saved"), "info");
 	});
 
 	it("includes the ask-first memory policy in every mode", async () => {
@@ -350,5 +405,38 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("treat project memory as temporary fallback state");
 		expect(guidance).toContain("fixed at the root cause");
 		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
+	});
+});
+
+describe("/mode command routing", () => {
+	it("switches mode in place on an explicit continue, persisting an in-place marker", async () => {
+		const { runMode, emitted, notify } = harness();
+		await runMode("implement continue");
+		expect(emitted).toContainEqual([MODE_UPDATE_EVENT, "implement"]);
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("implement"), "info");
+	});
+
+	it("routes an explicit fresh placement to the handoff path", async () => {
+		const { runMode, ctx } = harness();
+		await runMode("implement fresh");
+		// No plan resolves on disk, so the handoff path notifies its resolution
+		// error and never spawns — a warning that the in-place path would never
+		// emit, proving fresh routed to openHandoffSession rather than a switch.
+		expect(ctx.newSession).not.toHaveBeenCalled();
+		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Plan session first"), "warning");
+	});
+
+	it("warns with usage on an unknown mode and does nothing", async () => {
+		const { runMode, notify, emitted } = harness();
+		await runMode("simplify");
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("/mode"), "warning");
+		expect(emitted.some(([name]) => name === MODE_UPDATE_EVENT)).toBe(false);
+	});
+
+	it("guides an argument-less headless invocation through a displayed message", async () => {
+		const { commands, messages } = harness();
+		await commands.get("mode")!.handler("", { hasUI: false, ui: { notify: vi.fn() }, sessionManager: { getBranch: () => [] } });
+		const displayed = messages.find((message) => message.display === true);
+		expect(displayed?.content).toContain("Name a mode when headless");
 	});
 });

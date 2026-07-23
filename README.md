@@ -42,7 +42,7 @@ pi list
 
 ## Included Features
 
-- **agent-workflow** — Guidance-driven development across three session modes — **Plan → Implement → Review** — switched in place with `/plan`, `/implement`, `/review` or handed to a fresh seeded session with `/handoff <mode>`, with conversational question batches, plan + discovery-handoff persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
+- **agent-workflow** — Guidance-driven development across three session modes — **Plan → Implement → Review** — switched through one command, `/mode`: a picker chooses the mode and, for Implement/Review, Continue in this session or a fresh seeded session (live context usage shown). Adds conversational question batches, plan + discovery-handoff persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
 - **progress-tracker** — Workflow mode, phase, and context-usage indicator plus the interactive `/todos` checklist widget.
 - **session-dashboard** — Interactive welcome banner, spend visualization chart, and context indicators (`/help`).
 - **status-bar & usage-monitor** — Real-time quota and usage metrics in the status bar (`/usage`).

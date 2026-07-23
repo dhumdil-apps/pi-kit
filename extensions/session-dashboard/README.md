@@ -20,7 +20,7 @@ by ` · `: the working directory and loaded context files (`📜 …`, italic /
 de-emphasised, from pi core's `loadProjectContextFiles`) then `❓ /help`, rendered
 as code so it pops. Git branch/status are intentionally not repeated here — the
 status bar already shows them persistently. A compact workflow hint follows with
-`/plan`, `/implement`, `/review`, and `/handoff`, then the Raw Pi hint.
+the single `/mode` command, then the Raw Pi hint.
 
 `❓ /help` remains the full reference for commands, shortcuts, and every active
 extension with its complete description.

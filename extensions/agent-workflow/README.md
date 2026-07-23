@@ -3,9 +3,8 @@
 Injects one of **three session-mode flows** — Plan (default), Implement, or
 Review — plus shared tone/engineering/state/learning guidance into every turn.
 Motto: measure twice, cut once — plan in one session, implement in a fresh one,
-review with fresh eyes. The human switches modes in place with `/plan`,
-`/implement`, and `/review`, or crosses a session boundary with `/handoff`
-(the model cannot do either); Progress Tracker shows the current mode above the
+review with fresh eyes. The human drives every switch through one command,
+`/mode` (the model cannot); Progress Tracker shows the current mode above the
 editor. The flows are guidance only; nothing here is enforced.
 
 [`docs/FLOW.md`](../../docs/FLOW.md) is the canonical human-readable behavior
@@ -15,19 +14,27 @@ project-specific stack and repository conventions.
 
 ## User surface
 
-- `/plan`, `/implement`, `/review` — human-only session-mode selectors
-  (`mode.ts`). Each flips the injected flow for subsequent turns **in the
-  current session**, updates the above-editor workflow indicator, and persists
-  across reload/fork via a hidden branch marker. The marker also records
-  whether the mode was entered at a boundary or in place; in-place modes carry
-  a short caveat in their flow.
-- `/handoff <plan|implement|review> [task-name]` — human-only session boundary
-  (`handoff.ts`). Resolves the task (explicit name, the current task, or the
-  single pending plan under `.pi/goal/`; several plans mean it asks), then
-  spawns a session seeded with the mode marker and task name and sends a
-  kickoff message carrying the plan and discovery paths. The seeded marker is
-  why mode is re-derived from the branch before every turn: the new session's
-  extension instance loads before the marker exists.
+- `/mode` — the single human-only mode command (`index.ts`, `mode-picker.ts`).
+  With no arguments it opens a picker: step 1 chooses plan/implement/review
+  (the active mode is highlighted and marked *current*); for implement and
+  review, step 2 chooses **Continue in this session** or a **Fresh session**.
+  Both steps show the live context readout, so a filling context nudges toward
+  fresh. plan has no step 2 — it is always the same-session default.
+- `/mode <plan|implement|review> [continue|fresh] [task-name]` — the direct
+  form for muscle memory, headless runs, and scripts (no picker). `continue`
+  switches mode in place (`mode.ts`) — persisted across reload/fork via a
+  hidden branch marker that also records boundary-vs-in-place, so in-place
+  modes carry a short caveat in their flow. `fresh` crosses a session boundary
+  (`handoff.ts`): it resolves the task (explicit name, the current task, or the
+  single pending plan under `.pi/goal/`; several plans mean it asks) and spawns
+  a session seeded with the mode marker and task name plus a kickoff message
+  carrying the plan and discovery paths. The seeded marker is why mode is
+  re-derived from the branch before every turn: the new session's extension
+  instance loads before the marker exists. Only a command handler can spawn a
+  session, so `fresh` is reachable only through `/mode`.
+- After a plan is saved, the input is prefilled with `/mode implement`: one
+  Enter opens the continue-vs-fresh picker, so the plan → implement boundary
+  flows without retyping.
 - `manage_task` — set a concise task identity after exploration, refine it
   during planning, then create, transition, update, or resume its lifecycle
   plan. Saved names are branch-ready; the tool never changes Git branches.

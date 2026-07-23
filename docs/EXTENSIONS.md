@@ -13,7 +13,7 @@ extension.
 - **Usage History** — Historical token/cost reporting (`/usage`)
 - **Progress Tracker** — Global workflow route, context-usage readout, plus separate local todo widget (`manage_todo_list`, `/todos`)
 - **Session Dashboard** — Pi-glyph welcome, 30-day per-model spend chart, and project-context line
-- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`, `/handoff`; see [FLOW.md](FLOW.md))
+- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`, `/mode`; see [FLOW.md](FLOW.md))
 
 ## Supporting resources
 
@@ -53,7 +53,7 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
 - **No managed autonomous mode.** To run Pi unsupervised, start raw Pi with
   `pi --no-extensions` — which drops all bundle guidance.
 - **No subagents and no state machine.** Single-agent by policy, guidance over
-  rules; `/plan` is a human-only mode selector, not a phase machine.
+  rules; `/mode` is a human-only mode selector, not a phase machine.
 - **No context segment in the status bar.** Context usage lives in the Progress
   Tracker indicator above the editor, with token counts spelled out.
 

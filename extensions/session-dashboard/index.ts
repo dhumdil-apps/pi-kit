@@ -329,7 +329,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			const welcomeText = renderWelcomeText({
 				usageChart,
 				contextInfo,
-				tip: "*⌘ Workflow: `/plan` · `/implement` · `/review` · `/handoff`*\n*⚡ Raw Pi: `pi --no-extensions`*",
+				tip: "*⌘ Workflow: `/mode`* · *⚡ Raw Pi: `pi --no-extensions`*",
 			});
 
 			pi.sendMessage(

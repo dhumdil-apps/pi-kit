@@ -2,16 +2,17 @@
  * Agent Workflow
  *
  * Three session modes — Plan (default), Implement, Review — selected by the
- * human via /plan, /implement, /review at session boundaries (mode.ts).
+ * human via the /mode command at session boundaries (mode.ts, mode-picker.ts).
  * Only the active mode's flow is injected each turn, keeping each context
  * lean: plan in one session, cut in a fresh one, review with fresh eyes.
  * Lifecycle plans plus a .discovery.md handoff on disk carry state between
  * sessions. There are no enforced safety gates; the flows are guidance only.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerHandoffCommand } from "./handoff.js";
-import { registerModeManagement, type ModeOrigin, type WorkflowMode } from "./mode.js";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { HANDOFF_USAGE, handoffKickoff, openHandoffSession, resolveHandoffTask } from "./handoff.js";
+import { runModePicker, type Placement } from "./mode-picker.js";
+import { isWorkflowMode, registerModeManagement, WORKFLOW_MODES, type ModeOrigin, type WorkflowMode } from "./mode.js";
 import { registerTaskManagement } from "./task.js";
 
 const SHARED_TONE = `  <tone>
@@ -42,7 +43,7 @@ const SHARED_TAIL = `  <engineering>
     Memory policy: at implementation close-out, propose concise .pi/MEMORY.md updates and apply them only after the user confirms. Never update project memory unprompted, skip the question on routine tasks, and treat project memory as temporary fallback state for unaddressed takeaways: keep it minimal and clean up entries once fixed at the root cause in code or AGENTS.md. A one-off event is not durable; only a recurring pattern or one confirmed by the user is durable.  </learning>`;
 
 const PLAN_FLOW = `  <flow>
-    Session mode: PLAN (the default). Motto: measure twice, cut once — this session explores and plans; a fresh session implements. The human switches modes with the /plan, /implement, and /review commands at session boundaries; never switch or simulate another mode yourself.
+    Session mode: PLAN (the default). Motto: measure twice, cut once — this session explores and plans; a fresh session implements. The human switches modes with the /mode command at session boundaries; never switch or simulate another mode yourself.
 
     GOAL (ticket/vision/intent) is the starting point: understand the desired outcome.
     At task start set progress with manage_todo_list tool with operation=phase and phase=goal.
@@ -67,11 +68,11 @@ const PLAN_FLOW = `  <flow>
 
     After explicit approval, close the Plan session: call manage_task operation=save_plan with the approved big picture and committable checklist (this freezes the task name), and write the exploration handoff to .pi/goal/<task-name>.discovery.md — key files with line references, findings, settled decisions with rationale, dead ends ruled out, and the verification commands. That handoff exists so the next session does not re-explore; it is a hint, and current evidence wins over stale discovery.
     When a lifecycle plan for this task already exists, this is a re-plan: instead of save_plan, call operation=set_name, then operation=resume, then operation=update_plan status=todo with the complete revised plan, and refresh the discovery handoff.
-    This session does not implement. Do not transition the plan out of todo, and do not edit project files beyond the saved plan and the discovery handoff. After saving both, stop and tell the user to start a fresh session and run /implement to execute the first slice, or /handoff implement to open that session directly.
+    This session does not implement. Do not transition the plan out of todo, and do not edit project files beyond the saved plan and the discovery handoff. After saving both, stop and tell the user to run /mode implement to execute the first slice — continuing in this session or in a fresh one.
   </flow>`;
 
 const IMPLEMENT_FLOW = `  <flow>
-    Session mode: IMPLEMENT. Motto: measure twice, cut once — planning happened in a previous session; this fresh session executes exactly one approved slice with a lean context. The human switches modes with /plan, /implement, and /review at session boundaries; never switch or simulate another mode yourself.
+    Session mode: IMPLEMENT. Motto: measure twice, cut once — planning happened in a previous session; this fresh session executes exactly one approved slice with a lean context. The human switches modes with the /mode command at session boundaries; never switch or simulate another mode yourself.
 
     Start by locating the work:
     - Read project .pi/MEMORY.md when present.
@@ -83,15 +84,15 @@ const IMPLEMENT_FLOW = `  <flow>
 
     Execute the approved slice: set progress phase=implementation and create or update local todos for genuinely multi-step work. Baseline, shape the change, validate, and update relevant documentation.
     Then run exactly one simplification pass over the full slice diff, reading it as a reviewer rather than its author: remove dead code, debug output, commented-out code, and obsolete TODOs; consolidate duplication onto existing utilities (search for an existing equivalent before keeping a new helper); remove abstractions, options, and parameters introduced for one caller or a hypothetical future; drop drive-by refactors, formatting churn, and temporary scaffolding that is not a requirement; rename anything that needs the diff history to understand; keep comments that state constraints, drop ones that narrate. The pass must not change approved observable behavior or add features; rerun affected checks after it.
-    Update the active plan with verification evidence and concise session notes, then transition its status per project_state: status=done when every checklist item and final validation completed, otherwise back to status=todo so the next Implement session picks up the next slice. Close out with a concise outcome summary and honest verification results, reporting every skipped or failed check. For non-trivial slices, recommend starting a fresh session with /review before committing; the fresh-eyes review lives there, not here. List follow-ups or next steps only when genuine ones exist; when a durable takeaway surfaces, follow the reflection memory policy and ask first. Findings that change the approved outcome, behavior, scope, assumptions, or acceptance criteria follow the feedback rule below.
+    Update the active plan with verification evidence and concise session notes, then transition its status per project_state: status=done when every checklist item and final validation completed, otherwise back to status=todo so the next Implement session picks up the next slice. Close out with a concise outcome summary and honest verification results, reporting every skipped or failed check. For non-trivial slices, recommend running /mode review in a fresh session before committing; the fresh-eyes review lives there, not here. List follow-ups or next steps only when genuine ones exist; when a durable takeaway surfaces, follow the reflection memory policy and ask first. Findings that change the approved outcome, behavior, scope, assumptions, or acceptance criteria follow the feedback rule below.
 
-    Ordinary user feedback during IMPLEMENTATION invalidates prior implementation approval whenever it changes or challenges the approved outcome, requirements, constraints, scope, assumptions, behavior, acceptance criteria, or validation expectations, including when it reports a mismatch. Judge the substance rather than matching examples or keywords; novel feedback counts. Return to PLANNING, investigate read-only, identify what changed, and do not edit or use other state-changing implementation tools. Ask questions only when genuine choices remain; even with zero questions, present the complete revised goal, approach, interfaces, and validation plan and request fresh explicit approval. Earlier approval does not carry forward. When the feedback demands a fundamentally different approach rather than a revised slice, stop and tell the user to re-plan in a fresh session with /plan.
+    Ordinary user feedback during IMPLEMENTATION invalidates prior implementation approval whenever it changes or challenges the approved outcome, requirements, constraints, scope, assumptions, behavior, acceptance criteria, or validation expectations, including when it reports a mismatch. Judge the substance rather than matching examples or keywords; novel feedback counts. Return to PLANNING, investigate read-only, identify what changed, and do not edit or use other state-changing implementation tools. Ask questions only when genuine choices remain; even with zero questions, present the complete revised goal, approach, interfaces, and validation plan and request fresh explicit approval. Earlier approval does not carry forward. When the feedback demands a fundamentally different approach rather than a revised slice, stop and tell the user to re-plan with /mode plan in a fresh session.
 
     There is no hard pre-approval execution gate. Minimize mistakes through this explicit boundary. Reversible work inside the currently approved slice proceeds without repeated approval; materially out-of-scope actions still ask.
   </flow>`;
 
 const REVIEW_FLOW = `  <flow>
-    Session mode: REVIEW. Fresh-eyes verification of completed work: treat the implementation as unproven and try to falsify it. This session reviews the task diff against the saved plan and never expands scope or implements new work. The human switches modes with /plan, /implement, and /review at session boundaries; never switch or simulate another mode yourself.
+    Session mode: REVIEW. Fresh-eyes verification of completed work: treat the implementation as unproven and try to falsify it. This session reviews the task diff against the saved plan and never expands scope or implements new work. The human switches modes with the /mode command at session boundaries; never switch or simulate another mode yourself.
 
     - Read project .pi/MEMORY.md when present. Locate the lifecycle plan under .pi/goal/ and its sibling .pi/goal/<task-name>.discovery.md handoff, and read both for context; current evidence wins over stale discovery or plan text. Call manage_task operation=set_name with the plan's task name, then operation=resume, so the verdict can be recorded at close-out.
     - Intent first: reconstruct from the approved plan alone what a correct implementation must do BEFORE reading the diff, then read the diff and flag divergence — missing, contradicted, or accidentally expanded behavior — rather than reading the diff first and rationalizing it.
@@ -129,24 +130,116 @@ export function workflowPrompt(mode: WorkflowMode, origin: ModeOrigin = "boundar
 	return `<pi_workflow>\n${SHARED_TONE}\n\n${FLOWS[mode]}${note ? `\n\n${note}` : ""}\n\n${SHARED_TAIL}\n</pi_workflow>`;
 }
 
-const SAVE_PLAN_HINT = "Plan saved — /implement to continue here, or /handoff implement for a fresh session.";
+const SAVE_PLAN_HINT = "Plan saved — press Enter to implement (continue here or a fresh session), or edit the mode.";
+const SAVE_PLAN_HINT_HEADLESS = "Plan saved — run /mode implement to execute the first slice (add 'fresh' for a new session).";
+const MODE_NOTICE_TYPE = "agent-workflow:mode-notice";
 
 export default function createExtension(pi: ExtensionAPI): void {
 	registerTaskManagement(pi);
 	const mode = registerModeManagement(pi);
-	registerHandoffCommand(pi);
+
+	const notify = (ctx: ExtensionCommandContext, message: string, type: "info" | "warning") => {
+		if (ctx.hasUI) ctx.ui.notify(message, type);
+		else pi.sendMessage({ customType: MODE_NOTICE_TYPE, content: message, display: true }, { triggerTurn: false });
+	};
+
+	// The continue path starts the mode's first turn immediately; a kickoff only
+	// exists when a concrete plan resolves (implement/review). plan continue is a
+	// bare switch, and a resolution failure falls through to one too — the mode
+	// flow then guides the user to locate the plan.
+	const continueKickoff = (ctx: ExtensionCommandContext, target: WorkflowMode, taskName?: string): string | undefined => {
+		if (target === "plan") return undefined;
+		const { task } = resolveHandoffTask(ctx.cwd, target, taskName, ctx.sessionManager.getSessionName());
+		return handoffKickoff(target, task);
+	};
+
+	const apply = async (ctx: ExtensionCommandContext, target: WorkflowMode, placement: Placement, taskName?: string): Promise<void> => {
+		if (placement === "fresh") {
+			await openHandoffSession(pi, ctx, target, taskName);
+			return;
+		}
+		mode.switchInPlace(ctx, target, { kickoff: continueKickoff(ctx, target, taskName) });
+	};
+
+	pi.registerCommand("mode", {
+		description: "Switch workflow mode: plan · implement · review — pick interactively, or /mode <mode> [continue|fresh]",
+		getArgumentCompletions: (prefix) => {
+			const parts = prefix.split(/\s+/);
+			const last = parts[parts.length - 1] ?? "";
+			if (parts.length <= 1) {
+				return WORKFLOW_MODES.filter((m) => m.startsWith(last.trim())).map((m) => ({ value: m, label: m }));
+			}
+			if (parts.length === 2 && isWorkflowMode(parts[0]) && parts[0] !== "plan") {
+				return (["continue", "fresh"] as const).filter((p) => p.startsWith(last)).map((p) => ({ value: p, label: p }));
+			}
+			return [];
+		},
+		handler: async (args, ctx) => {
+			const tokens = args.trim().split(/\s+/).filter(Boolean);
+
+			// No arguments: pick interactively. Headless has no picker, so guide instead.
+			if (tokens.length === 0) {
+				if (!ctx.hasUI) {
+					notify(ctx, `Name a mode when headless. ${HANDOFF_USAGE}`, "warning");
+					return;
+				}
+				const selection = await runModePicker(ctx, { current: mode.getState().mode, usage: ctx.getContextUsage() });
+				if (selection) await apply(ctx, selection.mode, selection.placement);
+				return;
+			}
+
+			const [modeArg, ...rest] = tokens;
+			if (!isWorkflowMode(modeArg)) {
+				notify(ctx, HANDOFF_USAGE, "warning");
+				return;
+			}
+
+			let placement: Placement | undefined;
+			let taskParts = rest;
+			if (rest[0] === "continue" || rest[0] === "fresh") {
+				placement = rest[0];
+				taskParts = rest.slice(1);
+			}
+			const taskName = taskParts.join(" ") || undefined;
+
+			// A mode named without a placement opens the placement picker (UI only);
+			// plan has no placement choice, and headless defaults to continue.
+			if (!placement) {
+				if (ctx.hasUI && modeArg !== "plan") {
+					const selection = await runModePicker(ctx, { current: mode.getState().mode, usage: ctx.getContextUsage(), mode: modeArg });
+					if (selection) await apply(ctx, selection.mode, selection.placement, taskName);
+					return;
+				}
+				placement = "continue";
+			}
+
+			await apply(ctx, modeArg, placement, taskName);
+		},
+	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		const { mode: active, origin } = mode.syncFromBranch(ctx);
 		return { systemPrompt: `${event.systemPrompt}\n\n${workflowPrompt(active, origin)}` };
 	});
 
-	// Surface the next step the moment a plan lands; the flow keeps its own
-	// closing sentence as the headless fallback.
-	pi.on("tool_execution_end", async (event, ctx) => {
+	// When a plan lands, prime the next step instead of ending on a dead toast:
+	// prefill /mode implement so a single Enter opens the continue-vs-fresh picker
+	// (only a command handler can spawn the fresh session). Deferred to settle so
+	// it never fires mid-turn, and only fills an empty editor.
+	let pendingImplementOffer = false;
+	pi.on("tool_execution_end", async (event) => {
 		if (event.toolName !== "manage_task" || event.isError) return;
 		const operation = (event.result as { details?: { operation?: unknown } } | undefined)?.details?.operation;
-		if (operation !== "save_plan") return;
-		if (ctx.hasUI) ctx.ui.notify(SAVE_PLAN_HINT, "info");
+		if (operation === "save_plan") pendingImplementOffer = true;
+	});
+	pi.on("agent_settled", async (_event, ctx) => {
+		if (!pendingImplementOffer) return;
+		pendingImplementOffer = false;
+		if (ctx.hasUI) {
+			if (!ctx.ui.getEditorText().trim()) ctx.ui.setEditorText("/mode implement");
+			ctx.ui.notify(SAVE_PLAN_HINT, "info");
+		} else {
+			pi.sendMessage({ customType: MODE_NOTICE_TYPE, content: SAVE_PLAN_HINT_HEADLESS, display: true }, { triggerTurn: false });
+		}
 	});
 }

@@ -17,13 +17,17 @@ inside a context polluted by exploration and dead ends:
   one approved slice.
 - **Review** — a fresh-eyes session verifies the task diff against the plan.
 
-The human selects the mode two ways, and only the human: `/plan`, `/implement`,
-and `/review` switch mode **inside the running session** — right for small
-tasks, where a full session boundary costs more than it buys. `/handoff <mode>
-[task-name]` is the **session boundary**: it opens a fresh session, seeds the
-mode and the task name before the first turn, and sends a kickoff message
-carrying the concrete plan and discovery paths, so nothing has to be retyped
-and the new context stays lean. The model cannot switch modes either way.
+The human selects the mode through one command, and only the human: `/mode`.
+With no arguments it opens a picker — choose the mode (the active one is marked
+*current*), then for Implement and Review choose **Continue in this session** or
+a **Fresh session**, with the live context readout shown to inform the choice.
+**Continue** switches mode inside the running session — right for small tasks,
+where a full boundary costs more than it buys. A **Fresh session** is the
+**session boundary**: it opens a new session, seeds the mode and task name
+before the first turn, and sends a kickoff message carrying the concrete plan
+and discovery paths, so nothing is retyped and the new context stays lean. The
+direct form `/mode <mode> [continue|fresh] [task-name]` skips the picker for
+headless runs and scripts. The model cannot switch modes either way.
 
 A mode entered in place keeps a short caveat in its flow, because the
 fresh-context assumptions no longer hold: an in-place Implement may proceed
@@ -70,9 +74,9 @@ After approval the Plan session terminates: Pi saves the lifecycle plan under
 `.pi/goal/<task-name>.todo.md`, writes the exploration handoff to
 `.pi/goal/<task-name>.discovery.md` (key files, findings, settled decisions,
 dead ends, verification commands — so the next session doesn't re-explore), and
-points at the next step (`/implement` here, or `/handoff implement` for a fresh
-session). The discovery file is a deliberate, named handoff hint — current
-evidence always wins over stale discovery.
+points at the next step: the input is prefilled with `/mode implement`, so one
+Enter opens the continue-vs-fresh picker. The discovery file is a deliberate,
+named handoff hint — current evidence always wins over stale discovery.
 
 Re-planning an existing task is the same session, one call different: Pi
 resumes the plan and rewrites it with `update_plan status=todo` instead of
@@ -94,8 +98,8 @@ author-side **simplification pass** over the slice diff (dead code, duplication,
 speculative abstraction, scope creep, naming, scaffolding — never changing
 approved behavior), followed by rerunning affected checks. Close-out reports
 honest verification results, proposes a ready-to-use commit message, and for
-non-trivial slices recommends a fresh `/review` session before committing — the
-fresh-eyes review lives there, not here. The user commits, and pushes require
+non-trivial slices recommends a fresh `/mode review` session before committing —
+the fresh-eyes review lives there, not here. The user commits, and pushes require
 an explicit request.
 
 Ordinary feedback that changes or challenges the approved outcome returns the

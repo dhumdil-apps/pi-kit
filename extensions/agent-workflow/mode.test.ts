@@ -6,18 +6,20 @@ function harness() {
 	const commands = new Map<string, { description?: string; handler: (args: string, ctx: any) => Promise<void> }>();
 	const emitted: Array<[string, any]> = [];
 	const sent: Array<[any, any]> = [];
+	const userMessages: string[] = [];
 	const pi = {
 		on: vi.fn((name: string, handler: (event: any, ctx: any) => any) => {
 			handlers.set(name, [...(handlers.get(name) ?? []), handler]);
 		}),
 		registerCommand: vi.fn((name: string, command: any) => commands.set(name, command)),
 		sendMessage: vi.fn((message: any, options: any) => sent.push([message, options])),
+		sendUserMessage: vi.fn((content: string) => userMessages.push(content)),
 		events: {
 			emit: vi.fn((name: string, value: any) => emitted.push([name, value])),
 		},
 	};
 	const mode = registerModeManagement(pi as any);
-	return { handlers, commands, emitted, sent, mode };
+	return { handlers, commands, emitted, sent, userMessages, mode };
 }
 
 function uiCtx() {
@@ -34,16 +36,18 @@ function modeMarker(mode: string, origin?: string) {
 }
 
 describe("workflow mode management", () => {
-	it("registers the three mode commands and defaults to plan at a boundary", () => {
+	it("registers no commands of its own and defaults to plan at a boundary", () => {
 		const { commands, mode } = harness();
-		for (const name of ["plan", "implement", "review"]) expect(commands.has(name)).toBe(true);
+		// The mode selectors are folded into the single /mode command (index.ts);
+		// mode management only exposes switchInPlace, not its own commands.
+		for (const name of ["plan", "implement", "review", "mode", "handoff"]) expect(commands.has(name)).toBe(false);
 		expect(mode.getState()).toEqual({ mode: "plan", origin: "boundary" });
 	});
 
-	it("flips the mode, persists a hidden in-place marker, and publishes the mode on command", async () => {
-		const { commands, emitted, sent, mode } = harness();
+	it("flips the mode in place, persists a hidden in-place marker, and publishes the mode", () => {
+		const { emitted, sent, mode } = harness();
 		const ctx = uiCtx();
-		await commands.get("implement")!.handler("", ctx);
+		mode.switchInPlace(ctx as any, "implement");
 		expect(mode.getState()).toEqual({ mode: "implement", origin: "inplace" });
 		const [marker, options] = sent[0];
 		expect(marker.customType).toBe(MODE_ENTRY_TYPE);
@@ -54,15 +58,26 @@ describe("workflow mode management", () => {
 		expect(emitted.some(([name]) => name.startsWith("powerbar:"))).toBe(false);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("implement"), "info");
 
-		await commands.get("review")!.handler("", uiCtx());
+		mode.switchInPlace(uiCtx() as any, "review");
 		expect(mode.getState().mode).toBe("review");
-		await commands.get("plan")!.handler("", uiCtx());
+		mode.switchInPlace(uiCtx() as any, "plan");
 		expect(mode.getState().mode).toBe("plan");
 	});
 
-	it("falls back to sendMessage for the notice when the session has no UI", async () => {
-		const { commands, sent } = harness();
-		await commands.get("review")!.handler("", { hasUI: false, ui: { notify: vi.fn() } });
+	it("kicks off the turn instead of a notice when a kickoff is given", () => {
+		const { userMessages, sent, mode } = harness();
+		const ctx = uiCtx();
+		mode.switchInPlace(ctx as any, "implement", { kickoff: "Resume the plan and cut the slice." });
+		// The marker is still written, but the kickoff triggers the turn and the
+		// mode notice is suppressed.
+		expect(sent.some(([message]) => message.customType === MODE_ENTRY_TYPE)).toBe(true);
+		expect(userMessages).toEqual(["Resume the plan and cut the slice."]);
+		expect(ctx.ui.notify).not.toHaveBeenCalled();
+	});
+
+	it("falls back to sendMessage for the notice when the session has no UI", () => {
+		const { sent, mode } = harness();
+		mode.switchInPlace({ hasUI: false, ui: { notify: vi.fn() } } as any, "review");
 		const notice = sent.find(([message]) => message.display === true);
 		expect(notice?.[0].content).toContain("review");
 	});

@@ -56,7 +56,7 @@ Session-boundary changes need a scratch project with a seeded plan
 (`.pi/goal/demo-task.todo.md`) and a session directory to inspect afterwards:
 
 ```bash
-pi -p -ne -e ~/Github/pi-kit --tools '' --session-dir ./sessions "/handoff implement"
+pi -p -ne -e ~/Github/pi-kit --tools '' --session-dir ./sessions "/mode implement fresh"
 ```
 
 The newest file under `./sessions` must contain, in order: the `parentSession`

@@ -58,6 +58,22 @@ describe("phase indicator", () => {
 		expect(factory({ requestRender: () => {} }, theme).render(120)[0]).toContain("[accent]● PLAN · [accent]ctx");
 	});
 
+	it("keeps the context readout on the working spinner line", () => {
+		let factory: any;
+		const ctx = {
+			ui: {
+				setWorkingVisible: () => {},
+				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
+			},
+		} as any;
+
+		updatePhaseIndicator("implementation", "implement", ctx, true, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
+		const line = factory({ requestRender: () => {} }, theme).render(120)[0];
+		// The spinner and activity stay, and ctx is appended rather than dropped.
+		expect(line).toContain("IMPLEMENT · ");
+		expect(line).toContain("ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M");
+	});
+
 	it.each([
 		["plan", ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"]],
 		["implement", ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"]],
