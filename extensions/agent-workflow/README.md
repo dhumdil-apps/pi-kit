@@ -17,7 +17,9 @@ project-specific stack and repository conventions.
 - `/plan`, `/implement`, `/review` — human-only session-mode selectors
   (`mode.ts`). Each flips the injected flow for subsequent turns, updates the
   `workflow-mode` status-bar segment, and persists across reload/fork via a
-  hidden branch marker.
+  hidden branch marker. The segment sits at the right end of status-bar row 2,
+  preceded by a static red `yolo` tag — a standing reminder that the bundle
+  ships no permission gate.
 - `manage_task` — set a concise task identity after exploration, refine it
   during planning, then create, transition, update, or resume its lifecycle
   plan. Saved names are branch-ready; the tool never changes Git branches.

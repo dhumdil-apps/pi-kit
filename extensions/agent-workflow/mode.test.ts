@@ -56,6 +56,7 @@ describe("workflow mode management", () => {
 		const update = emitted.find(([name, value]) => name === "powerbar:update" && value.id === "workflow-mode");
 		expect(update?.[1].text).toBe("IMPLEMENT");
 		expect(update?.[1].transient).toBe(true);
+		expect(update?.[1].row).toBe(2);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("implement"), "info");
 
 		await commands.get("review")!.handler("", uiCtx());
@@ -85,8 +86,16 @@ describe("workflow mode management", () => {
 		const { handlers, emitted } = harness();
 		expect(emitted.filter(([name]) => name === "powerbar:register-segment")).toHaveLength(0);
 		await handlers.get("session_start")![0]({}, branchCtx([]));
-		const registration = emitted.find(([name]) => name === "powerbar:register-segment");
-		expect(registration?.[1].id).toBe("workflow-mode");
+		const registrations = emitted.filter(([name]) => name === "powerbar:register-segment").map(([, value]) => value.id);
+		expect(registrations).toEqual(["yolo-mode", "workflow-mode"]);
+	});
+
+	it("emits a static yolo tag on row 2 before the mode segment", async () => {
+		const { handlers, emitted } = harness();
+		await handlers.get("session_start")![0]({}, branchCtx([]));
+		const updates = emitted.filter(([name]) => name === "powerbar:update").map(([, value]) => value);
+		expect(updates.map((update) => update.id)).toEqual(["yolo-mode", "workflow-mode"]);
+		expect(updates[0]).toMatchObject({ text: "yolo", color: "error", row: 2, transient: true });
 	});
 
 	it("re-emits the mode segment when the powerbar requests a refresh (survives the core clear)", async () => {

@@ -73,7 +73,7 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
 - `minimal-action-confirmation`: removed (2026-07-23). The denylist permission
   gate, its `.pi/confirmations/` log, and its `permission-gate` setting are gone;
   the bundle runs ungated and relies on conversational consent before destructive
-  actions.
+  actions. A static red `yolo` tag on status-bar row 2 marks this permanently.
 - `/flash`: removed (2026-07-22). The managed "cruise control" autonomous mode
   and its `⚡ flash` status segment are gone. To run Pi unsupervised, start raw Pi
   with `pi --no-extensions` — which drops all bundle guidance.
