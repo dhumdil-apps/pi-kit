@@ -3,6 +3,7 @@ import { MODE_ENTRY_TYPE, registerModeManagement } from "./mode.js";
 
 function harness() {
 	const handlers = new Map<string, Array<(event: any, ctx: any) => any>>();
+	const listeners = new Map<string, Array<(value: any) => any>>();
 	const commands = new Map<string, { description?: string; handler: (args: string, ctx: any) => Promise<void> }>();
 	const emitted: Array<[string, any]> = [];
 	const sent: Array<[any, any]> = [];
@@ -12,10 +13,15 @@ function harness() {
 		}),
 		registerCommand: vi.fn((name: string, command: any) => commands.set(name, command)),
 		sendMessage: vi.fn((message: any, options: any) => sent.push([message, options])),
-		events: { emit: vi.fn((name: string, value: any) => emitted.push([name, value])) },
+		events: {
+			emit: vi.fn((name: string, value: any) => emitted.push([name, value])),
+			on: vi.fn((name: string, listener: (value: any) => any) => {
+				listeners.set(name, [...(listeners.get(name) ?? []), listener]);
+			}),
+		},
 	};
 	const getMode = registerModeManagement(pi as any);
-	return { handlers, commands, emitted, sent, getMode, pi };
+	return { handlers, listeners, commands, emitted, sent, getMode, pi };
 }
 
 function uiCtx() {
@@ -80,6 +86,16 @@ describe("workflow mode management", () => {
 		await handlers.get("session_start")![0]({}, branchCtx([]));
 		const registration = emitted.find(([name]) => name === "powerbar:register-segment");
 		expect(registration?.[1].id).toBe("workflow-mode");
+	});
+
+	it("re-emits the mode segment when the powerbar requests a refresh (survives the core clear)", async () => {
+		const { handlers, listeners, emitted } = harness();
+		await handlers.get("session_start")![0]({}, branchCtx([modeMarker("implement")]));
+		emitted.length = 0;
+		const refresh = listeners.get("powerbar:request-refresh")![0];
+		refresh(undefined);
+		const update = emitted.find(([name, value]) => name === "powerbar:update" && value.id === "workflow-mode");
+		expect(update?.[1].text).toBe("IMPLEMENT");
 	});
 
 	it("reconstructs on session_tree navigation as well", async () => {

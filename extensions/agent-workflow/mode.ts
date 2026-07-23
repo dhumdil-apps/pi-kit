@@ -62,6 +62,11 @@ export function registerModeManagement(pi: ExtensionAPI): () => WorkflowMode {
 	pi.on("session_start", reconstruct);
 	pi.on("session_tree", reconstruct);
 
+	// agent-workflow loads before status-bar, so its session_start emit above
+	// lands before the powerbar core clears its store on its own session_start.
+	// The core asks earlier producers to re-emit once the store is reset.
+	pi.events.on("powerbar:request-refresh", emitMode);
+
 	for (const mode of WORKFLOW_MODES) {
 		pi.registerCommand(mode, {
 			description: MODE_DESCRIPTIONS[mode],

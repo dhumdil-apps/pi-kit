@@ -123,6 +123,13 @@ export default function createExtension(pi: ExtensionAPI): void {
 		settings = loadSettings();
 		currentCtx = ctx;
 		hideFooter(ctx);
+		// Producers loaded AFTER this core re-emit during their own session_start
+		// handler (which runs after this clear), so their segments survive.
+		// Producers loaded BEFORE this core (e.g. agent-workflow's workflow-mode)
+		// already emitted before the clear above and would be wiped — ask them to
+		// re-emit now that the store has been reset. Producers that keep their own
+		// lifecycle can ignore this; segmentEquals makes a duplicate emit a no-op.
+		pi.events.emit("powerbar:request-refresh", undefined);
 		refresh();
 	});
 

@@ -15,7 +15,7 @@ function harness() {
 		getSessionName: vi.fn(() => sessionName),
 		setSessionName: vi.fn((name: string) => { sessionName = name; }),
 		sendMessage: vi.fn(),
-		events: { emit: vi.fn((name: string, value: unknown) => emitted.push([name, value])) },
+		events: { emit: vi.fn((name: string, value: unknown) => emitted.push([name, value])), on: vi.fn() },
 	};
 	createExtension(pi as any);
 	const promptFor = async (mode: "plan" | "implement" | "review"): Promise<string> => {
