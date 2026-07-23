@@ -36,10 +36,9 @@ name then git/provider/model; active-branch message counts then token/cost
 usage on the left; then CPU/RAM/SSD/network and hourly/weekly subscription
 usage.
 
-Agent Workflow owns task naming through `manage_task`: after exploration it
-sets a concise `SI-<ticket>-<summary>` session name, may refine it during
-Planning, and freezes it when the approved plan is saved. This producer only
-displays the current name immediately before the git branch and follows
+Agent Workflow owns task naming through `save_plan`: saving a plan names the
+session after the task (a concise `SI-<ticket>-<summary>` form). This producer
+only displays the current name immediately before the git branch and follows
 session-name changes and resumes.
 
 ## Origin

@@ -31,7 +31,7 @@ dogfood a change from inside another project. `-ne` disables extension discovery
 to avoid collision warnings.
 
 Do **not** `pi install <local path>` while the published package is installed:
-both copies register `manage_task` and `manage_todo_list`, so the managed
+both copies register `save_plan` and `manage_todo_list`, so the managed
 extensions fail to load with a tool-conflict error on every start. `-ne -np --no-themes -e` is
 the conflict-free way to run unpublished code.
 
@@ -55,15 +55,15 @@ pi -p -ne -e ~/Github/pi-kit --tools '' --no-session "Reply with exactly one wor
 ```
 
 Session-boundary changes need a scratch project with a seeded plan
-(`.pi/goal/demo-task.todo.md`) and a session directory to inspect afterwards:
+(`.pi/plan/demo-task.md`) and a session directory to inspect afterwards:
 
 ```bash
-pi -p -ne -e ~/Github/pi-kit --tools '' --session-dir ./sessions "/mode implement fresh"
+pi -p -ne -e ~/Github/pi-kit --tools '' --session-dir ./sessions "/handoff demo-task"
 ```
 
 The newest file under `./sessions` must contain, in order: the `parentSession`
 link, the hidden `agent-workflow:mode` marker, a `session_info` entry naming the
-task, and the kickoff user message carrying the real plan and discovery paths.
+task, and the kickoff user message carrying the real plan path.
 
 Interactive checks still belong to visual or lifecycle changes: Status Bar
 rendering, the above-editor indicator, session dashboard, and workflow prompts.

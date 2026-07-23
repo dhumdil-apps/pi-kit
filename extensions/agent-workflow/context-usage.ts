@@ -1,9 +1,10 @@
 /**
  * Context-usage readout shared across the workflow UI.
  *
- * Lives in agent-workflow (not progress-tracker) so the /mode picker can show
- * the same `ctx █░░░ 84.0k / 1.0M` readout the phase indicator renders, without
- * a circular import: progress-tracker already depends on agent-workflow.
+ * Lives in agent-workflow (not progress-tracker) so the approval prompt can
+ * lean on the same thresholds the phase indicator's `ctx █░░░ 84.0k / 1.0M`
+ * readout uses, without a circular import: progress-tracker already depends
+ * on agent-workflow.
  */
 
 import type { ContextUsage, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";

@@ -7,129 +7,71 @@ Behavior changes must update this document, the injected prompt, and its
 contract tests together. Project-level `AGENTS.md` files own project-specific
 stack and repository conventions.
 
-Motto: **measure twice, cut once.** Pi splits work across **three session
-modes** with a session boundary between them, so implementation never runs
-inside a context polluted by exploration and dead ends:
+The flow is three steps:
 
-- **Plan** (default) — explore, question, and produce an approved lifecycle
-  plan plus a discovery handoff. No implementation.
-- **Implement** — a fresh session resumes the saved plan and executes exactly
-  one approved slice.
-- **Review** — a fresh-eyes session verifies the task diff against the plan.
+1. **Understand** the goal and explore the repository.
+2. **Present** a short plan — current state, desired state, approach, quirks —
+   and end with a native prompt: **Proceed, handoff, or revise.**
+3. **Execute** the approved plan and summarize honestly.
 
-The human selects the mode through one command, and only the human: `/mode`.
-With no arguments it opens a picker — choose the mode (the active one is marked
-*current*), then for Implement and Review choose **Continue in this session** or
-a **Fresh session**, with the live context readout shown to inform the choice.
-**Continue** switches mode inside the running session — right for small tasks,
-where a full boundary costs more than it buys. A **Fresh session** is the
-**session boundary**: it opens a new session, seeds the mode and task name
-before the first turn, and sends a kickoff message carrying the concrete plan
-and discovery paths, so nothing is retyped and the new context stays lean. The
-direct form `/mode <mode> [continue|fresh] [task-name]` skips the picker for
-headless runs and scripts. The model cannot switch modes either way.
+Two session modes carry those steps: **Plan** (the default — steps 1 and 2) and
+**Implement** (step 3). Implement is reachable only through Proceed or a
+handoff, so executing is always executing an approved plan. There is no review
+mode — a review is just a new request whose goal is "review X", handled by the
+same two steps. The model never switches modes itself.
 
-A mode entered in place keeps a short caveat in its flow, because the
-fresh-context assumptions no longer hold: an in-place Implement may proceed
-from a plan approved earlier in the same session, and an in-place Review says
-plainly in its verdict that it is an author-side pass, not fresh eyes.
-
-Progress Tracker shows the current mode, the workflow phase, and context usage
-above the editor. Only the active mode's flow is injected each turn; the
-injected prompt is stable within a session, so provider prefix-cache reuse
-holds (the suffix changes only when the mode changes). Local todos are
-independent work items in every mode; nothing here is enforced — the bundle
-ships no permission gate.
-
-Pi leads with the outcome, stays concise, and never fabricates results; when
-unsure it says so and proposes how to verify.
+Standing rules, in every mode: **never commit, stash, or push.** Progress
+Tracker shows the current mode, the workflow phase, and context usage above the
+editor. Only the active mode's flow is injected each turn, so the prompt is
+stable within a session and provider prefix-cache reuse holds. Nothing here is
+enforced — the bundle ships no permission gate.
 
 ## Plan mode (default)
 
-The user describes the desired outcome; Pi confirms the goal and reads project
-`.pi/MEMORY.md` when present (user-owned, ignored by this bundle's Git default).
+Pi reads project `.pi/MEMORY.md` when present, explores the repository on every
+task regardless of size, and asks questions only for genuine open choices that
+exploration surfaced — in ordinary messages, no ceremony. When exploration
+settles everything, the plan comes directly.
 
-Pi explores read-only on every task, regardless of size — only the questioning
-scales with task complexity, never the investigation. It classifies uncommitted
-repository work before planning and never commits or stashes automatically.
+The plan is exactly four sections:
 
-Discovery questions cover genuine open choices only, asked in conversational
-batches of two or three numbered questions with lettered options (A recommended);
-compact replies like `1A 2C 3B` work. After each batch Pi gives a concise
-cumulative summary: big picture, settled and open topics, what comes next. When
-exploration settles everything, Pi presents the plan directly without ceremonial
-questions.
+1. **Current state** — how it works today.
+2. **Desired state** — what it should do instead.
+3. **Approach** — how to get from one to the other.
+4. **Quirks** — the non-obvious constraints, gotchas, and key paths worth
+   carrying into a handoff.
 
-Plans are verification-first: every step is **change → verification**, plans
-cover the correctness dimensions that actually apply, refactors state their
-observable invariant, and boundary changes validate both producer and consumer.
-Goals that exceed one clean pass become a lifecycle plan of independently
-committable slices — one approved slice per Implement session.
+Pi presents those sections in chat, calls `save_plan` with the same content —
+the message and the file are identical, so there is nothing to keep in sync —
+and ends with **Proceed, handoff, or revise?** The file lands at
+`.pi/plan/<task-name>.md` and names the session. When the turn settles, the
+approval prompt appears:
 
-The plan ends with "Proceed or revise?". Only a clear confirmation that directly
-answers that plan is approval; anything else continues planning, and earlier
-approval never carries forward.
+- **Proceed** — switch to Implement in this session and start immediately. The
+  prompt recommends this while the context is lean.
+- **Handoff** — prefills `/handoff <task-name>`; Enter spawns a fresh Implement
+  session seeded with the mode and task name plus a kickoff naming the plan
+  path. Recommended once the context is loaded (past 100k tokens or 40% full).
+- **Revise** (or dismissing the prompt) — nothing changes; revise and save
+  again, which simply overwrites the same file.
 
-After approval the Plan session terminates: Pi saves the lifecycle plan under
-`.pi/goal/<task-name>.todo.md`, writes the exploration handoff to
-`.pi/goal/<task-name>.discovery.md` (key files, findings, settled decisions,
-dead ends, verification commands — so the next session doesn't re-explore), and
-points at the next step: the placement picker opens on its own, offering to
-implement here or in a new session. The discovery file is a deliberate,
-named handoff hint — current evidence always wins over stale discovery.
-
-Re-planning an existing task is the same session, one call different: Pi
-resumes the plan and rewrites it with `update_plan status=todo` instead of
-`save_plan`, and refreshes the discovery handoff. The plan never leaves `todo`
-in Plan mode.
+Headless runs get a displayed message naming the `/handoff` command instead of
+the prompt. Plan mode never implements.
 
 ## Implement mode
 
-A fresh session with a lean context. Pi locates the pending plan under
-`.pi/goal/` (asking which task when several are pending, never guessing) and
-reads its discovery handoff, resumes it via `manage_task`
-(`set_name` then `resume`), revalidates against the current request and
-repository state, presents a one-slice plan, and gets fresh explicit approval
-before activating that slice — except when the session came straight from the
-plan the user just approved (either placement of the post-plan picker), where
-that approval carries and Pi states the slice and starts; revalidation still
-happens, and a repository state that diverges from the plan still stops and
-returns to the user. The plan is the only cross-session source of
-truth and current repository evidence always wins over resumed plan or
-discovery text. Pi baselines before changing behavior, root-causes bugs with
-evidence before fixing them, and validates. The slice ends with exactly one
-author-side **simplification pass** over the slice diff (dead code, duplication,
-speculative abstraction, scope creep, naming, scaffolding — never changing
-approved behavior), followed by rerunning affected checks. Close-out reports
-honest verification results, proposes a ready-to-use commit message, and for
-non-trivial slices recommends a fresh `/mode review` session before committing —
-the fresh-eyes review lives there, not here. The user commits, and pushes require
-an explicit request.
+The plan is already approved — from Proceed or from a handoff — so Pi reads it
+and executes it without re-requesting approval. On a blocker unknown at
+planning time it stops, reports, and lets the user decide — never guesses.
+Close-out is a concise, honest summary: what changed, verification results,
+every skipped or failed check. The user commits.
 
-Ordinary feedback that changes or challenges the approved outcome returns the
-work to planning for a revised slice plan and fresh explicit approval; a
-fundamental rethink stops the session and goes back to a fresh Plan session.
-
-## Review mode
-
-A fresh-eyes falsification pass over completed work, baked into the flow itself
-(there is no review skill). Pi reads and resumes the plan plus its discovery
-handoff, then reconstructs the correct implementation from the plan *before*
-reading the diff so divergence is flagged rather than rationalized. The subject
-is the slice just implemented — the uncommitted diff against HEAD — and widens
-to the full task diff on request or when the plan closed as done. That is the
-usual case: the review offer only appears once the plan is done, so a
-multi-slice task is reviewed as a whole, including its already-committed slices.
-It probes edge and failure
-behavior adversarially, distrusts green checks (would the tests fail if the
-change were reverted?), covers contract/security/operations/migration/UI angles
-where the diff touches them, and flags oversized diffs as findings rather than
-running a rewrite pass. Findings are reported as blocking / important /
-optional with evidence; only clear in-scope blocking and important findings are
-fixed, and anything that changes the approved outcome or scope goes back to the
-user for a new Plan session. Review never expands scope or implements new work.
-Close-out appends a one-line dated verdict — blocking/important/optional counts
-and the outcome — to the plan's session notes, leaving its status unchanged.
+Plan files are **never deleted by the agent** — not at close-out, not on
+success. `.pi/plan/` is the user's to keep, archive, or prune; because it
+accumulates, `/handoff` resolution never assumes a single file: the explicit
+name wins, then the session name, and only a lone remaining file is picked
+implicitly — otherwise it asks which. Legacy `.pi/goal/` files are ignored and
+preserved.
 
 ## Autonomous runs
 
@@ -139,13 +81,9 @@ guidance and **no safety guardrails** — start it with `pi --no-extensions`
 
 ## Reflection and durable learning
 
-Close-out ends with a concise outcome summary and, when a durable non-obvious
-lesson surfaced, an offer to record it. Project memory (`.pi/MEMORY.md`) is a
-temporary fallback for unaddressed takeaways — minimal, updated only with user
-confirmation, cleaned up once fixed at the root cause in code or `AGENTS.md`.
-
-For a deeper review, ask for one in plain chat — no command or extension is
-involved:
+At close-out Pi may propose concise `.pi/MEMORY.md` updates and applies them
+only after the user confirms. For a deeper review, ask for one in plain chat —
+no command or extension is involved:
 
 > Reconstruct a causal timeline of this session: what I asked, what you did,
 > where friction or rework happened, and why. Cite the specific turns and tool

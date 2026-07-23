@@ -118,7 +118,7 @@ describe("session dashboard startup", () => {
 		await startup;
 
 		const content = sendMessage.mock.calls[0]?.[0].content as string;
-		expect(content).toContain("⌘ Workflow: `/mode`");
+		expect(content).toContain("⌘ Workflow: `/handoff`");
 		expect(content.indexOf("⌘ Workflow")).toBeLessThan(content.indexOf("⚡ Raw Pi"));
 		expect(content).not.toContain("π Measure twice, cut once. What’s your goal?");
 		expect(content.endsWith("*⚡ Raw Pi: `pi --no-extensions`*")).toBe(true);

@@ -1,11 +1,11 @@
 # Agent Workflow
 
-Injects one of **three session-mode flows** — Plan (default), Implement, or
-Review — plus shared tone/engineering/state/learning guidance into every turn.
-Motto: measure twice, cut once — plan in one session, implement in a fresh one,
-review with fresh eyes. The human drives every switch through one command,
-`/mode` (the model cannot); Progress Tracker shows the current mode above the
-editor. The flows are guidance only; nothing here is enforced.
+Injects one of **two session-mode flows** — Plan (default) or Implement — plus
+shared tone/engineering/state/learning guidance into every turn. The flow is
+three steps: understand the goal and explore, present a four-section plan
+ending in **Proceed, handoff, or revise?**, then execute the approved plan and
+summarize. Standing rule in every mode: never commit, stash, or push. The flows
+are guidance only; nothing here is enforced.
 
 [`docs/FLOW.md`](../../docs/FLOW.md) is the canonical human-readable behavior
 contract; this extension's injected prompt is its operational mirror and the
@@ -14,63 +14,41 @@ project-specific stack and repository conventions.
 
 ## User surface
 
-- `/mode` — the single human-only mode command (`index.ts`, `mode-picker.ts`).
-  With no arguments it opens a picker: step 1 chooses plan/implement/review
-  (the active mode is highlighted and marked *current*); for implement and
-  review, step 2 chooses **Continue in this session** or a **Fresh session**.
-  Both steps show the live context readout, so a filling context nudges toward
-  fresh. plan has no step 2 — it is always the same-session default.
-- `/mode <plan|implement|review> [continue|fresh] [task-name]` — the direct
-  form for muscle memory, headless runs, and scripts (no picker). `continue`
-  switches mode in place (`mode.ts`) — persisted across reload/fork via a
-  hidden branch marker that also records boundary-vs-in-place, so in-place
-  modes carry a short caveat in their flow. `fresh` crosses a session boundary
-  (`handoff.ts`): it resolves the task (explicit name, the current task, or the
-  single pending plan under `.pi/goal/`; several plans mean it asks) and spawns
-  a session seeded with the mode marker and task name plus a kickoff message
-  carrying the plan and discovery paths. The seeded marker is why mode is
-  re-derived from the branch before every turn: the new session's extension
-  instance loads before the marker exists. Only a command handler can spawn a
-  session, so `fresh` is reachable only through `/mode`.
-- Closing a plan opens the placement picker automatically: saving a plan offers
-  Implement, and closing one as `done` offers Review (never per slice — a
-  multi-slice plan is reviewed once, as a whole). `Reject` dismisses it. Picking
-  the same session switches in place and starts the turn; picking a new session
-  prefills the exact `/mode <mode> fresh <task>` command, since only a command
-  handler can spawn a session. The offer marks the Implement mode approved, so
-  the approval given here is not asked for again — in place or across the
-  boundary.
-- The picker recommends where to run: it preselects continuing when the context
-  is lean and a new session once it is loaded (over 100k tokens or 40% full —
-  the same thresholds that colour the `ctx` readout).
-- `manage_task` — set a concise task identity after exploration, refine it
-  during planning, then create, transition, update, or resume its lifecycle
-  plan. Saved names are branch-ready; the tool never changes Git branches.
+- `save_plan` — the single tool (`task.ts`). The agent calls it after
+  presenting the plan; it normalizes the task name, names the session, and
+  writes `.pi/plan/<task-name>.md` with the same four sections shown in chat:
+  Current state, Desired state, Approach, Quirks. Re-saving after a revision
+  overwrites the same file. The agent never deletes plan files; legacy
+  `.pi/goal/` files are ignored and preserved.
+- **The approval prompt** (`index.ts`) — a successful `save_plan` arms it, and
+  it appears when the turn settles, as a native `ctx.ui.select`: *Proceed,
+  handoff, or revise?* The context load picks the recommendation (lean →
+  Proceed, loaded → Handoff — the same thresholds that colour the `ctx`
+  readout). Proceed switches to Implement in place (`mode.ts`) and kicks off
+  execution immediately; Handoff prefills `/handoff <task-name>` (only a
+  command handler can spawn a session); Revise or dismissing changes nothing.
+  Headless sessions get a displayed message naming the command instead.
+- `/handoff [task-name]` — the only registered command (`handoff.ts`). Spawns a
+  fresh Implement session seeded with the mode marker and task name before its
+  first turn, plus a kickoff naming the plan path; executing from a handoff is
+  auto-approved. Because `.pi/plan/` accumulates, resolution never assumes a
+  single file: explicit name, then session name, then a lone remaining file —
+  several files mean it asks.
 
-Lifecycle plans use `.pi/goal/<task-name>.<status>.md`: `todo` waits for its
-next slice, `active` records the one approved slice underway, and `done` means
-the full checklist and final validation completed. The mutable plan is the
-cross-session source of truth; local todos cover only the current slice. A
-sibling `.pi/goal/<task-name>.discovery.md` exploration handoff (written by
-Plan mode, read by Implement/Review) is a prompt convention, not tool-managed
-state — a hint that current evidence always beats. Resume always requires
-comparison with current intent, Git state, diff, and validation, then fresh
-approval for one committable slice. Legacy unsuffixed plans and
-`.pi/handoffs/` files are ignored and preserved.
+The mode survives reload/fork via a hidden branch marker, re-derived before
+every turn — that is also how a handoff-seeded session knows its mode before
+its first turn (`mode.ts` publishes it so Progress Tracker can render it).
 
-The agent, not the extension, maintains `.pi/MEMORY.md` according to the workflow
-protocol with explicit user confirmation. For a deep manual session
-retrospective, see [docs/FLOW.md](../../docs/FLOW.md#reflection-and-durable-learning).
+The agent, not the extension, maintains `.pi/MEMORY.md`: it proposes updates at
+close-out and applies them only after the user confirms.
 
 ## Notes
 
 - The workflow block stays near the start of extension load order for provider
   prefix-cache reuse; within a session the injected prompt is stable (it only
-  changes when the human switches mode).
+  changes when the mode switches).
 - The behavior contract is documented in [docs/FLOW.md](../../docs/FLOW.md);
   the injected prompt in `index.ts` carries the full operational detail.
-- `mode.ts` publishes the restored mode on session events so Progress Tracker
-  can render it after rebuilding its own state.
 
 ## Origin
 
