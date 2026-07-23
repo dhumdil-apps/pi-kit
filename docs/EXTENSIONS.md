@@ -12,7 +12,7 @@ extension.
 - **Usage Monitor** — Live provider quota data for Status Bar
 - **Usage History** — Historical token/cost reporting (`/usage`)
 - **Progress Tracker** — Global workflow route plus separate local todo widget (`manage_todo_list`, `/todos`)
-- **Session Dashboard** — Pi-glyph welcome, This-Week spend chart, and project-context line
+- **Session Dashboard** — Pi-glyph welcome, 30-day per-model spend chart, and project-context line
 - **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`; see [FLOW.md](FLOW.md))
 
 ## Supporting resources

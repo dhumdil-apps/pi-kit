@@ -31,7 +31,7 @@ function padLeftVis(text: string, len: number): string {
 
 /**
  * Decorative, non-interactive reproduction of the /usage "Graphs" view for the
- * "This Week · Per bucket cost · by provider" mode. Holds a pre-built GraphModel
+ * "Last 30 Days · Per bucket cost · by model" mode. Holds a pre-built GraphModel
  * (serialized into the banner text, rebuilt here) and renders the same braille
  * chart via the shared renderChart(), plus a static legend. Width-responsive:
  * the chart is generated at the pane width (capped) and every line is clipped so
@@ -47,10 +47,10 @@ export class UsageChartCard implements Component {
 
 	render(width: number): string[] {
 		if (width <= 0) return [];
-		const lines: string[] = [this.titleFn("This Week") + this.mutedFn(" · Per bucket cost · by provider")];
+		const lines: string[] = [this.titleFn("Last 30 Days") + this.mutedFn(" · Per bucket cost · by model")];
 
 		if (this.model.groupedTotal === 0) {
-			lines.push(this.dimFn("  No usage yet this week"));
+			lines.push(this.dimFn("  No usage in the last 30 days"));
 			return lines.map((line) => truncateToWidth(line, width, ""));
 		}
 
@@ -58,9 +58,8 @@ export class UsageChartCard implements Component {
 		const formatTime = (ms: number): string => {
 			const d = new Date(ms);
 			const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-			// Within a day: just the time. Within a week (This Week is hourly-bucketed):
-			// weekday + time, so the three ticks stay distinct instead of repeating a
-			// bare date. Longer spans fall back to a date.
+			// Short spans use times or weekday + time so ticks stay distinct.
+			// The 30-day dashboard uses dates.
 			if (spanMs <= 26 * 3_600_000) return hm;
 			if (spanMs <= 8 * 24 * 3_600_000) return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${hm}`;
 			return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -295,13 +294,13 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 
 			let usageChart: string | undefined;
 			if (usage) {
-				// Same model the /usage Graphs view builds for This Week · Per bucket
-				// cost · by provider. GraphModel is plain arrays/objects, so it serializes
+				// Same model the /usage Graphs view builds for Last 30 Days · Per bucket
+				// cost · by model. GraphModel is plain arrays/objects, so it serializes
 				// cleanly into the banner text and is rebuilt by the message renderer.
 				const model = buildGraphModel(usage.hourly, {
-					period: "thisWeek",
+					period: "last30Days",
 					metric: "cost",
-					groupBy: "provider",
+					groupBy: "model",
 					cumulative: false,
 					bounds: usage.bounds,
 				});

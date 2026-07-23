@@ -7,11 +7,11 @@ theme-rendered welcome that keeps startup focused. `extensions.ts` still supplie
 the grouped metadata and descriptions for `/help`; its focused test requires an
 exact one-to-one match with the active extension manifest.
 
-A "This Week · Per bucket cost · by provider" usage chart follows the welcome: a
+A "Last 30 Days · Per bucket cost · by model" usage chart follows the welcome: a
 non-interactive braille line chart built from `usage-history`'s `buildGraphModel`
-and `renderChart`, showing this week's spend by provider (with a "No usage yet
-this week" fallback). Its x-axis uses weekday + time labels so the ticks stay
-distinct across a short week. It is omitted when usage data is unavailable.
+and `renderChart`, showing the last 30 days' spend by model (with a "No usage in
+the last 30 days" fallback). Its x-axis uses date labels. It is omitted when usage
+data is unavailable.
 
 One concise, plain-markdown line closes the dashboard, chips separated by ` · `:
 the working directory and loaded context files (`📜 …`, italic / de-emphasised,

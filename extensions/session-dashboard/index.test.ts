@@ -1,8 +1,16 @@
 import { homedir } from "node:os";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
+import type { UsageData } from "../usage-history/data.js";
 import type { GraphModel } from "../usage-history/graph.js";
 import { TOTAL_SERIES_KEY } from "../usage-history/graph.js";
+
+const usageMocks = vi.hoisted(() => ({ collectUsageData: vi.fn<() => Promise<UsageData | null>>(() => Promise.resolve(null)) }));
+vi.mock("../usage-history/data.js", async (importOriginal) => ({
+	...(await importOriginal()),
+	collectUsageData: usageMocks.collectUsageData,
+}));
+
 import sessionDashboardExtension, { contextFileList, tildify, UsageChartCard } from "./index.js";
 
 describe("tildify", () => {
@@ -44,22 +52,22 @@ describe("UsageChartCard", () => {
 	});
 	const card = (m: GraphModel = model()) => new UsageChartCard(m, (s) => s, (s) => s, (s) => s);
 
-	it("renders the This Week · Per bucket cost · by provider header and a per-provider legend", () => {
+	it("renders the Last 30 Days · Per bucket cost · by model header and a per-model legend", () => {
 		const rendered = card().render(72);
-		expect(rendered[0]).toContain("This Week");
-		expect(rendered[0]).toContain("Per bucket cost · by provider");
+		expect(rendered[0]).toContain("Last 30 Days");
+		expect(rendered[0]).toContain("Per bucket cost · by model");
 		expect(rendered.some((line) => line.includes("Total"))).toBe(true);
 		expect(rendered.some((line) => line.includes("anthropic") && line.includes("100%"))).toBe(true);
 	});
 
-	it("shows a fallback note and no chart when there is no usage this week", () => {
+	it("shows a fallback note and no chart when there is no usage in the last 30 days", () => {
 		const empty = model({
 			series: [{ key: TOTAL_SERIES_KEY, label: "Total", points: [0], total: 0, hidden: false, firstIdx: -1, lastIdx: -1 }],
 			groupedTotal: 0,
 			yMax: 0,
 		});
 		const rendered = card(empty).render(72);
-		expect(rendered.some((line) => line.includes("No usage yet this week"))).toBe(true);
+		expect(rendered.some((line) => line.includes("No usage in the last 30 days"))).toBe(true);
 		expect(rendered.some((line) => line.includes("anthropic"))).toBe(false);
 	});
 
@@ -99,6 +107,47 @@ describe("session dashboard startup", () => {
 			expect.anything(),
 		);
 		expect(setWidget).toHaveBeenLastCalledWith("session-dashboard-loading", undefined);
+	});
+
+	it("serializes a daily per-model 30-day graph", async () => {
+		const day = 24 * 3_600_000;
+		const start = Date.UTC(2026, 6, 1);
+		const now = start + 30 * day;
+		const emptyPeriod: UsageData["today"] = {
+			providers: new Map(),
+			totals: { sessions: 0, messages: 0, cost: 0, tokens: { total: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
+			insights: { insights: [] },
+		};
+		usageMocks.collectUsageData.mockResolvedValueOnce({
+			today: emptyPeriod,
+			thisWeek: emptyPeriod,
+			lastWeek: emptyPeriod,
+			last30Days: emptyPeriod,
+			allTime: emptyPeriod,
+			hourly: new Map([
+				[start + 2 * day, new Map([["openai\u0000gpt-5\u0000", { messages: 1, cost: 1, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 }]])],
+				[start + 17 * day, new Map([["openai\u0000gpt-5-mini\u0000", { messages: 1, cost: 2, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 }]])],
+			]),
+			bounds: { todayMs: now - day, weekStartMs: now - 7 * day, lastWeekStartMs: now - 14 * day, last30DaysStartMs: start, nowMs: now },
+		});
+		const handlers = new Map<string, (event: unknown, ctx: unknown) => Promise<void>>();
+		const sendMessage = vi.fn();
+		const pi = {
+			registerMessageRenderer: vi.fn(),
+			registerCommand: vi.fn(),
+			on: (event: string, handler: (event: unknown, ctx: unknown) => Promise<void>) => handlers.set(event, handler),
+			sendMessage,
+		};
+		sessionDashboardExtension(pi as never);
+
+		await handlers.get("session_start")?.({}, { hasUI: true, cwd: process.cwd(), ui: { setWidget: vi.fn() } });
+
+		const content = sendMessage.mock.calls[0]?.[0].content as string;
+		const json = content.match(/<!-- session-dashboard-usage-chart -->\n(.+)\n<!-- \/session-dashboard-usage-chart -->/)?.[1];
+		const graph = JSON.parse(json ?? "") as GraphModel;
+		expect(graph).toMatchObject({ domainStartMs: start, domainEndMs: now, bucketMs: day });
+		expect(graph.bucketStarts).toHaveLength(30);
+		expect(graph.series.map((series) => series.key)).toEqual([TOTAL_SERIES_KEY, "gpt-5-mini", "gpt-5"]);
 	});
 
 	it("formats context files cleanly", () => {
