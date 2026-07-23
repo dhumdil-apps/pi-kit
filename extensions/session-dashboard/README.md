@@ -11,7 +11,10 @@ A "Last 30 Days · Per bucket cost · by model" usage chart appears first when
 usage is available: a non-interactive braille line chart built from
 `usage-history`'s `buildGraphModel` and `renderChart`, showing the last 30 days'
 spend by model (with a "No usage in the last 30 days" fallback). Its x-axis uses
-date labels.
+date labels. The Total series is hidden here — `renderChart` draws it last so it
+wins contested cells, which on a card this small overdraws the per-model lines it
+summarizes; the legend closes with it as a dim, markerless summary row instead.
+`/usage` is unaffected: there the Total stays visible and its legend can toggle it.
 
 The chart is followed by one concise, plain-markdown context line, chips separated
 by ` · `: the working directory and loaded context files (`📜 …`, italic /

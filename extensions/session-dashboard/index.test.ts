@@ -39,7 +39,7 @@ describe("UsageChartCard", () => {
 	const t0 = Date.UTC(2026, 6, 20, 9, 0, 0); // fixed timestamp — no Date.now() in the model
 	const model = (overrides: Partial<GraphModel> = {}): GraphModel => ({
 		series: [
-			{ key: TOTAL_SERIES_KEY, label: "Total", points: [1, 2], total: 3, hidden: false, firstIdx: 0, lastIdx: 1 },
+			{ key: TOTAL_SERIES_KEY, label: "Total", points: [1, 2], total: 3, hidden: true, firstIdx: 0, lastIdx: 1 },
 			{ key: "anthropic", label: "anthropic", points: [1, 2], total: 3, hidden: false, firstIdx: 0, lastIdx: 1 },
 		],
 		bucketStarts: [t0, t0 + HOUR],
@@ -56,8 +56,23 @@ describe("UsageChartCard", () => {
 		const rendered = card().render(72);
 		expect(rendered[0]).toContain("Last 30 Days");
 		expect(rendered[0]).toContain("Per bucket cost · by model");
-		expect(rendered.some((line) => line.includes("Total"))).toBe(true);
 		expect(rendered.some((line) => line.includes("anthropic") && line.includes("100%"))).toBe(true);
+	});
+
+	it("closes the legend with Total as a markerless summary row", () => {
+		const rendered = card().render(72);
+		const totalIdx = rendered.findIndex((line) => line.includes("Total"));
+		const seriesIdx = rendered.findIndex((line) => line.includes("anthropic"));
+		expect(seriesIdx).toBeGreaterThanOrEqual(0);
+		expect(totalIdx).toBeGreaterThan(seriesIdx);
+		expect(rendered[totalIdx]).not.toContain("●");
+		expect(rendered[totalIdx]).not.toContain("%");
+	});
+
+	it("omits the summary row when the model carries no Total series", () => {
+		const rendered = card(model({ series: model().series.filter((s) => s.key !== TOTAL_SERIES_KEY) })).render(72);
+		expect(rendered.some((line) => line.includes("Total"))).toBe(false);
+		expect(rendered.some((line) => line.includes("anthropic"))).toBe(true);
 	});
 
 	it("shows a fallback note and no chart when there is no usage in the last 30 days", () => {
@@ -151,6 +166,8 @@ describe("session dashboard startup", () => {
 		expect(graph).toMatchObject({ domainStartMs: start, domainEndMs: now, bucketMs: day });
 		expect(graph.bucketStarts).toHaveLength(30);
 		expect(graph.series.map((series) => series.key)).toEqual([TOTAL_SERIES_KEY, "gpt-5-mini", "gpt-5"]);
+		// Hidden at build time so it neither overdraws the per-model lines nor inflates yMax.
+		expect(graph.series.map((series) => series.hidden)).toEqual([true, false, false]);
 	});
 
 	it("formats context files cleanly", () => {

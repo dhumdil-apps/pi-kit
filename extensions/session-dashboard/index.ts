@@ -74,16 +74,21 @@ export class UsageChartCard implements Component {
 		});
 		lines.push(...chart, "");
 
+		// Total is excluded from the chart (see the build site) — keep it out of the
+		// series legend too, and close with it as a dim summary row instead.
 		for (let i = 0; i < this.model.series.length; i++) {
 			const s = this.model.series[i]!;
+			if (s.key === TOTAL_SERIES_KEY) continue;
 			const marker = seriesColor(i) + "●" + COLOR_RESET;
 			const value = formatAxisCost(s.total);
 			const pct =
-				s.key !== TOTAL_SERIES_KEY && this.model.groupedTotal > 0
-					? ` ${this.dimFn(`${Math.round((s.total / this.model.groupedTotal) * 100)}%`)}`
-					: "";
+				this.model.groupedTotal > 0 ? ` ${this.dimFn(`${Math.round((s.total / this.model.groupedTotal) * 100)}%`)}` : "";
 			lines.push(`  ${marker} ${padRightVis(s.label, 24)} ${padLeftVis(value, 8)}${pct}`);
 		}
+
+		const total = this.model.series.find((s) => s.key === TOTAL_SERIES_KEY);
+		// One blank marker column keeps the row aligned with the series rows above.
+		if (total) lines.push(this.dimFn(`    ${padRightVis(total.label, 24)} ${padLeftVis(formatAxisCost(total.total), 8)}`));
 
 		return lines.map((line) => truncateToWidth(line, width, ""));
 	}
@@ -297,11 +302,16 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				// Same model the /usage Graphs view builds for Last 30 Days · Per bucket
 				// cost · by model. GraphModel is plain arrays/objects, so it serializes
 				// cleanly into the banner text and is rebuilt by the message renderer.
+				// Total is hidden here (unlike /usage, where the legend can toggle it):
+				// renderChart draws it last so it wins contested cells, which on this
+				// small card overdraws the very per-model lines it summarizes. Hiding it
+				// at build time also keeps it out of the serialized model's yMax.
 				const model = buildGraphModel(usage.hourly, {
 					period: "last30Days",
 					metric: "cost",
 					groupBy: "model",
 					cumulative: false,
+					hidden: new Set([TOTAL_SERIES_KEY]),
 					bounds: usage.bounds,
 				});
 				usageChart = JSON.stringify(model);
