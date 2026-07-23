@@ -17,11 +17,21 @@ npm install
 Consumers install `pi-kit` via `pi install` and run the managed copy in `~/.pi/agent/git/`.
 Maintainers work from an editable clone of this repository.
 
-To test unpublished working-copy code directly without altering your global Pi installation:
+Run the working copy — extensions and prompts, no push required — with discovery
+off so the managed copy cannot load alongside it:
 
 ```bash
-pi -ne -e .
+pi -ne -e ~/Github/pi-kit
 ```
+
+`-e` accepts the package directory and reads its `package.json` manifest; `.`
+works when the shell is already in the repository root. Use an absolute path to
+dogfood a change from inside another project.
+
+Do **not** `pi install <local path>` while the published package is installed:
+both copies register `manage_task` and `manage_todo_list`, so the managed
+extensions fail to load with a tool-conflict error on every start. `-ne -e` is
+the conflict-free way to run unpublished code.
 
 ## Verification
 
@@ -35,13 +45,34 @@ git diff --check
 
 `npm run typecheck` checks every vendored TypeScript extension and must exit zero.
 
-Run headless load smoke test:
+Smoke the working copy headlessly — the bundle loads and the default session is
+Plan mode:
 
 ```bash
-pi -p --no-session --tools '' "Reply exactly HEADLESS_OK"
+pi -p -ne -e ~/Github/pi-kit --tools '' --no-session "Reply with exactly one word: the session mode named in your workflow flow."
 ```
 
-Interactive checks should be performed when making visual or lifecycle changes to Status Bar rendering, session dashboard, workflow questions, or action confirmation dialogs.
+Session-boundary changes need a scratch project with a seeded plan
+(`.pi/goal/demo-task.todo.md`) and a session directory to inspect afterwards:
+
+```bash
+pi -p -ne -e ~/Github/pi-kit --tools '' --session-dir ./sessions "/handoff implement"
+```
+
+The newest file under `./sessions` must contain, in order: the `parentSession`
+link, the hidden `agent-workflow:mode` marker, a `session_info` entry naming the
+task, and the kickoff user message carrying the real plan and discovery paths.
+
+Interactive checks still belong to visual or lifecycle changes: Status Bar
+rendering, the above-editor indicator, session dashboard, and workflow prompts.
+
+## After publishing
+
+Push, then refresh and smoke the managed copy consumers actually run:
+
+```bash
+pi update --extension https://github.com/dhumdil-apps/pi-kit && pi list
+```
 
 ## Change checklist
 
