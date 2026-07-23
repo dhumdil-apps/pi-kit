@@ -17,20 +17,22 @@ npm install
 Consumers install `pi-kit` via `pi install` and run the managed copy in `~/.pi/agent/git/`.
 Maintainers work from an editable clone of this repository.
 
-Run the working copy — extensions and prompts, no push required — with discovery
+Run the working copy — extensions, prompts, and themes, no push required — with discovery
 off so the managed copy cannot load alongside it:
 
 ```bash
-pi -ne -e ~/Github/pi-kit
+pi -ne -np --no-themes -e ~/Github/pi-kit
 ```
 
 `-e` accepts the package directory and reads its `package.json` manifest; `.`
 works when the shell is already in the repository root. Use an absolute path to
-dogfood a change from inside another project.
+dogfood a change from inside another project. `-ne` disables extension discovery, while
+`-np` and `--no-themes` disable prompt template and theme discovery from installed packages
+to avoid collision warnings.
 
 Do **not** `pi install <local path>` while the published package is installed:
 both copies register `manage_task` and `manage_todo_list`, so the managed
-extensions fail to load with a tool-conflict error on every start. `-ne -e` is
+extensions fail to load with a tool-conflict error on every start. `-ne -np --no-themes -e` is
 the conflict-free way to run unpublished code.
 
 ## Verification
