@@ -1,4 +1,8 @@
+# Install scripts for transitive deps of the pi peer packages. All denied:
+# esbuild's postinstall only fetches the platform binary pnpm already installs
+# as @esbuild/darwin-arm64, protobufjs' is legacy path shuffling, and
+# @google/genai is not installed here. Nothing pi-kit builds needs them.
 allowBuilds:
-  '@google/genai': set this to true or false
-  esbuild: set this to true or false
-  protobufjs: set this to true or false
+  '@google/genai': false
+  esbuild: false
+  protobufjs: false
