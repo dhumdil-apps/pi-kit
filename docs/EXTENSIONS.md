@@ -18,8 +18,6 @@ extension.
 
 ## Supporting resources
 
-- **Review skill** (`skills/review/`) — Risk-adaptive, evidence-based correctness review that invokes the separate simplify pass once
-- **Simplify skill** (`skills/simplify/`) — Focused removal and clarification pass that does not change approved behavior
 - **Init prompt** (`prompts/init.md`) — Analyze a project and propose an `AGENTS.md`
 - **Bundled themes** (`themes/dark.json`, `themes/github-dark.json`) — Portable bundled themes (`"theme": "github-dark"`)
 
@@ -30,6 +28,12 @@ explores inline, proposes the plan itself, implements each step inline,
 validates after each step, then reviews inline. Only the parent agent owns
 user interaction, todos, commits, and final acceptance — there is no subagent
 tool or child-process delegation.
+
+The Plan / Implement / Review session-mode split (2026-07-23, see
+[FLOW.md](FLOW.md)) does not change this: each mode is still the one agent in
+one session, with the disk (lifecycle plan + `discovery.md`) as the handoff.
+Delegating phases to child processes was considered and rejected — the
+single-agent policy stands (see the earlier `pi-subagents` removal below).
 
 ## Extension Preferences registry
 
@@ -47,19 +51,26 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
 
 ## Removed or folded-in components
 
+- `skills/review` and `skills/simplify`: removed (2026-07-23). The bundle is
+  fully skill-free — the review procedure now lives minimized inside the Review
+  mode flow (always injected in `/review` sessions, so there is no invocation
+  step to forget), and the simplification checklist lives inline at the end of
+  the Implement mode flow, run once by the author on the slice diff.
 - `pi-add-dir`: removed because it did not fit the normal workflow.
 - `pi-memory-md`: removed; project memory is an optional user-owned `.pi/MEMORY.md` file, consulted by the workflow without an extension.
-- standalone `pi-simplify`: removed; its focused cleanup logic now lives in
-  `skills/simplify/` and is also invoked once by the bundle-local review skill.
+- standalone `pi-simplify`: removed; its focused cleanup logic lived on in
+  `skills/simplify/` until 2026-07-23 and is now the inline simplification pass
+  in the Implement mode flow.
 - `pi-subagents`: removed (2026-07-19). The multi-agent orchestration
   (scout/planner/worker/reviewer, later a serial explorer/coder pair) proved
   unstable — dead-looped handoffs and flaky parallel/async runs.
 - `pi-web-access`: removed (2026-07-20). Brainstorming and repository context
   are local-first; deliberate shell web access through `curl` is consent-gated.
 - `plan-mode`: removed (2026-07-19). The phase/state machine, triage, ledger,
-  gates, and `/plan` commands were replaced by the guidance flow in
+  gates, and its `/plan` commands were replaced by the guidance flow in
   [FLOW.md](FLOW.md) plus the global Minimal Action Confirmation rules — guidance over
-  rules, gates only where content is genuinely dangerous.
+  rules, gates only where content is genuinely dangerous. (The current `/plan`
+  command is unrelated: a human-only session-mode selector, not a state machine.)
 - `interactive-prompt` and `skills/ask-user`: removed (2026-07-20).
   Planning is conversational; only safety confirmations use Pi's built-in dialog.
 - `/flash`: removed (2026-07-22). The managed "cruise control" autonomous mode

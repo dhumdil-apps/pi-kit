@@ -8,14 +8,14 @@ notices for vendored components are consolidated below under [Upstream License N
 - **Pi Usage (Powerbar dependency)** (`@juanibiapina/pi-usage`) — npm `0.1.0`
 - **Usage Extension** (`@tmustier/pi-usage-extension`) — npm `0.9.1`
 - **Manage Todo List** (`tintinweb/pi-manage-todo-list`) — commit `b75c449aa85ce328e9a8b632f62bf642aed40359`
-- **Simplify review logic** (vendored into `skills/simplify/`) — `pi-simplify` (Matt Devy), npm `0.2.3`
+- **Simplify review logic** (now the inline simplification pass in the Implement mode flow, `extensions/agent-workflow/index.ts`) — `pi-simplify` (Matt Devy), npm `0.2.3`
 
 Removed from the bundle (2026-07-18): `pi-add-dir` (unused), `pi-memory-md`
 (replaced briefly by a bundle-local extension, then removed in favor of an
 optional user-owned `.pi/MEMORY.md`; this also removed the `nodejieba`/
 `node-pre-gyp` vulnerable `tar` install-time exposure), and the standalone `pi-simplify` extension (its
-focused cleanup logic now lives in `skills/simplify/`; the broader bundle-local
-`review` skill invokes that pass once).
+focused cleanup logic lived in `skills/simplify/` until 2026-07-23 and is now
+the inline simplification pass in the Implement mode flow).
 
 Removed from the bundle (2026-07-19): `pi-subagents` (Nico Bailon, npm
 `0.35.0`, MIT declared in its manifest with no separate license file in the

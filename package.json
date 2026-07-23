@@ -40,9 +40,6 @@
       "./extensions/session-dashboard/index.ts",
       "./extensions/minimal-action-confirmation/index.ts"
     ],
-    "skills": [
-      "./skills"
-    ],
     "prompts": [
       "./prompts"
     ],

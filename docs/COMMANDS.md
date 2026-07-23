@@ -1,17 +1,16 @@
 # Commands and tools
 
 This is the short operational reference. Some vendored extensions expose more
-advanced commands; follow their linked README when needed. There is no plan
-mode and no `/plan` command — the working flow is guidance, described in
-[FLOW.md](FLOW.md).
+advanced commands; follow their linked README when needed. The working flow is
+guidance split across three session modes, described in [FLOW.md](FLOW.md);
+there is no enforced state machine.
 
 ## Everyday commands
 
+- **`/plan`**, **`/implement`**, **`/review`** — Human-only session-mode selectors (Plan is the default); each flips which flow is injected and shows the mode in the status bar
 - **`/todos`** — Reveal workflow progress and toggle the independent local todo widget
 - **`/extension-settings`** — Edit registered global extension settings
 - **`/usage`** — Show historical token/cost usage
-- **`/review`** — Run the risk-adaptive correctness pipeline, fix supported in-scope findings, invoke simplify once, and revalidate the relevant diff
-- **`/simplify`** — Remove unnecessary complexity and development residue without changing approved behavior
 
 ## User-facing tools
 

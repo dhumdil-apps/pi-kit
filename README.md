@@ -42,13 +42,13 @@ pi list
 
 ## Included Features
 
-- **agent-workflow** — Guidance-driven development: **GOAL → PLANNING → IMPLEMENTATION**, conversational question batches, plan persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
+- **agent-workflow** — Guidance-driven development across three session modes — **Plan → Implement → Review** (`/plan`, `/implement`, `/review`) — with conversational question batches, plan + discovery-handoff persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
 - **minimal-action-confirmation** — Enforced safety guardrails: confirms destructive shell commands, out-of-project writes, web requests, reading vendored dependencies, and recursive search.
 - **project-memory** — Optional project-level `.pi/MEMORY.md` consulted at task start and maintained with your confirmation at task close-out.
 - **progress-tracker** — Global workflow status route and interactive `/todos` checklist widget.
 - **session-dashboard** — Interactive welcome banner, spend visualization chart, and context indicators (`/help`).
 - **status-bar & usage-monitor** — Real-time quota and usage metrics in the status bar (`/usage`).
-- **bundled skills & themes** — `/review` and `/simplify` skills, plus `dark` and `github-dark` themes.
+- **bundled themes** — `dark` and `github-dark` themes (the review and simplify procedures live inside the workflow flows, not as skills).
 
 ## Documentation
 
