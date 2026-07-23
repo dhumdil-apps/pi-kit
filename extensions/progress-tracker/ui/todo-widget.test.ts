@@ -1,13 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { updatePhaseIndicator, updateTodoWidget } from "./todo-widget.js";
 import { TodoStateManager } from "../state-manager.js";
 
 describe("phase indicator", () => {
 	it.each([
-		["goal", "accent", "● GOAL"],
-		["planning", "accent", "● PLANNING"],
-		["implementation", "accent", "● IMPLEMENTATION"],
-	] as const)("renders the idle %s phase persistently", (phase, color, expected) => {
+		["goal", "plan", "accent", "● PLAN · GOAL"],
+		["planning", "implement", "accent", "● IMPLEMENT · PLANNING"],
+		["implementation", "review", "accent", "● REVIEW · IMPLEMENTATION"],
+	] as const)("renders the idle %s phase with %s mode persistently", (phase, mode, color, expected) => {
 		let factory: any;
 		const ctx = {
 			ui: {
@@ -17,16 +17,17 @@ describe("phase indicator", () => {
 		} as any;
 		const theme = { fg: (actualColor: string, text: string) => `[${actualColor}]${text}` } as any;
 
-		updatePhaseIndicator(phase, ctx, false);
+		updatePhaseIndicator(phase, mode, ctx, false);
 
 		expect(factory({ requestRender: () => {} }, theme).render(80)).toEqual([`[${color}]${expected}`]);
 	});
 
 	it.each([
-		["goal", "Visioning…"],
-		["planning", "Exploring…"],
-		["implementation", "Implementing…"],
-	] as const)("shows an accent-colored animated message while %s is working", (phase, message) => {
+		["plan", ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"]],
+		["implement", ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"]],
+		["review", ["Auditing…", "Probing…", "Verifying…", "Inspecting…", "Challenging…", "Confirming…"]],
+	] as const)("rotates the approved %s activity messages while working", (mode, messages) => {
+		vi.useFakeTimers();
 		let factory: any;
 		const ctx = {
 			ui: {
@@ -34,11 +35,16 @@ describe("phase indicator", () => {
 				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
 			},
 		} as any;
-		updatePhaseIndicator(phase, ctx, true);
+		updatePhaseIndicator("implementation", mode, ctx, true);
 		const component = factory({ requestRender: () => {} }, { fg: (color: string, text: string) => `[${color}]${text}` });
-		expect(component.render(80)[0]).toContain(`[accent]⠋ ${message}`);
+		for (const message of messages) {
+			expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${message}`);
+			vi.advanceTimersByTime(12 * 120);
+		}
 		component.dispose();
 	});
+
+	afterEach(() => vi.useRealTimers());
 });
 
 describe("todo widget", () => {

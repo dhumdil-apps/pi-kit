@@ -7,16 +7,22 @@
 
 import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
+import type { WorkflowMode } from "../../agent-workflow/mode.js";
 import type { TodoStateManager } from "../state-manager.js";
 import type { WorkflowPhase } from "../types.js";
 
 const PHASE_WIDGET_ID = "workflow-phase";
 const TODO_WIDGET_ID = "todo-list";
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const PHASE_DISPLAY: Record<WorkflowPhase, { label: string; color: ThemeColor; messages: string[] }> = {
-  goal: { label: "GOAL", color: "accent", messages: ["Visioning…"] },
-  planning: { label: "PLANNING", color: "accent", messages: ["Exploring…", "Discovering…"] },
-  implementation: { label: "IMPLEMENTATION", color: "accent", messages: ["Implementing…", "Shaping…", "Polishing…"] },
+const PHASE_DISPLAY: Record<WorkflowPhase, { label: string; color: ThemeColor }> = {
+  goal: { label: "GOAL", color: "accent" },
+  planning: { label: "PLANNING", color: "accent" },
+  implementation: { label: "IMPLEMENTATION", color: "accent" },
+};
+const MODE_DISPLAY: Record<WorkflowMode, { label: string; messages: string[] }> = {
+  plan: { label: "PLAN", messages: ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"] },
+  implement: { label: "IMPLEMENT", messages: ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"] },
+  review: { label: "REVIEW", messages: ["Auditing…", "Probing…", "Verifying…", "Inspecting…", "Challenging…", "Confirming…"] },
 };
 
 /** Status icons for each todo state */
@@ -32,8 +38,8 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
   return theme.fg("success", "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(width - filled));
 }
 
-/** Replace pi's transient working row with a persistent phase-aware indicator. */
-export function updatePhaseIndicator(phase: WorkflowPhase, ctx: ExtensionContext, working: boolean): void {
+/** Replace pi's transient working row with a persistent workflow indicator. */
+export function updatePhaseIndicator(phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, working: boolean): void {
   ctx.ui.setWorkingVisible(false);
   ctx.ui.setWidget(
     PHASE_WIDGET_ID,
@@ -49,11 +55,12 @@ export function updatePhaseIndicator(phase: WorkflowPhase, ctx: ExtensionContext
 
       return {
         render: (width: number) => {
-          const display = PHASE_DISPLAY[phase];
+          const phaseDisplay = PHASE_DISPLAY[phase];
+          const modeDisplay = MODE_DISPLAY[mode];
           const text = working
-            ? `${SPINNER_FRAMES[tick % SPINNER_FRAMES.length]} ${display.messages[Math.floor(tick / 12) % display.messages.length]}`
-            : `● ${display.label}`;
-          return [truncateToWidth(theme.fg(display.color, text), width)];
+            ? `${SPINNER_FRAMES[tick % SPINNER_FRAMES.length]} ${modeDisplay.label} · ${modeDisplay.messages[Math.floor(tick / 12) % modeDisplay.messages.length]}`
+            : `● ${modeDisplay.label} · ${phaseDisplay.label}`;
+          return [truncateToWidth(theme.fg(phaseDisplay.color, text), width)];
         },
         invalidate: () => {},
         dispose: () => {

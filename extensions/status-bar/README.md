@@ -16,9 +16,9 @@ sub-extensions each emit one or more segments:
 - **`src/powerbar-os/`** — `cpu`, `ram`, `disk`/SSD, `net`
 
 Any extension may register a transient segment via powerbar events: it renders
-only while active and does not need a configured slot. Workflow phase is
-deliberately outside Status Bar; Progress Tracker renders it
-as a persistent phase-aware working indicator above the editor.
+only while active and does not need a configured slot. Workflow mode and phase
+are deliberately outside Status Bar; Progress Tracker renders them in a
+persistent above-editor indicator.
 
 All Status Bar progress bars use the theme accent normally, changing to warning
 and error at their configured usage thresholds. CPU, RAM, and SSD usage render

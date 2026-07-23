@@ -18,8 +18,9 @@ inside a context polluted by exploration and dead ends:
 - **Review** — a fresh-eyes session verifies the task diff against the plan.
 
 The human selects the mode with the `/plan`, `/implement`, and `/review`
-commands; the current mode is shown in the status bar. The model cannot switch
-modes — mode is a human decision at a session boundary, which is what preserves
+commands; Progress Tracker shows the current mode above the editor and retains
+the workflow phase while idle. The model cannot switch modes — mode is a human
+decision at a session boundary, which is what preserves
 the fresh-context discipline. Only the active mode's flow is injected each
 turn; the injected prompt is stable within a session, so provider prefix-cache
 reuse holds (the suffix changes only when the mode changes, at session

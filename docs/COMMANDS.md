@@ -7,7 +7,7 @@ there is no enforced state machine.
 
 ## Everyday commands
 
-- **`/plan`**, **`/implement`**, **`/review`** — Human-only session-mode selectors (Plan is the default); each flips which flow is injected and shows the mode in the status bar
+- **`/plan`**, **`/implement`**, **`/review`** — Human-only session-mode selectors (Plan is the default); each flips which flow is injected and updates the above-editor workflow indicator
 - **`/todos`** — Reveal workflow progress and toggle the independent local todo widget
 - **`/extension-settings`** — Edit registered global extension settings
 - **`/usage`** — Show historical token/cost usage

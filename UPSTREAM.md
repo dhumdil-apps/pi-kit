@@ -34,8 +34,8 @@ Discovery and plan approval now use ordinary conversational turns.
 
 Removed from the bundle (2026-07-23): `minimal-action-confirmation`
 (bundle-local). The denylist permission gate, its confirmation log, and its
-`permission-gate` setting are gone — the bundle now runs ungated ("yolo"),
-with destructive-action consent handled conversationally by the workflow flows.
+`permission-gate` setting are gone — the bundle now runs ungated, with
+destructive-action consent handled conversationally by the workflow flows.
 
 ## Local compatibility changes
 

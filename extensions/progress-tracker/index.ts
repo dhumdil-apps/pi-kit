@@ -11,6 +11,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { isWorkflowMode, MODE_UPDATE_EVENT, type WorkflowMode } from "../agent-workflow/mode.js";
 import { CLEAR_ENTRY_TYPE, TodoStateManager } from "./state-manager.js";
 import { createManageTodoListTool } from "./tool.js";
 import { clearPhaseIndicator, updatePhaseIndicator, updateTodoWidget } from "./ui/todo-widget.js";
@@ -19,12 +20,13 @@ export default function (pi: ExtensionAPI) {
   const state = new TodoStateManager();
 
   let currentCtx: ExtensionContext | undefined;
+  let currentMode: WorkflowMode = "plan";
   let todosVisible = false;
   let working = false;
 
   const refreshStatus = () => {
     if (!currentCtx) return;
-    updatePhaseIndicator(state.getPhase(), currentCtx, working);
+    updatePhaseIndicator(state.getPhase(), currentMode, currentCtx, working);
     updateTodoWidget(state, currentCtx, todosVisible);
   };
 
@@ -42,6 +44,12 @@ export default function (pi: ExtensionAPI) {
     if (operation === "write") todosVisible = state.read().length > 0;
     refreshStatus();
   };
+
+  pi.events.on(MODE_UPDATE_EVENT, (mode: unknown) => {
+    if (!isWorkflowMode(mode)) return;
+    currentMode = mode;
+    refreshStatus();
+  });
 
   pi.on("session_start", async (_event, ctx) => reconstructState(ctx));
   pi.on("session_tree", async (_event, ctx) => reconstructState(ctx));
