@@ -31,8 +31,8 @@ function branchCtx(entries: any[]) {
 }
 
 /** The shape sessionManager.getBranch() actually returns for pi.sendMessage markers. */
-function modeMarker(mode: string, origin?: string) {
-	return { type: "custom_message", customType: MODE_ENTRY_TYPE, display: false, content: `Workflow mode: ${mode}.`, details: { mode, origin } };
+function modeMarker(mode: string, origin?: string, approved?: boolean) {
+	return { type: "custom_message", customType: MODE_ENTRY_TYPE, display: false, content: `Workflow mode: ${mode}.`, details: { mode, origin, approved } };
 }
 
 describe("workflow mode management", () => {
@@ -48,11 +48,11 @@ describe("workflow mode management", () => {
 		const { emitted, sent, mode } = harness();
 		const ctx = uiCtx();
 		mode.switchInPlace(ctx as any, "implement");
-		expect(mode.getState()).toEqual({ mode: "implement", origin: "inplace" });
+		expect(mode.getState()).toEqual({ mode: "implement", origin: "inplace", approved: false });
 		const [marker, options] = sent[0];
 		expect(marker.customType).toBe(MODE_ENTRY_TYPE);
 		expect(marker.display).toBe(false);
-		expect(marker.details).toEqual({ mode: "implement", origin: "inplace" });
+		expect(marker.details).toEqual({ mode: "implement", origin: "inplace", approved: false });
 		expect(options).toEqual({ triggerTurn: false });
 		expect(emitted).toContainEqual([MODE_UPDATE_EVENT, "implement"]);
 		expect(emitted.some(([name]) => name.startsWith("powerbar:"))).toBe(false);
@@ -105,10 +105,21 @@ describe("workflow mode management", () => {
 		expect(mode.syncFromBranch(branchCtx([modeMarker("implement", "inplace")]) as any)).toEqual({
 			mode: "implement",
 			origin: "inplace",
+			approved: false,
 		});
 		expect(mode.syncFromBranch(branchCtx([modeMarker("review", "boundary")]) as any).origin).toBe("boundary");
 		// Markers written before origin existed restore as boundary.
 		expect(mode.syncFromBranch(branchCtx([modeMarker("review")]) as any).origin).toBe("boundary");
+	});
+
+	it("carries the approved flag through the marker so the approval gate stays closed once", () => {
+		const { sent, mode } = harness();
+		mode.switchInPlace(uiCtx() as any, "implement", { kickoff: "go", approved: true });
+		expect(sent[0][0].details).toEqual({ mode: "implement", origin: "inplace", approved: true });
+		expect(mode.getState().approved).toBe(true);
+		// A handoff-seeded marker restores it too; anything but an explicit true is false.
+		expect(mode.syncFromBranch(branchCtx([modeMarker("implement", "boundary", true)]) as any).approved).toBe(true);
+		expect(mode.syncFromBranch(branchCtx([modeMarker("implement", "boundary")]) as any).approved).toBe(false);
 	});
 
 	it("derives the mode of a session seeded after load, publishing only on change", () => {
@@ -116,7 +127,7 @@ describe("workflow mode management", () => {
 		// A /handoff-seeded session loads in the plan default, then finds its marker.
 		expect(mode.getState().mode).toBe("plan");
 		mode.syncFromBranch(branchCtx([modeMarker("implement", "boundary")]) as any);
-		expect(mode.getState()).toEqual({ mode: "implement", origin: "boundary" });
+		expect(mode.getState()).toEqual({ mode: "implement", origin: "boundary", approved: false });
 		expect(emitted).toEqual([[MODE_UPDATE_EVENT, "implement"]]);
 
 		mode.syncFromBranch(branchCtx([modeMarker("implement", "boundary")]) as any);

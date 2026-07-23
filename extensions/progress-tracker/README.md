@@ -13,9 +13,11 @@ todos remain a separate widget and may track work in any phase.
 - Persistent workflow indicator — idle `goal` states show `<MODE>`; later
   phases show `<MODE> · <PHASE>`. Both are followed by the context readout
   `ctx █░░░ 84.0k / 1.0M`, refreshed at turn boundaries and colored
-  accent / warning / error above 60% and 80% (this is the bundle's only context
-  indicator — Status Bar no longer ships one). The bar carries the proportion,
-  so the percentage is not printed. Active agent runs choose a
+  accent / warning / error — warning past 100k tokens or 40% full, error past
+  200k or 80%, whichever trips first, so a wide context window still warns
+  before quality degrades (this is the bundle's only context indicator — Status
+  Bar no longer ships one). The bar carries the proportion, so the percentage is
+  not printed. Active agent runs choose a
   concise mode-specific activity and randomly change it every 10 seconds
   without immediately repeating it, in the default blue accent color.
 - `/todos` command — report the phase indicator location and toggle the

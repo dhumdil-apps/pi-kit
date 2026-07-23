@@ -46,7 +46,8 @@ function makeHarness(cwd: string, options: CtxOptions = {}) {
 		},
 	};
 
-	const open = (mode: WorkflowMode, taskName?: string) => openHandoffSession(pi as never, ctx as never, mode, taskName);
+	const open = (mode: WorkflowMode, taskName?: string, options?: { approved?: boolean }) =>
+		openHandoffSession(pi as never, ctx as never, mode, taskName, options);
 	return { open, notify, sent, newSession, next, seeded };
 }
 
@@ -124,7 +125,7 @@ describe("openHandoffSession", () => {
 
 		expect(newSession).toHaveBeenCalledWith(expect.objectContaining({ parentSession: "/sessions/current.jsonl" }));
 		expect(seeded.entries).toEqual([
-			{ customType: MODE_ENTRY_TYPE, content: "Workflow mode: implement.", display: false, details: { mode: "implement", origin: "boundary" } },
+			{ customType: MODE_ENTRY_TYPE, content: "Workflow mode: implement.", display: false, details: { mode: "implement", origin: "boundary", approved: false } },
 		]);
 		expect(seeded.names).toEqual(["dashboard-polish"]);
 		const [kickoff] = next.sendUserMessage.mock.calls[0];
@@ -163,10 +164,34 @@ describe("openHandoffSession", () => {
 		expect(replan.next.sendUserMessage.mock.calls[0][0]).toContain("Re-plan the task dashboard-polish");
 	});
 
+	it("carries an approved plan into the implement session instead of re-asking", async () => {
+		await seedPlan(cwd, "dashboard-polish");
+		const { open, seeded, next } = makeHarness(cwd);
+		await open("implement", undefined, { approved: true });
+		expect(seeded.entries[0].details).toEqual({ mode: "implement", origin: "boundary", approved: true });
+		expect(next.sendUserMessage.mock.calls[0][0]).toContain("do not ask for approval again");
+	});
+
+	it("never marks a review session approved — review has no approval gate", async () => {
+		await seedPlan(cwd, "dashboard-polish", "active");
+		const { open, seeded } = makeHarness(cwd);
+		await open("review", undefined, { approved: true });
+		expect(seeded.entries[0].details).toEqual({ mode: "review", origin: "boundary", approved: false });
+	});
+
+	it("widens a done plan's review to the whole task, not just the working tree", async () => {
+		await seedPlan(cwd, "shipped-goal", "done");
+		const { open, next } = makeHarness(cwd);
+		await open("review");
+		const [kickoff] = next.sendUserMessage.mock.calls[0];
+		expect(kickoff).toContain("full task diff against the task's base");
+		expect(kickoff).toContain("already committed");
+	});
+
 	it("opens an empty plan session when there is no task to carry over", async () => {
 		const { open, seeded, next } = makeHarness(cwd);
 		await open("plan");
-		expect(seeded.entries[0].details).toEqual({ mode: "plan", origin: "boundary" });
+		expect(seeded.entries[0].details).toEqual({ mode: "plan", origin: "boundary", approved: false });
 		expect(seeded.names).toEqual([]);
 		expect(next.sendUserMessage).not.toHaveBeenCalled();
 		expect(next.ui.notify).toHaveBeenCalledWith(expect.stringContaining("Describe the goal"), "info");

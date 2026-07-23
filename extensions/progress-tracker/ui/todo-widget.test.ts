@@ -29,6 +29,9 @@ describe("phase indicator", () => {
 		[{ tokens: 0, contextWindow: 200_000, percent: 0 }, "[accent]ctx [accent][dim]░░░░ [accent]0 / 200.0k"],
 		[{ tokens: 140_000, contextWindow: 200_000, percent: 70 }, "[warning]ctx [warning]███[dim]░ [warning]140.0k / 200.0k"],
 		[{ tokens: 180_000, contextWindow: 200_000, percent: 90 }, "[error]ctx [error]████[dim] [error]180.0k / 200.0k"],
+		// Absolute thresholds trip on a wide window long before the fill ratio does.
+		[{ tokens: 120_000, contextWindow: 1_000_000, percent: 12 }, "[warning]ctx [warning]█[dim]░░░ [warning]120.0k / 1.0M"],
+		[{ tokens: 250_000, contextWindow: 1_000_000, percent: 25 }, "[error]ctx [error]█[dim]░░░ [error]250.0k / 1.0M"],
 	])("renders the context readout with a usage-colored bar (%o)", (usage, expected) => {
 		expect(contextUsageText(usage as any, theme)).toBe(expected);
 	});

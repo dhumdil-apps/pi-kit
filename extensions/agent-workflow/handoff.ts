@@ -91,13 +91,19 @@ export function resolveHandoffTask(cwd: string, mode: WorkflowMode, requested: s
 	return { error: `No lifecycle plan under ${CONFIG_DIR_NAME}/goal/ — run a Plan session first.` };
 }
 
-export function handoffKickoff(mode: WorkflowMode, task: HandoffTask | undefined): string | undefined {
+export function handoffKickoff(mode: WorkflowMode, task: HandoffTask | undefined, options: { approved?: boolean } = {}): string | undefined {
 	if (!task) return undefined;
 	switch (mode) {
 		case "implement":
-			return `Resume the lifecycle plan at ${task.planPath} and execute the next slice. Read ${task.discoveryPath} first when present.`;
+			return options.approved
+				? `Execute the next slice of the approved lifecycle plan at ${task.planPath}. The user approved this plan in the session that handed off to this one, so do not ask for approval again — state the slice you are executing and start. Read ${task.discoveryPath} first when present.`
+				: `Resume the lifecycle plan at ${task.planPath} and execute the next slice. Read ${task.discoveryPath} first when present.`;
 		case "review":
-			return `Review the task ${task.name}: plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}.`;
+			// A done plan means every slice landed, so the review covers the whole task —
+			// including slices already committed — not just whatever is still uncommitted.
+			return task.status === "done"
+				? `Review the completed task ${task.name}: plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}. The plan is closed as done, so review the full task diff against the task's base — every slice, including the ones already committed — not only the working tree.`
+				: `Review the task ${task.name}: plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}.`;
 		case "plan":
 			return `Re-plan the task ${task.name}: existing plan at ${task.planPath}, discovery handoff at ${task.discoveryPath}.`;
 	}
@@ -113,6 +119,7 @@ export async function openHandoffSession(
 	ctx: ExtensionCommandContext,
 	mode: WorkflowMode,
 	taskName?: string,
+	options: { approved?: boolean } = {},
 ): Promise<void> {
 	const notify = (message: string, type: "info" | "warning") => {
 		if (ctx.hasUI) ctx.ui.notify(message, type);
@@ -125,14 +132,16 @@ export async function openHandoffSession(
 		return;
 	}
 
-	const kickoff = handoffKickoff(mode, task);
+	// Approval only carries into implementation; review has no approval gate.
+	const approved = options.approved === true && mode === "implement";
+	const kickoff = handoffKickoff(mode, task, { approved });
 	await ctx.waitForIdle();
 	await ctx.newSession({
 		parentSession: ctx.sessionManager.getSessionFile(),
 		// session_start fires before this, so the marker is what the new
 		// session's extension instance derives its mode from.
 		setup: async (sessionManager) => {
-			sessionManager.appendCustomMessageEntry(MODE_ENTRY_TYPE, `Workflow mode: ${mode}.`, false, { mode, origin: "boundary" });
+			sessionManager.appendCustomMessageEntry(MODE_ENTRY_TYPE, `Workflow mode: ${mode}.`, false, { mode, origin: "boundary", approved });
 			if (task) sessionManager.appendSessionInfo(task.name);
 		},
 		withSession: async (next) => {

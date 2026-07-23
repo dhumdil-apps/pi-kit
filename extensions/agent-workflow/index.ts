@@ -9,9 +9,9 @@
  * sessions. There are no enforced safety gates; the flows are guidance only.
  */
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { HANDOFF_USAGE, handoffKickoff, openHandoffSession, resolveHandoffTask } from "./handoff.js";
-import { runModePicker, type Placement } from "./mode-picker.js";
+import { runModePicker, runPlacementPicker, type Placement } from "./mode-picker.js";
 import { isWorkflowMode, registerModeManagement, WORKFLOW_MODES, type ModeOrigin, type WorkflowMode } from "./mode.js";
 import { registerTaskManagement } from "./task.js";
 
@@ -68,7 +68,7 @@ const PLAN_FLOW = `  <flow>
 
     After explicit approval, close the Plan session: call manage_task operation=save_plan with the approved big picture and committable checklist (this freezes the task name), and write the exploration handoff to .pi/goal/<task-name>.discovery.md — key files with line references, findings, settled decisions with rationale, dead ends ruled out, and the verification commands. That handoff exists so the next session does not re-explore; it is a hint, and current evidence wins over stale discovery.
     When a lifecycle plan for this task already exists, this is a re-plan: instead of save_plan, call operation=set_name, then operation=resume, then operation=update_plan status=todo with the complete revised plan, and refresh the discovery handoff.
-    This session does not implement. Do not transition the plan out of todo, and do not edit project files beyond the saved plan and the discovery handoff. After saving both, stop and tell the user to run /mode implement to execute the first slice — continuing in this session or in a fresh one.
+    This session does not implement. Do not transition the plan out of todo, and do not edit project files beyond the saved plan and the discovery handoff. After saving both, stop: the /mode picker then offers the user to implement the first slice here or in a fresh session.
   </flow>`;
 
 const IMPLEMENT_FLOW = `  <flow>
@@ -119,24 +119,48 @@ const INPLACE_NOTES: Partial<Record<WorkflowMode, string>> = {
   </in_place_switch>`,
 };
 
+/**
+ * Appended when the user approved the plan in the session that produced this mode
+ * (the post-save_plan offer), so the approval gate must not fire a second time.
+ */
+const APPROVED_HANDOFF_NOTE = `  <approved_plan>
+    The user approved this lifecycle plan in the Plan session that produced this one, and that approval carries into this session: do NOT re-request approval for the first slice. Call manage_task operation=set_name then operation=resume, state in one short paragraph the single slice you are about to execute, call operation=update_plan status=active, and start implementing it. Revalidation still happens — read the plan, run git status --short, and inspect the relevant diff — but only stop and return to the user when the repository state diverges from the plan or the slice is no longer the right next step. Everything after the first slice follows the normal IMPLEMENT flow.
+  </approved_plan>`;
+
 const FLOWS: Record<WorkflowMode, string> = {
 	plan: PLAN_FLOW,
 	implement: IMPLEMENT_FLOW,
 	review: REVIEW_FLOW,
 };
 
-export function workflowPrompt(mode: WorkflowMode, origin: ModeOrigin = "boundary"): string {
-	const note = origin === "inplace" ? INPLACE_NOTES[mode] : undefined;
-	return `<pi_workflow>\n${SHARED_TONE}\n\n${FLOWS[mode]}${note ? `\n\n${note}` : ""}\n\n${SHARED_TAIL}\n</pi_workflow>`;
+export function workflowPrompt(mode: WorkflowMode, origin: ModeOrigin = "boundary", approved = false): string {
+	const notes = [
+		origin === "inplace" ? INPLACE_NOTES[mode] : undefined,
+		approved && mode === "implement" ? APPROVED_HANDOFF_NOTE : undefined,
+	].filter(Boolean);
+	return `<pi_workflow>\n${SHARED_TONE}\n\n${FLOWS[mode]}${notes.length ? `\n\n${notes.join("\n\n")}` : ""}\n\n${SHARED_TAIL}\n</pi_workflow>`;
 }
 
-const SAVE_PLAN_HINT = "Plan saved — press Enter to implement (continue here or a fresh session), or edit the mode.";
-const SAVE_PLAN_HINT_HEADLESS = "Plan saved — run /mode implement to execute the first slice (add 'fresh' for a new session).";
 const MODE_NOTICE_TYPE = "agent-workflow:mode-notice";
+
+/** The modes the automatic post-close offer can propose; plan is never offered. */
+type OfferMode = Exclude<WorkflowMode, "plan">;
+
+/** Headless has no picker, so the offer degrades to the command to run. */
+function headlessOfferHint(target: OfferMode, task: string | undefined): string {
+	const command = `/mode ${target} fresh${task ? ` ${task}` : ""}`;
+	return target === "implement"
+		? `Plan saved — run ${command} to execute the first slice (use 'continue' to stay in this session).`
+		: `Plan closed — run ${command} to review the task (use 'continue' to stay in this session).`;
+}
 
 export default function createExtension(pi: ExtensionAPI): void {
 	registerTaskManagement(pi);
 	const mode = registerModeManagement(pi);
+	// Armed when the user picks a fresh session from the post-save_plan offer, and
+	// consumed by the /mode implement command it primes, so the spawned session
+	// inherits the approval the user just gave here.
+	let approvedHandoff = false;
 
 	const notify = (ctx: ExtensionCommandContext, message: string, type: "info" | "warning") => {
 		if (ctx.hasUI) ctx.ui.notify(message, type);
@@ -147,18 +171,23 @@ export default function createExtension(pi: ExtensionAPI): void {
 	// exists when a concrete plan resolves (implement/review). plan continue is a
 	// bare switch, and a resolution failure falls through to one too — the mode
 	// flow then guides the user to locate the plan.
-	const continueKickoff = (ctx: ExtensionCommandContext, target: WorkflowMode, taskName?: string): string | undefined => {
+	const continueKickoff = (ctx: ExtensionContext, target: WorkflowMode, taskName?: string, approved = false): string | undefined => {
 		if (target === "plan") return undefined;
 		const { task } = resolveHandoffTask(ctx.cwd, target, taskName, ctx.sessionManager.getSessionName());
-		return handoffKickoff(target, task);
+		return handoffKickoff(target, task, { approved });
 	};
 
 	const apply = async (ctx: ExtensionCommandContext, target: WorkflowMode, placement: Placement, taskName?: string): Promise<void> => {
+		if (placement === "reject") return;
+		// The offer arms this when the user just approved the plan here; either
+		// placement of the /mode implement it primes carries that approval forward.
+		const approved = target === "implement" && approvedHandoff;
+		approvedHandoff = false;
 		if (placement === "fresh") {
-			await openHandoffSession(pi, ctx, target, taskName);
+			await openHandoffSession(pi, ctx, target, taskName, { approved });
 			return;
 		}
-		mode.switchInPlace(ctx, target, { kickoff: continueKickoff(ctx, target, taskName) });
+		mode.switchInPlace(ctx, target, { kickoff: continueKickoff(ctx, target, taskName, approved), approved });
 	};
 
 	pi.registerCommand("mode", {
@@ -218,28 +247,51 @@ export default function createExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
-		const { mode: active, origin } = mode.syncFromBranch(ctx);
-		return { systemPrompt: `${event.systemPrompt}\n\n${workflowPrompt(active, origin)}` };
+		const { mode: active, origin, approved } = mode.syncFromBranch(ctx);
+		return { systemPrompt: `${event.systemPrompt}\n\n${workflowPrompt(active, origin, approved)}` };
 	});
 
-	// When a plan lands, prime the next step instead of ending on a dead toast:
-	// prefill /mode implement so a single Enter opens the continue-vs-fresh picker
-	// (only a command handler can spawn the fresh session). Deferred to settle so
-	// it never fires mid-turn, and only fills an empty editor.
-	let pendingImplementOffer = false;
+	// A closing plan primes the next step instead of ending on a dead toast: a plan
+	// saved offers IMPLEMENT, a plan closed as done offers REVIEW. The offer is
+	// deferred to settle so it never fires mid-turn.
+	let pendingOffer: { target: OfferMode; task?: string } | undefined;
 	pi.on("tool_execution_end", async (event) => {
 		if (event.toolName !== "manage_task" || event.isError) return;
-		const operation = (event.result as { details?: { operation?: unknown } } | undefined)?.details?.operation;
-		if (operation === "save_plan") pendingImplementOffer = true;
+		const details = (event.result as { details?: { operation?: unknown; name?: unknown; status?: unknown } } | undefined)?.details;
+		const task = typeof details?.name === "string" ? details.name : undefined;
+		if (details?.operation === "save_plan") pendingOffer = { target: "implement", task };
+		// Only the final close offers a review: a multi-slice plan returning to todo is
+		// mid-flight, and reviewing each slice separately is more churn than signal.
+		if (details?.operation === "update_plan" && details.status === "done" && mode.getState().mode === "implement") {
+			pendingOffer = { target: "review", task };
+		}
 	});
 	pi.on("agent_settled", async (_event, ctx) => {
-		if (!pendingImplementOffer) return;
-		pendingImplementOffer = false;
-		if (ctx.hasUI) {
-			if (!ctx.ui.getEditorText().trim()) ctx.ui.setEditorText("/mode implement");
-			ctx.ui.notify(SAVE_PLAN_HINT, "info");
-		} else {
-			pi.sendMessage({ customType: MODE_NOTICE_TYPE, content: SAVE_PLAN_HINT_HEADLESS, display: true }, { triggerTurn: false });
+		const offer = pendingOffer;
+		if (!offer) return;
+		pendingOffer = undefined;
+		const { target, task } = offer;
+
+		if (!ctx.hasUI) {
+			pi.sendMessage({ customType: MODE_NOTICE_TYPE, content: headlessOfferHint(target, task), display: true }, { triggerTurn: false });
+			return;
 		}
+
+		const placement = await runPlacementPicker(ctx, { mode: target, usage: ctx.getContextUsage(), withReject: true });
+		if (!placement || placement === "reject") {
+			ctx.ui.notify(`${target === "implement" ? "Plan saved" : "Plan closed"}. Run /mode ${target} when you want to continue.`, "info");
+			return;
+		}
+		if (placement === "continue") {
+			const approved = target === "implement";
+			mode.switchInPlace(ctx, target, { kickoff: continueKickoff(ctx, target, task, approved), approved });
+			return;
+		}
+		// Only a command handler can spawn a session, so the fresh path hands the user
+		// the exact command — naming the task, since other plans may be pending.
+		approvedHandoff = target === "implement";
+		const command = `/mode ${target} fresh${task ? ` ${task}` : ""}`;
+		if (!ctx.ui.getEditorText().trim()) ctx.ui.setEditorText(command);
+		ctx.ui.notify(`Press Enter to run ${command} in a new session.`, "info");
 	});
 }

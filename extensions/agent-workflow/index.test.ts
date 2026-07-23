@@ -57,8 +57,8 @@ function harness() {
 	};
 
 	/** Seed the mode the way a /handoff-spawned session does, then inject. */
-	const promptFor = async (mode: Mode): Promise<string> => {
-		branch.push({ type: "custom_message", customType: MODE_ENTRY_TYPE, display: false, content: `Workflow mode: ${mode}.`, details: { mode, origin: "boundary" } });
+	const promptFor = async (mode: Mode, approved = false): Promise<string> => {
+		branch.push({ type: "custom_message", customType: MODE_ENTRY_TYPE, display: false, content: `Workflow mode: ${mode}.`, details: { mode, origin: "boundary", approved } });
 		return inject();
 	};
 
@@ -69,8 +69,30 @@ function harness() {
 	};
 
 	const runMode = (args: string) => commands.get("mode")!.handler(args, ctx);
-	return { handlers, commands, emitted, notify, userMessages, messages, promptFor, promptAfterCommand, ctx, runMode };
+
+	/**
+	 * Drive the automatic post-close offer: arm it with a manage_task result, then
+	 * settle with a ctx whose picker answers `choice` (null = Esc). The editor
+	 * starts empty unless `editorText` says otherwise.
+	 */
+	const offer = async (result: unknown, choice: string | null, editorText = "", isError = false) => {
+		const setEditorText = vi.fn();
+		const offerNotify = vi.fn();
+		const custom = vi.fn(async () => choice);
+		const settleCtx = {
+			...ctx,
+			ui: { notify: offerNotify, setEditorText, getEditorText: () => editorText, custom },
+		};
+		await handlers.get("tool_execution_end")![0]({ toolName: "manage_task", isError, result }, settleCtx);
+		await handlers.get("agent_settled")![0]({}, settleCtx);
+		return { setEditorText, notify: offerNotify, custom };
+	};
+
+	return { handlers, commands, emitted, notify, userMessages, messages, promptFor, promptAfterCommand, ctx, runMode, offer };
 }
+
+const savedPlan = { details: { operation: "save_plan", name: "dashboard-polish", status: "todo" } };
+const closedPlan = { details: { operation: "update_plan", name: "dashboard-polish", status: "done" } };
 
 describe("agent workflow lifecycle", () => {
 	it("registers a single /mode command and no agent-observing hooks", async () => {
@@ -139,7 +161,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("operation=save_plan");
 		expect(guidance).toContain(".pi/goal/<task-name>.discovery.md");
 		expect(guidance).toContain("This session does not implement");
-		expect(guidance).toContain("run /mode implement to execute the first slice");
+		expect(guidance).toContain("the /mode picker then offers the user to implement the first slice");
 		expect(guidance).toContain("current evidence wins over stale discovery");
 		expect(guidance).toContain("never switch or simulate another mode yourself");
 		// The old single-flow glue that continued straight into implementation is gone.
@@ -306,7 +328,7 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("instead of save_plan");
 		expect(guidance).toContain("operation=update_plan status=todo with the complete revised plan");
 		expect(guidance).toContain("Do not transition the plan out of todo");
-		expect(guidance).toContain("/mode implement");
+		expect(guidance).toContain("/mode picker");
 	});
 
 	it("never lets implement mode pick between several pending plans silently", async () => {
@@ -348,54 +370,16 @@ describe("agent workflow lifecycle", () => {
 		expect(await harness().promptAfterCommand("plan")).not.toContain("in_place_switch");
 	});
 
-	it("primes /mode implement in the editor after a successful save_plan", async () => {
-		const { handlers } = harness();
-		const arm = handlers.get("tool_execution_end")![0];
-		const deliver = handlers.get("agent_settled")![0];
-		const setEditorText = vi.fn();
-		const notify = vi.fn();
-		const ctx = { hasUI: true, ui: { notify, setEditorText, getEditorText: () => "" } };
+	it("suppresses the approval gate only when the marker carries the approval", async () => {
+		expect(await harness().promptFor("implement")).not.toContain("approved_plan");
 
-		await arm({ toolName: "manage_task", isError: false, result: { details: { operation: "save_plan" } } });
-		await deliver({}, ctx);
-		expect(setEditorText).toHaveBeenCalledWith("/mode implement");
-		expect(notify).toHaveBeenCalledWith(expect.stringContaining("Plan saved"), "info");
+		const guidance = await harness().promptFor("implement", true);
+		expect(guidance).toContain("do NOT re-request approval for the first slice");
+		// The flow itself is unchanged by the approval.
+		expect(guidance).toContain("Session mode: IMPLEMENT");
 
-		// The offer is one-shot: a second settle with nothing armed does nothing.
-		setEditorText.mockClear();
-		notify.mockClear();
-		await deliver({}, ctx);
-		expect(setEditorText).not.toHaveBeenCalled();
-		expect(notify).not.toHaveBeenCalled();
-	});
-
-	it("does not prime after a failed save_plan, an update_plan, or another tool", async () => {
-		const { handlers } = harness();
-		const arm = handlers.get("tool_execution_end")![0];
-		const deliver = handlers.get("agent_settled")![0];
-		const setEditorText = vi.fn();
-		const ctx = { hasUI: true, ui: { notify: vi.fn(), setEditorText, getEditorText: () => "" } };
-
-		await arm({ toolName: "manage_task", isError: true, result: { details: { operation: "save_plan" } } });
-		await arm({ toolName: "manage_task", isError: false, result: { details: { operation: "update_plan" } } });
-		await arm({ toolName: "manage_todo_list", isError: false, result: { details: { operation: "save_plan" } } });
-		await arm({ toolName: "manage_task", isError: false, result: undefined });
-		await deliver({}, ctx);
-		expect(setEditorText).not.toHaveBeenCalled();
-	});
-
-	it("leaves a non-empty editor untouched but still announces the saved plan", async () => {
-		const { handlers } = harness();
-		const arm = handlers.get("tool_execution_end")![0];
-		const deliver = handlers.get("agent_settled")![0];
-		const setEditorText = vi.fn();
-		const notify = vi.fn();
-		const ctx = { hasUI: true, ui: { notify, setEditorText, getEditorText: () => "already typing" } };
-
-		await arm({ toolName: "manage_task", isError: false, result: { details: { operation: "save_plan" } } });
-		await deliver({}, ctx);
-		expect(setEditorText).not.toHaveBeenCalled();
-		expect(notify).toHaveBeenCalledWith(expect.stringContaining("Plan saved"), "info");
+		// Review has no approval gate, so the note never applies there.
+		expect(await harness().promptFor("review", true)).not.toContain("approved_plan");
 	});
 
 	it("includes the ask-first memory policy in every mode", async () => {
@@ -405,6 +389,94 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("treat project memory as temporary fallback state");
 		expect(guidance).toContain("fixed at the root cause");
 		expect(guidance).toContain("only a recurring pattern or one confirmed by the user is durable");
+	});
+});
+
+describe("post-close mode offer", () => {
+	it("offers implementation after a saved plan and carries the approval in place", async () => {
+		const { offer, messages, userMessages } = harness();
+		const { setEditorText, custom } = await offer(savedPlan, "continue");
+
+		// The picker replaces the old editor prefill on the continue path.
+		expect(custom).toHaveBeenCalledTimes(1);
+		expect(setEditorText).not.toHaveBeenCalled();
+		const marker = messages.find((message) => message.customType === MODE_ENTRY_TYPE);
+		expect(marker?.details).toEqual({ mode: "implement", origin: "inplace", approved: true });
+		expect(userMessages).toEqual([]);
+	});
+
+	it("hands the fresh path the exact command, naming the task", async () => {
+		const { offer } = harness();
+		const { setEditorText, notify } = await offer(savedPlan, "fresh");
+		expect(setEditorText).toHaveBeenCalledWith("/mode implement fresh dashboard-polish");
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("Press Enter"), "info");
+	});
+
+	it("leaves a non-empty editor untouched but still names the command", async () => {
+		const { offer } = harness();
+		const { setEditorText, notify } = await offer(savedPlan, "fresh", "already typing");
+		expect(setEditorText).not.toHaveBeenCalled();
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("/mode implement fresh dashboard-polish"), "info");
+	});
+
+	it.each([["reject"], [null]])("changes nothing when the offer is declined (%s)", async (choice) => {
+		const { offer, messages, emitted } = harness();
+		const { setEditorText, notify } = await offer(savedPlan, choice);
+		expect(setEditorText).not.toHaveBeenCalled();
+		expect(messages.some((message) => message.customType === MODE_ENTRY_TYPE)).toBe(false);
+		expect(emitted.some(([name]) => name === MODE_UPDATE_EVENT)).toBe(false);
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("/mode implement"), "info");
+	});
+
+	it("is one-shot: a second settle with nothing armed does nothing", async () => {
+		const { handlers, offer } = harness();
+		await offer(savedPlan, "reject");
+		const custom = vi.fn(async () => "continue");
+		await handlers.get("agent_settled")![0]({}, { hasUI: true, ui: { custom, notify: vi.fn() } });
+		expect(custom).not.toHaveBeenCalled();
+	});
+
+	it("does not arm on a failed save_plan or another tool", async () => {
+		const { handlers, offer } = harness();
+		const failed = await offer(savedPlan, "continue", "", true);
+		expect(failed.custom).not.toHaveBeenCalled();
+
+		const custom = vi.fn(async () => "continue");
+		const ctx = { hasUI: true, ui: { custom, notify: vi.fn() } };
+		await handlers.get("tool_execution_end")![0]({ toolName: "manage_todo_list", isError: false, result: savedPlan }, ctx);
+		await handlers.get("tool_execution_end")![0]({ toolName: "manage_task", isError: false, result: undefined }, ctx);
+		await handlers.get("agent_settled")![0]({}, ctx);
+		expect(custom).not.toHaveBeenCalled();
+	});
+
+	it("offers review only when the plan closes as done, never per slice", async () => {
+		// A multi-slice plan returning to todo is mid-flight; no offer there.
+		const midFlight = harness();
+		await midFlight.runMode("implement continue");
+		const pending = await midFlight.offer({ details: { operation: "update_plan", name: "dashboard-polish", status: "todo" } }, "continue");
+		expect(pending.custom).not.toHaveBeenCalled();
+		const starting = await midFlight.offer({ details: { operation: "update_plan", name: "dashboard-polish", status: "active" } }, "continue");
+		expect(starting.custom).not.toHaveBeenCalled();
+
+		const closed = harness();
+		await closed.runMode("implement continue");
+		const { setEditorText } = await closed.offer(closedPlan, "fresh");
+		expect(setEditorText).toHaveBeenCalledWith("/mode review fresh dashboard-polish");
+	});
+
+	it("does not offer review from a mode other than implement", async () => {
+		const { offer } = harness();
+		const { custom } = await offer(closedPlan, "continue");
+		expect(custom).not.toHaveBeenCalled();
+	});
+
+	it("degrades to a displayed command when the session is headless", async () => {
+		const { handlers, messages } = harness();
+		const ctx = { hasUI: false, ui: { notify: vi.fn() } };
+		await handlers.get("tool_execution_end")![0]({ toolName: "manage_task", isError: false, result: savedPlan }, ctx);
+		await handlers.get("agent_settled")![0]({}, ctx);
+		const displayed = messages.find((message) => message.display === true);
+		expect(displayed?.content).toContain("/mode implement fresh dashboard-polish");
 	});
 });
 

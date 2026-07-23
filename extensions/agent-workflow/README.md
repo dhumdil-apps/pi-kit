@@ -32,9 +32,17 @@ project-specific stack and repository conventions.
   re-derived from the branch before every turn: the new session's extension
   instance loads before the marker exists. Only a command handler can spawn a
   session, so `fresh` is reachable only through `/mode`.
-- After a plan is saved, the input is prefilled with `/mode implement`: one
-  Enter opens the continue-vs-fresh picker, so the plan → implement boundary
-  flows without retyping.
+- Closing a plan opens the placement picker automatically: saving a plan offers
+  Implement, and closing one as `done` offers Review (never per slice — a
+  multi-slice plan is reviewed once, as a whole). `Reject` dismisses it. Picking
+  the same session switches in place and starts the turn; picking a new session
+  prefills the exact `/mode <mode> fresh <task>` command, since only a command
+  handler can spawn a session. The offer marks the Implement mode approved, so
+  the approval given here is not asked for again — in place or across the
+  boundary.
+- The picker recommends where to run: it preselects continuing when the context
+  is lean and a new session once it is loaded (over 100k tokens or 40% full —
+  the same thresholds that colour the `ctx` readout).
 - `manage_task` — set a concise task identity after exploration, refine it
   during planning, then create, transition, update, or resume its lifecycle
   plan. Saved names are branch-ready; the tool never changes Git branches.

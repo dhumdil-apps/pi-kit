@@ -11,10 +11,11 @@
 
 import { type ContextUsage, DynamicBorder, type ExtensionContext, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text, type TUI } from "@earendil-works/pi-tui";
-import { contextUsageText } from "./context-usage.js";
+import { contextUsageText, isLeanContext } from "./context-usage.js";
 import { WORKFLOW_MODES, type WorkflowMode } from "./mode.js";
 
-export type Placement = "continue" | "fresh";
+/** reject only ever comes back from the automatic post-close offer. */
+export type Placement = "continue" | "fresh" | "reject";
 
 export interface ModeSelection {
 	mode: WorkflowMode;
@@ -130,11 +131,40 @@ function contextSubtitle(usage: ContextUsage | undefined, theme: Theme): string 
 	return contextUsageText(usage, theme) ?? theme.fg("muted", "ctx —");
 }
 
+const CONTINUE_LABEL: Record<Exclude<WorkflowMode, "plan">, string> = {
+	implement: "Continue with implementation",
+	review: "Continue with review",
+};
+
+/**
+ * Ask where the mode runs: this session or the next one. The recommendation follows the
+ * context load — a lean context can absorb the work here, a loaded one should hand off —
+ * and is both preselected and badged. `withReject` adds the third way out used by the
+ * automatic post-close offer, where Esc is not the only sensible answer.
+ */
+export function runPlacementPicker(
+	ctx: ExtensionContext,
+	options: { mode: Exclude<WorkflowMode, "plan">; usage: ContextUsage | undefined; withReject?: boolean },
+): Promise<Placement | undefined> {
+	const lean = isLeanContext(options.usage);
+	const recommended = lean ? 0 : 1;
+	return selectOne(ctx, (theme) => ({
+		title: options.mode === "implement" ? "Implement" : "Review",
+		subtitle: contextSubtitle(options.usage, theme),
+		initialIndex: recommended,
+		choices: [
+			{ value: "continue", label: CONTINUE_LABEL[options.mode], badge: recommended === 0 ? "recommended" : undefined },
+			{ value: "fresh", label: "Proceed in a new session", badge: recommended === 1 ? "recommended" : undefined },
+			...(options.withReject ? [{ value: "reject", label: "Reject", hint: "revise or save for later" }] : []),
+		],
+	})).then((value) => value as Placement | undefined);
+}
+
 /**
  * Run the mode picker. Returns the chosen mode and placement, or undefined if
  * the user cancelled at any step. plan resolves immediately as a same-session
  * switch; implement/review ask continue-vs-fresh. Pass `mode` to skip step 1
- * (the mode is already known, e.g. the post-plan `/mode implement` prompt).
+ * (the mode is already known, e.g. `/mode implement` with no placement).
  */
 export async function runModePicker(
 	ctx: ExtensionContext,
@@ -160,15 +190,7 @@ export async function runModePicker(
 	// plan is the same-session default; no continue-vs-fresh choice.
 	if (mode === "plan") return { mode, placement: "continue" };
 
-	const placement = await selectOne(ctx, (theme) => ({
-		title: mode === "implement" ? "Implement" : "Review",
-		subtitle: contextSubtitle(options.usage, theme),
-		initialIndex: 0,
-		choices: [
-			{ value: "continue", label: "Continue in this session", hint: "reuse this context" },
-			{ value: "fresh", label: "Fresh session", hint: "lean context — recommended" },
-		],
-	}));
+	const placement = await runPlacementPicker(ctx, { mode, usage: options.usage });
 	if (!placement) return undefined;
-	return { mode, placement: placement as Placement };
+	return { mode, placement };
 }

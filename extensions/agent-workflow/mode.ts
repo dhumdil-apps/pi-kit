@@ -28,6 +28,11 @@ export type ModeOrigin = "boundary" | "inplace";
 export interface ModeState {
 	mode: WorkflowMode;
 	origin: ModeOrigin;
+	/**
+	 * The user approved this plan in the session that produced this mode, so the
+	 * Implement flow must not re-request approval for the first slice.
+	 */
+	approved?: boolean;
 }
 
 export const MODE_ENTRY_TYPE = "agent-workflow:mode";
@@ -48,9 +53,9 @@ export function isWorkflowMode(value: unknown): value is WorkflowMode {
  * pi.sendMessage is a top-level custom_message entry — not a message entry
  * with a custom role.
  */
-function markerDetails(entry: SessionEntry): { mode?: unknown; origin?: unknown } | undefined {
+function markerDetails(entry: SessionEntry): { mode?: unknown; origin?: unknown; approved?: unknown } | undefined {
 	if (entry.type !== "custom_message" || entry.customType !== MODE_ENTRY_TYPE) return undefined;
-	return entry.details as { mode?: unknown; origin?: unknown } | undefined;
+	return entry.details as { mode?: unknown; origin?: unknown; approved?: unknown } | undefined;
 }
 
 function restoredState(ctx: ExtensionContext): ModeState {
@@ -58,7 +63,11 @@ function restoredState(ctx: ExtensionContext): ModeState {
 	for (const entry of ctx.sessionManager.getBranch()) {
 		const details = markerDetails(entry);
 		if (!isWorkflowMode(details?.mode)) continue;
-		state = { mode: details.mode, origin: details.origin === "inplace" ? "inplace" : "boundary" };
+		state = {
+			mode: details.mode,
+			origin: details.origin === "inplace" ? "inplace" : "boundary",
+			approved: details.approved === true,
+		};
 	}
 	return state;
 }
@@ -73,7 +82,7 @@ export interface ModeManagement {
 	 * kickoff is given, so the flow starts immediately) or surface a notice.
 	 * This is the same-session half of /mode; a fresh session opens via handoff.
 	 */
-	switchInPlace: (ctx: ExtensionContext, mode: WorkflowMode, options?: { kickoff?: string }) => void;
+	switchInPlace: (ctx: ExtensionContext, mode: WorkflowMode, options?: { kickoff?: string; approved?: boolean }) => void;
 }
 
 export function registerModeManagement(pi: ExtensionAPI): ModeManagement {
@@ -96,8 +105,8 @@ export function registerModeManagement(pi: ExtensionAPI): ModeManagement {
 	pi.on("session_start", reconstruct);
 	pi.on("session_tree", reconstruct);
 
-	const switchInPlace = (ctx: ExtensionContext, mode: WorkflowMode, options: { kickoff?: string } = {}): void => {
-		current = { mode, origin: "inplace" };
+	const switchInPlace = (ctx: ExtensionContext, mode: WorkflowMode, options: { kickoff?: string; approved?: boolean } = {}): void => {
+		current = { mode, origin: "inplace", approved: options.approved === true };
 		pi.sendMessage(
 			{ customType: MODE_ENTRY_TYPE, content: `Workflow mode: ${mode}.`, display: false, details: current },
 			{ triggerTurn: false },

@@ -74,8 +74,8 @@ After approval the Plan session terminates: Pi saves the lifecycle plan under
 `.pi/goal/<task-name>.todo.md`, writes the exploration handoff to
 `.pi/goal/<task-name>.discovery.md` (key files, findings, settled decisions,
 dead ends, verification commands — so the next session doesn't re-explore), and
-points at the next step: the input is prefilled with `/mode implement`, so one
-Enter opens the continue-vs-fresh picker. The discovery file is a deliberate,
+points at the next step: the placement picker opens on its own, offering to
+implement here or in a new session. The discovery file is a deliberate,
 named handoff hint — current evidence always wins over stale discovery.
 
 Re-planning an existing task is the same session, one call different: Pi
@@ -90,7 +90,11 @@ A fresh session with a lean context. Pi locates the pending plan under
 reads its discovery handoff, resumes it via `manage_task`
 (`set_name` then `resume`), revalidates against the current request and
 repository state, presents a one-slice plan, and gets fresh explicit approval
-before activating that slice; the plan is the only cross-session source of
+before activating that slice — except when the session came straight from the
+plan the user just approved (either placement of the post-plan picker), where
+that approval carries and Pi states the slice and starts; revalidation still
+happens, and a repository state that diverges from the plan still stops and
+returns to the user. The plan is the only cross-session source of
 truth and current repository evidence always wins over resumed plan or
 discovery text. Pi baselines before changing behavior, root-causes bugs with
 evidence before fixing them, and validates. The slice ends with exactly one
@@ -113,7 +117,9 @@ A fresh-eyes falsification pass over completed work, baked into the flow itself
 handoff, then reconstructs the correct implementation from the plan *before*
 reading the diff so divergence is flagged rather than rationalized. The subject
 is the slice just implemented — the uncommitted diff against HEAD — and widens
-to the full task diff only on request or when the plan is being closed as done.
+to the full task diff on request or when the plan closed as done. That is the
+usual case: the review offer only appears once the plan is done, so a
+multi-slice task is reviewed as a whole, including its already-committed slices.
 It probes edge and failure
 behavior adversarially, distrusts green checks (would the tests fail if the
 change were reverted?), covers contract/security/operations/migration/UI angles
