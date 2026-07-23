@@ -96,6 +96,34 @@ describe("task lifecycle plans", () => {
 		expect(await readFile(result.details.path, "utf8")).toBe(revised);
 	});
 
+	it("rewrites a todo plan in place for a re-plan and points save_plan at update_plan", async () => {
+		const harness = makeHarness(cwd);
+		await harness.execute({ operation: "set_name", name: "replanned goal" });
+		await harness.execute({ operation: "save_plan", plan: todoPlan });
+		const blocked = await harness.execute({ operation: "save_plan", plan: todoPlan });
+		expect(blocked.isError).toBe(true);
+		expect(blocked.content[0].text).toContain("use update_plan to revise it");
+
+		const revised = `${todoPlan}\n- [ ] Second slice → verify it\n`;
+		const result = await harness.execute({ operation: "update_plan", status: "todo", plan: revised });
+		expect(result.isError).toBeUndefined();
+		expect(result.details.path).toMatch(/\.todo\.md$/);
+		expect(await readFile(result.details.path, "utf8")).toBe(revised);
+	});
+
+	it("rewrites a done plan in place so review can append its verdict", async () => {
+		const harness = makeHarness(cwd);
+		await harness.execute({ operation: "set_name", name: "review verdict" });
+		await harness.execute({ operation: "save_plan", plan: todoPlan });
+		await harness.execute({ operation: "update_plan", status: "active", plan: activePlan });
+		await harness.execute({ operation: "update_plan", status: "done", plan: donePlan });
+		const withVerdict = `${donePlan}\n## Session notes\n\n- 2026-07-23 review: 0 blocking, 1 important (fixed), 2 optional — approved\n`;
+		const result = await harness.execute({ operation: "update_plan", status: "done", plan: withVerdict });
+		expect(result.isError).toBeUndefined();
+		expect(result.details.status).toBe("done");
+		expect(await readFile(result.details.path, "utf8")).toBe(withVerdict);
+	});
+
 	it("rejects invalid transitions and incomplete done plans", async () => {
 		const harness = makeHarness(cwd);
 		await harness.execute({ operation: "set_name", name: "invalid transition" });

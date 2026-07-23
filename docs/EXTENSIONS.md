@@ -11,9 +11,9 @@ extension.
 - **Status Bar** — Footer/status composition (Configured through `/extension-settings`)
 - **Usage Monitor** — Live provider quota data for Status Bar
 - **Usage History** — Historical token/cost reporting (`/usage`)
-- **Progress Tracker** — Global workflow route plus separate local todo widget (`manage_todo_list`, `/todos`)
+- **Progress Tracker** — Global workflow route, context-usage readout, plus separate local todo widget (`manage_todo_list`, `/todos`)
 - **Session Dashboard** — Pi-glyph welcome, 30-day per-model spend chart, and project-context line
-- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`; see [FLOW.md](FLOW.md))
+- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`manage_task`, `/handoff`; see [FLOW.md](FLOW.md))
 
 ## Supporting resources
 
@@ -41,8 +41,9 @@ These are the settings currently exposed through `/extension-settings`:
 - **Status Bar** — `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width`
 
 Status Bar defaults place
-`git-branch,session-name,agent-stats,context-usage,tokens,cpu,ram,disk,net` on
-the left and `provider,model,sub-hourly,sub-weekly` on the right. Unnamed
+`git-branch,session-name,agent-stats,tokens,cpu,ram,disk,net` on
+the left and `provider,model,sub-hourly,sub-weekly` on the right. Context usage
+lives in the Progress Tracker indicator above the editor, not in the powerbar. Unnamed
 sessions receive `<short-desc>` (or `<ticket>-<short-desc>` when a ticket is supplied). Global extension values are configured via `/extension-settings`.
 
 Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
@@ -54,6 +55,9 @@ Core Pi model/thinking configuration lives in `~/.pi/agent/settings.json`.
   mode flow (always injected in `/review` sessions, so there is no invocation
   step to forget), and the simplification checklist lives inline at the end of
   the Implement mode flow, run once by the author on the slice diff.
+- Status Bar's `context-usage` segment: removed (2026-07-23). Context usage is
+  now part of the Progress Tracker indicator above the editor, with the token
+  counts spelled out — one home per fact.
 - `pi-add-dir`: removed because it did not fit the normal workflow.
 - `pi-memory-md`: removed; project memory is an optional user-owned `.pi/MEMORY.md` file, consulted by the workflow without an extension.
 - standalone `pi-simplify`: removed; its focused cleanup logic lived on in

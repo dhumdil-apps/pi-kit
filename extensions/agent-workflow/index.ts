@@ -10,7 +10,8 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerModeManagement, type WorkflowMode } from "./mode.js";
+import { registerHandoffCommand } from "./handoff.js";
+import { registerModeManagement, type ModeOrigin, type WorkflowMode } from "./mode.js";
 import { registerTaskManagement } from "./task.js";
 
 const SHARED_TONE = `  <tone>
@@ -65,7 +66,8 @@ const PLAN_FLOW = `  <flow>
     - Present the complete goal/approach/interfaces/validation plan and end with: Proceed or revise? Interpret Proceed, Approved, Continue, and equivalent positive intent as approval only when the immediately preceding assistant response explicitly requested plan approval. Revision language (Revise, Refine, Check, requested changes, or mixed approval plus changes) always remains in PLANNING. Reissue the complete revised plan.
 
     After explicit approval, close the Plan session: call manage_task operation=save_plan with the approved big picture and committable checklist (this freezes the task name), and write the exploration handoff to .pi/goal/<task-name>.discovery.md — key files with line references, findings, settled decisions with rationale, dead ends ruled out, and the verification commands. That handoff exists so the next session does not re-explore; it is a hint, and current evidence wins over stale discovery.
-    This session does not implement. Do not transition the plan out of todo, and do not edit project files beyond the saved plan and the discovery handoff. After saving both, stop and tell the user to start a fresh session and run /implement to execute the first slice.
+    When a lifecycle plan for this task already exists, this is a re-plan: instead of save_plan, call operation=set_name, then operation=resume, then operation=update_plan status=todo with the complete revised plan, and refresh the discovery handoff.
+    This session does not implement. Do not transition the plan out of todo, and do not edit project files beyond the saved plan and the discovery handoff. After saving both, stop and tell the user to start a fresh session and run /implement to execute the first slice, or /handoff implement to open that session directly.
   </flow>`;
 
 const IMPLEMENT_FLOW = `  <flow>
@@ -73,7 +75,7 @@ const IMPLEMENT_FLOW = `  <flow>
 
     Start by locating the work:
     - Read project .pi/MEMORY.md when present.
-    - Locate the pending lifecycle plan by listing .pi/goal/*.todo.md and .pi/goal/*.active.md. If none exists, say so and ask the user to run a Plan session first; do not plan a substantial goal from scratch in this mode.
+    - Locate the pending lifecycle plan by listing .pi/goal/*.todo.md and .pi/goal/*.active.md. If none exists, say so and ask the user to run a Plan session first; do not plan a substantial goal from scratch in this mode. If more than one pending plan exists and the request does not name one, ask the user which task to execute; never pick one silently.
     - Read the sibling .pi/goal/<task-name>.discovery.md handoff when present instead of re-exploring from zero. It is a hint only: current intent, git status --short, relevant diffs, and validation evidence always win over stale discovery or plan text.
     - Call manage_task operation=set_name with the plan's task name, then operation=resume.
     - Revalidate the plan against the current request and repository state. Classify uncommitted work: matching the plan is a continuation to revalidate; separate completed work must be reviewed and committed by the user first; separate unfinished work must be finished first or, with explicit user authorization, captured in a fresh plan and stashed. Never commit or stash automatically, and never absorb unrelated work merely because its files do not overlap.
@@ -91,16 +93,30 @@ const IMPLEMENT_FLOW = `  <flow>
 const REVIEW_FLOW = `  <flow>
     Session mode: REVIEW. Fresh-eyes verification of completed work: treat the implementation as unproven and try to falsify it. This session reviews the task diff against the saved plan and never expands scope or implements new work. The human switches modes with /plan, /implement, and /review at session boundaries; never switch or simulate another mode yourself.
 
-    - Read project .pi/MEMORY.md when present. Locate the lifecycle plan under .pi/goal/ and its sibling .pi/goal/<task-name>.discovery.md handoff, and read both for context; current evidence wins over stale discovery or plan text.
+    - Read project .pi/MEMORY.md when present. Locate the lifecycle plan under .pi/goal/ and its sibling .pi/goal/<task-name>.discovery.md handoff, and read both for context; current evidence wins over stale discovery or plan text. Call manage_task operation=set_name with the plan's task name, then operation=resume, so the verdict can be recorded at close-out.
     - Intent first: reconstruct from the approved plan alone what a correct implementation must do BEFORE reading the diff, then read the diff and flag divergence — missing, contradicted, or accidentally expanded behavior — rather than reading the diff first and rationalizing it.
-    - Establish the full task diff (git status --short and the relevant diff against the task's base) and read the changed code with its immediate callers and tests.
+    - Establish the diff under review: normally the slice just implemented, from git status --short and the uncommitted diff against HEAD. Widen to the full task diff against the task's base only when the user asks for it or the plan is being closed as done. Read the changed code with its immediate callers and tests.
     - Probe adversarially, assuming the happy path hides a defect: empty, missing, invalid, and boundary inputs plus relevant ordering, state transitions, timing, partial completion, cleanup, and recovery behavior.
     - Distrust green checks: confirm the tests assert observable behavior and would fail if the change were reverted; flag weak assertions, excessive mocking, and missing negative, boundary, or failure cases. When cheap and safe, briefly regress the single riskiest new behavior to watch its covering test fail, then restore — prefer that evidence over asserting it.
     - Where the diff touches them, also check: contracts (producers and consumers together, defaults, compatibility), security (trust boundaries, plausible abuse paths), operations (partial failure, cancellation, timeouts, cleanup), migration and rollback, and UI states with accessibility and headless fallback. Flag where the diff is larger than necessary — dead code, duplication, needless abstraction, scope creep — as findings, not as a rewrite pass.
     - Record each finding as blocking, important, or optional with claim, evidence, impact, and verification path; unsupported suspicion is an uncertainty, not a finding. Never fabricate results, never soften a real problem, and never claim this is an independent human review.
     - Fix only clear in-scope blocking and important findings that stay within the approved plan; do not apply optional taste changes. Rerun affected checks after any fix and propose an updated ready-to-use commit message. Findings that change the approved outcome, behavior, scope, or acceptance criteria go back to the user for a fresh Plan session — do not implement them here.
     - Close out by naming the strongest remaining risk and attempting one concrete falsification of it, then a concise verdict: fixed and unresolved findings, uncertainties, every skipped or failed check, and the acceptance only the user can provide. If there are no findings, say so plainly.
+    - Record that verdict in the plan: call manage_task operation=update_plan with the plan's current status unchanged and the complete plan text plus one appended session-note line — the date, the blocking, important, and optional counts, and the outcome.
   </flow>`;
+
+/**
+ * Appended only when the human switched mode inside a running session, where
+ * the fresh-context assumptions of the boundary flows do not hold.
+ */
+const INPLACE_NOTES: Partial<Record<WorkflowMode, string>> = {
+	implement: `  <in_place_switch>
+    This session switched into IMPLEMENT in place, so the plan may have been approved earlier in this same context: when it was, proceed from that in-context plan — that approval carries forward, and a discovery handoff written this session does not need re-reading. The manage_task calls are unchanged.
+  </in_place_switch>`,
+	review: `  <in_place_switch>
+    This session switched into REVIEW in place, so you may be reviewing work you authored in this same context: state plainly in the verdict that this is an author-side pass, not a fresh-eyes review.
+  </in_place_switch>`,
+};
 
 const FLOWS: Record<WorkflowMode, string> = {
 	plan: PLAN_FLOW,
@@ -108,15 +124,29 @@ const FLOWS: Record<WorkflowMode, string> = {
 	review: REVIEW_FLOW,
 };
 
-export function workflowPrompt(mode: WorkflowMode): string {
-	return `<pi_workflow>\n${SHARED_TONE}\n\n${FLOWS[mode]}\n\n${SHARED_TAIL}\n</pi_workflow>`;
+export function workflowPrompt(mode: WorkflowMode, origin: ModeOrigin = "boundary"): string {
+	const note = origin === "inplace" ? INPLACE_NOTES[mode] : undefined;
+	return `<pi_workflow>\n${SHARED_TONE}\n\n${FLOWS[mode]}${note ? `\n\n${note}` : ""}\n\n${SHARED_TAIL}\n</pi_workflow>`;
 }
+
+const SAVE_PLAN_HINT = "Plan saved — /implement to continue here, or /handoff implement for a fresh session.";
 
 export default function createExtension(pi: ExtensionAPI): void {
 	registerTaskManagement(pi);
-	const getMode = registerModeManagement(pi);
+	const mode = registerModeManagement(pi);
+	registerHandoffCommand(pi);
 
-	pi.on("before_agent_start", async (event) => {
-		return { systemPrompt: `${event.systemPrompt}\n\n${workflowPrompt(getMode())}` };
+	pi.on("before_agent_start", async (event, ctx) => {
+		const { mode: active, origin } = mode.syncFromBranch(ctx);
+		return { systemPrompt: `${event.systemPrompt}\n\n${workflowPrompt(active, origin)}` };
+	});
+
+	// Surface the next step the moment a plan lands; the flow keeps its own
+	// closing sentence as the headless fallback.
+	pi.on("tool_execution_end", async (event, ctx) => {
+		if (event.toolName !== "manage_task" || event.isError) return;
+		const operation = (event.result as { details?: { operation?: unknown } } | undefined)?.details?.operation;
+		if (operation !== "save_plan") return;
+		if (ctx.hasUI) ctx.ui.notify(SAVE_PLAN_HINT, "info");
 	});
 }

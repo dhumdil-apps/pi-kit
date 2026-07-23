@@ -26,7 +26,9 @@ export default function (pi: ExtensionAPI) {
 
   const refreshStatus = () => {
     if (!currentCtx) return;
-    updatePhaseIndicator(state.getPhase(), currentMode, currentCtx, working);
+    // Context usage only moves at turn boundaries, which is exactly when
+    // refreshStatus runs, so reading it here keeps the render pure.
+    updatePhaseIndicator(state.getPhase(), currentMode, currentCtx, working, currentCtx.getContextUsage());
     updateTodoWidget(state, currentCtx, todosVisible);
   };
 

@@ -3,22 +3,38 @@
  *
  * Each session runs in exactly one mode — plan (default), implement, or
  * review — selected by a human through the /plan, /implement, and /review
- * commands. The model cannot switch modes: mode is a session-boundary
- * decision that preserves fresh-context discipline (measure twice, cut once).
- * The mode persists across reload/fork via a hidden custom-message marker and
- * is reconstructed by scanning the branch, mirroring the progress-tracker
- * clear-marker pattern.
+ * commands (in place) or /handoff (a fresh seeded session). The model cannot
+ * switch modes: mode is a session-boundary decision that preserves
+ * fresh-context discipline (measure twice, cut once).
+ *
+ * A hidden custom-message marker in the branch is the single source of truth,
+ * so the mode survives reload/fork and also applies to a session seeded by
+ * /handoff — whose extension instance loads (and defaults to plan) before the
+ * marker is appended. State is therefore re-derived from the branch on session
+ * events and before every turn, mirroring the progress-tracker clear-marker
+ * pattern.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@earendil-works/pi-coding-agent";
 
 export const WORKFLOW_MODES = ["plan", "implement", "review"] as const;
 export type WorkflowMode = (typeof WORKFLOW_MODES)[number];
 
+/**
+ * Where the active mode came from: a session boundary (restored marker or a
+ * /handoff-seeded session) or an in-place switch mid-session.
+ */
+export type ModeOrigin = "boundary" | "inplace";
+
+export interface ModeState {
+	mode: WorkflowMode;
+	origin: ModeOrigin;
+}
+
 export const MODE_ENTRY_TYPE = "agent-workflow:mode";
 
 export const MODE_UPDATE_EVENT = "agent-workflow:mode-update";
-const MODE_DESCRIPTIONS: Record<WorkflowMode, string> = {
+export const MODE_DESCRIPTIONS: Record<WorkflowMode, string> = {
 	plan: "Plan mode: explore and produce an approved lifecycle plan plus discovery handoff; no implementation",
 	implement: "Implement mode: resume a saved plan in a fresh context and execute one approved slice",
 	review: "Review mode: fresh-eyes review of the task diff against the saved plan; no new work",
@@ -28,23 +44,47 @@ export function isWorkflowMode(value: unknown): value is WorkflowMode {
 	return typeof value === "string" && (WORKFLOW_MODES as readonly string[]).includes(value);
 }
 
-function restoredMode(ctx: ExtensionContext): WorkflowMode {
-	let mode: WorkflowMode = "plan";
-	for (const entry of ctx.sessionManager.getBranch()) {
-		if (entry.type !== "message" || entry.message.role !== "custom" || entry.message.customType !== MODE_ENTRY_TYPE) continue;
-		const candidate = (entry.message.details as { mode?: unknown } | undefined)?.mode;
-		if (isWorkflowMode(candidate)) mode = candidate;
-	}
-	return mode;
+/**
+ * getBranch() yields raw session entries, so a hidden marker sent with
+ * pi.sendMessage is a top-level custom_message entry — not a message entry
+ * with a custom role.
+ */
+function markerDetails(entry: SessionEntry): { mode?: unknown; origin?: unknown } | undefined {
+	if (entry.type !== "custom_message" || entry.customType !== MODE_ENTRY_TYPE) return undefined;
+	return entry.details as { mode?: unknown; origin?: unknown } | undefined;
 }
 
-export function registerModeManagement(pi: ExtensionAPI): () => WorkflowMode {
-	let currentMode: WorkflowMode = "plan";
+function restoredState(ctx: ExtensionContext): ModeState {
+	let state: ModeState = { mode: "plan", origin: "boundary" };
+	for (const entry of ctx.sessionManager.getBranch()) {
+		const details = markerDetails(entry);
+		if (!isWorkflowMode(details?.mode)) continue;
+		state = { mode: details.mode, origin: details.origin === "inplace" ? "inplace" : "boundary" };
+	}
+	return state;
+}
 
-	const emitMode = () => pi.events.emit(MODE_UPDATE_EVENT, currentMode);
+export interface ModeManagement {
+	getState: () => ModeState;
+	/** Re-derive the mode from the branch marker; publishes only on change. */
+	syncFromBranch: (ctx: ExtensionContext) => ModeState;
+}
+
+export function registerModeManagement(pi: ExtensionAPI): ModeManagement {
+	let current: ModeState = { mode: "plan", origin: "boundary" };
+
+	const emitMode = () => pi.events.emit(MODE_UPDATE_EVENT, current.mode);
+
+	const syncFromBranch = (ctx: ExtensionContext): ModeState => {
+		const next = restoredState(ctx);
+		const changed = next.mode !== current.mode;
+		current = next;
+		if (changed) emitMode();
+		return current;
+	};
 
 	const reconstruct = async (_event: unknown, ctx: ExtensionContext) => {
-		currentMode = restoredMode(ctx);
+		current = restoredState(ctx);
 		emitMode();
 	};
 	pi.on("session_start", reconstruct);
@@ -54,9 +94,9 @@ export function registerModeManagement(pi: ExtensionAPI): () => WorkflowMode {
 		pi.registerCommand(mode, {
 			description: MODE_DESCRIPTIONS[mode],
 			handler: async (_args, ctx) => {
-				currentMode = mode;
+				current = { mode, origin: "inplace" };
 				pi.sendMessage(
-					{ customType: MODE_ENTRY_TYPE, content: `Workflow mode: ${mode}.`, display: false, details: { mode } },
+					{ customType: MODE_ENTRY_TYPE, content: `Workflow mode: ${mode}.`, display: false, details: current },
 					{ triggerTurn: false },
 				);
 				emitMode();
@@ -67,5 +107,5 @@ export function registerModeManagement(pi: ExtensionAPI): () => WorkflowMode {
 		});
 	}
 
-	return () => currentMode;
+	return { getState: () => current, syncFromBranch };
 }

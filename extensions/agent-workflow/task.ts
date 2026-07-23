@@ -9,8 +9,8 @@ const SESSION_NAME = /^(?:([a-z0-9]+-\d+)-)?([a-z0-9]+(?:-[a-z0-9]+)*)$/i;
 const TICKET_ID = /\b([a-z0-9]+-\d+)\b/i;
 const UNCHECKED_ITEM = /^\s*[-*]\s+\[ \]/m;
 const MAX_SLUG_WORDS = 4;
-const PLAN_STATUSES = ["todo", "active", "done"] as const;
-type PlanStatus = (typeof PLAN_STATUSES)[number];
+export const PLAN_STATUSES = ["todo", "active", "done"] as const;
+export type PlanStatus = (typeof PLAN_STATUSES)[number];
 
 const STOP_WORDS = new Set([
 	"a", "an", "and", "are", "as", "be", "can", "could", "for", "i", "is", "it", "need",
@@ -44,7 +44,7 @@ interface TaskDetails {
 	error?: string;
 }
 
-interface PlanState {
+export interface PlanState {
 	status: PlanStatus;
 	path: string;
 }
@@ -69,7 +69,7 @@ export function normalizeTaskName(summary: string, currentName?: string): string
 	return ticket ? `${ticket}-${slug}` : slug;
 }
 
-function canonicalTaskName(name: string | undefined): string | undefined {
+export function canonicalTaskName(name: string | undefined): string | undefined {
 	const match = name?.trim().match(SESSION_NAME);
 	if (!match) return undefined;
 	const ticket = match[1]?.toUpperCase();
@@ -81,7 +81,7 @@ function taskPlanPath(cwd: string, name: string, status: PlanStatus): string {
 	return join(cwd, CONFIG_DIR_NAME, "goal", `${name}.${status}.md`);
 }
 
-function findPlanStates(cwd: string, name: string): PlanState[] {
+export function findPlanStates(cwd: string, name: string): PlanState[] {
 	return PLAN_STATUSES
 		.map((status) => ({ status, path: taskPlanPath(cwd, name, status) }))
 		.filter(({ path }) => existsSync(path));
@@ -115,9 +115,14 @@ function validatePlanForStatus(plan: string, status: PlanStatus): string | undef
 	return undefined;
 }
 
+/**
+ * Same-status rewrites are always allowed: a Plan session revises a todo plan
+ * in place, and a Review session appends its verdict without moving the plan.
+ */
 function transitionAllowed(from: PlanStatus, to: PlanStatus): boolean {
-	return (from === "todo" && to === "active") ||
-		(from === "active" && (to === "active" || to === "todo" || to === "done"));
+	return from === to ||
+		(from === "todo" && to === "active") ||
+		(from === "active" && (to === "todo" || to === "done"));
 }
 
 export function registerTaskManagement(pi: ExtensionAPI): void {
@@ -158,7 +163,7 @@ export function registerTaskManagement(pi: ExtensionAPI): void {
 			}
 
 			if (params.operation === "save_plan") {
-				if (states.length > 0) return taskError(params.operation, name, `lifecycle plan already exists at ${states[0].path}`, states[0].path, true);
+				if (states.length > 0) return taskError(params.operation, name, `lifecycle plan already exists at ${states[0].path}; use update_plan to revise it`, states[0].path, true);
 				const plan = params.plan ?? "";
 				const validationError = validatePlanForStatus(plan, "todo");
 				if (validationError) return taskError(params.operation, name, validationError);

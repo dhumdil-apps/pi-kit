@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { updatePhaseIndicator, updateTodoWidget } from "./todo-widget.js";
+import { contextUsageText, updatePhaseIndicator, updateTodoWidget } from "./todo-widget.js";
 import { TodoStateManager } from "../state-manager.js";
+
+const theme = { fg: (color: string, text: string) => `[${color}]${text}` } as any;
 
 describe("phase indicator", () => {
 	it.each([
-		["goal", "plan", "accent", "● PLAN · GOAL"],
+		["goal", "plan", "accent", "● PLAN"],
 		["planning", "implement", "accent", "● IMPLEMENT · PLANNING"],
 		["implementation", "review", "accent", "● REVIEW · IMPLEMENTATION"],
 	] as const)("renders the idle %s phase with %s mode persistently", (phase, mode, color, expected) => {
@@ -15,7 +17,6 @@ describe("phase indicator", () => {
 				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
 			},
 		} as any;
-		const theme = { fg: (actualColor: string, text: string) => `[${actualColor}]${text}` } as any;
 
 		updatePhaseIndicator(phase, mode, ctx, false);
 
@@ -23,11 +24,22 @@ describe("phase indicator", () => {
 	});
 
 	it.each([
-		["plan", ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"]],
-		["implement", ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"]],
-		["review", ["Auditing…", "Probing…", "Verifying…", "Inspecting…", "Challenging…", "Confirming…"]],
-	] as const)("rotates the approved %s activity messages while working", (mode, messages) => {
-		vi.useFakeTimers();
+		[{ tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 }, "[accent]ctx [accent]▰[dim]▱▱▱ [accent]8% (84.0k / 1.0M)"],
+		[{ tokens: 940, contextWindow: 200_000, percent: 0.47 }, "[accent]ctx [accent]▰[dim]▱▱▱ [accent]0% (940 / 200.0k)"],
+		[{ tokens: 0, contextWindow: 200_000, percent: 0 }, "[accent]ctx [accent][dim]▱▱▱▱ [accent]0% (0 / 200.0k)"],
+		[{ tokens: 140_000, contextWindow: 200_000, percent: 70 }, "[warning]ctx [warning]▰▰▰[dim]▱ [warning]70% (140.0k / 200.0k)"],
+		[{ tokens: 180_000, contextWindow: 200_000, percent: 90 }, "[error]ctx [error]▰▰▰▰[dim] [error]90% (180.0k / 200.0k)"],
+	])("renders the context readout with a usage-colored bar (%o)", (usage, expected) => {
+		expect(contextUsageText(usage as any, theme)).toBe(expected);
+	});
+
+	it("omits the context readout while the token count is unknown", () => {
+		expect(contextUsageText(undefined, theme)).toBeUndefined();
+		expect(contextUsageText({ tokens: null, contextWindow: 200_000, percent: null } as any, theme)).toBeUndefined();
+		expect(contextUsageText({ tokens: 10, contextWindow: 0, percent: null } as any, theme)).toBeUndefined();
+	});
+
+	it("appends the context readout to the idle indicator", () => {
 		let factory: any;
 		const ctx = {
 			ui: {
@@ -35,16 +47,49 @@ describe("phase indicator", () => {
 				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
 			},
 		} as any;
+
+		updatePhaseIndicator("planning", "implement", ctx, false, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
+		expect(factory({ requestRender: () => {} }, theme).render(120)).toEqual([
+			"[accent]● IMPLEMENT · PLANNING · [accent]ctx [accent]▰[dim]▱▱▱ [accent]8% (84.0k / 1.0M)",
+		]);
+
+		// The goal phase stays label-free, and the working row is unchanged.
+		updatePhaseIndicator("goal", "plan", ctx, false, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
+		expect(factory({ requestRender: () => {} }, theme).render(120)[0]).toContain("[accent]● PLAN · [accent]ctx");
+	});
+
+	it.each([
+		["plan", ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"]],
+		["implement", ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"]],
+		["review", ["Auditing…", "Probing…", "Verifying…", "Inspecting…", "Challenging…", "Confirming…"]],
+	] as const)("changes the active %s activity every 10 seconds without repeating it", (mode, messages) => {
+		vi.useFakeTimers();
+		vi.spyOn(Math, "random").mockReturnValue(0);
+		let factory: any;
+		const requestRender = vi.fn();
+		const ctx = {
+			ui: {
+				setWorkingVisible: () => {},
+				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
+			},
+		} as any;
 		updatePhaseIndicator("implementation", mode, ctx, true);
-		const component = factory({ requestRender: () => {} }, { fg: (color: string, text: string) => `[${color}]${text}` });
-		for (const message of messages) {
-			expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${message}`);
-			vi.advanceTimersByTime(12 * 120);
-		}
+		const component = factory({ requestRender }, { fg: (color: string, text: string) => `[${color}]${text}` });
+
+		expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${messages[0]}`);
+		vi.advanceTimersByTime(9_999);
+		expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${messages[0]}`);
+		const rendersBeforeChange = requestRender.mock.calls.length;
+		vi.advanceTimersByTime(1);
+		expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${messages[1]}`);
+		expect(requestRender).toHaveBeenCalledTimes(rendersBeforeChange + 1);
 		component.dispose();
 	});
 
-	afterEach(() => vi.useRealTimers());
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
 });
 
 describe("todo widget", () => {

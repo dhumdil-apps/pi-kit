@@ -11,7 +11,6 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import powerbarContext from "./src/powerbar-context/index.js";
 import powerbarGit from "./src/powerbar-git/index.js";
 import powerbarModel from "./src/powerbar-model/index.js";
 import powerbarOs from "./src/powerbar-os/index.js";
@@ -30,7 +29,6 @@ export default function createExtension(pi: ExtensionAPI): void {
 	powerbarModel(pi);
 	powerbarProvider(pi);
 	powerbarTokens(pi);
-	powerbarContext(pi);
 	powerbarSub(pi);
 	powerbarOs(pi);
 }

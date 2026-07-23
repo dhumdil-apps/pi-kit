@@ -16,8 +16,8 @@ function harness() {
 			emit: vi.fn((name: string, value: any) => emitted.push([name, value])),
 		},
 	};
-	const getMode = registerModeManagement(pi as any);
-	return { handlers, commands, emitted, sent, getMode };
+	const mode = registerModeManagement(pi as any);
+	return { handlers, commands, emitted, sent, mode };
 }
 
 function uiCtx() {
@@ -28,35 +28,36 @@ function branchCtx(entries: any[]) {
 	return { sessionManager: { getBranch: () => entries } };
 }
 
-function modeMarker(mode: string) {
-	return { type: "message", message: { role: "custom", customType: MODE_ENTRY_TYPE, details: { mode } } };
+/** The shape sessionManager.getBranch() actually returns for pi.sendMessage markers. */
+function modeMarker(mode: string, origin?: string) {
+	return { type: "custom_message", customType: MODE_ENTRY_TYPE, display: false, content: `Workflow mode: ${mode}.`, details: { mode, origin } };
 }
 
 describe("workflow mode management", () => {
-	it("registers the three mode commands and defaults to plan", () => {
-		const { commands, getMode } = harness();
+	it("registers the three mode commands and defaults to plan at a boundary", () => {
+		const { commands, mode } = harness();
 		for (const name of ["plan", "implement", "review"]) expect(commands.has(name)).toBe(true);
-		expect(getMode()).toBe("plan");
+		expect(mode.getState()).toEqual({ mode: "plan", origin: "boundary" });
 	});
 
-	it("flips the mode, persists a hidden marker, and publishes the mode on command", async () => {
-		const { commands, emitted, sent, getMode } = harness();
+	it("flips the mode, persists a hidden in-place marker, and publishes the mode on command", async () => {
+		const { commands, emitted, sent, mode } = harness();
 		const ctx = uiCtx();
 		await commands.get("implement")!.handler("", ctx);
-		expect(getMode()).toBe("implement");
+		expect(mode.getState()).toEqual({ mode: "implement", origin: "inplace" });
 		const [marker, options] = sent[0];
 		expect(marker.customType).toBe(MODE_ENTRY_TYPE);
 		expect(marker.display).toBe(false);
-		expect(marker.details).toEqual({ mode: "implement" });
+		expect(marker.details).toEqual({ mode: "implement", origin: "inplace" });
 		expect(options).toEqual({ triggerTurn: false });
 		expect(emitted).toContainEqual([MODE_UPDATE_EVENT, "implement"]);
 		expect(emitted.some(([name]) => name.startsWith("powerbar:"))).toBe(false);
 		expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("implement"), "info");
 
 		await commands.get("review")!.handler("", uiCtx());
-		expect(getMode()).toBe("review");
+		expect(mode.getState().mode).toBe("review");
 		await commands.get("plan")!.handler("", uiCtx());
-		expect(getMode()).toBe("plan");
+		expect(mode.getState().mode).toBe("plan");
 	});
 
 	it("falls back to sendMessage for the notice when the session has no UI", async () => {
@@ -67,20 +68,43 @@ describe("workflow mode management", () => {
 	});
 
 	it("reconstructs and publishes the last mode marker on session_start", async () => {
-		const { handlers, emitted, getMode } = harness();
+		const { handlers, emitted, mode } = harness();
 		const sessionStart = handlers.get("session_start")![0];
 		await sessionStart({}, branchCtx([modeMarker("implement"), modeMarker("review")]));
-		expect(getMode()).toBe("review");
+		expect(mode.getState().mode).toBe("review");
 		expect(emitted).toContainEqual([MODE_UPDATE_EVENT, "review"]);
 		// No marker (or an unknown one) restores the plan default.
 		await sessionStart({}, branchCtx([modeMarker("bogus")]));
-		expect(getMode()).toBe("plan");
+		expect(mode.getState()).toEqual({ mode: "plan", origin: "boundary" });
 		expect(emitted).toContainEqual([MODE_UPDATE_EVENT, "plan"]);
 	});
 
 	it("reconstructs on session_tree navigation as well", async () => {
-		const { handlers, getMode } = harness();
+		const { handlers, mode } = harness();
 		await handlers.get("session_tree")![0]({}, branchCtx([modeMarker("implement")]));
-		expect(getMode()).toBe("implement");
+		expect(mode.getState().mode).toBe("implement");
+	});
+
+	it("restores the marker's origin, defaulting unmarked entries to boundary", () => {
+		const { mode } = harness();
+		expect(mode.syncFromBranch(branchCtx([modeMarker("implement", "inplace")]) as any)).toEqual({
+			mode: "implement",
+			origin: "inplace",
+		});
+		expect(mode.syncFromBranch(branchCtx([modeMarker("review", "boundary")]) as any).origin).toBe("boundary");
+		// Markers written before origin existed restore as boundary.
+		expect(mode.syncFromBranch(branchCtx([modeMarker("review")]) as any).origin).toBe("boundary");
+	});
+
+	it("derives the mode of a session seeded after load, publishing only on change", () => {
+		const { emitted, mode } = harness();
+		// A /handoff-seeded session loads in the plan default, then finds its marker.
+		expect(mode.getState().mode).toBe("plan");
+		mode.syncFromBranch(branchCtx([modeMarker("implement", "boundary")]) as any);
+		expect(mode.getState()).toEqual({ mode: "implement", origin: "boundary" });
+		expect(emitted).toEqual([[MODE_UPDATE_EVENT, "implement"]]);
+
+		mode.syncFromBranch(branchCtx([modeMarker("implement", "boundary")]) as any);
+		expect(emitted).toHaveLength(1);
 	});
 });

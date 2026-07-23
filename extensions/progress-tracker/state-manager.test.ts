@@ -95,8 +95,10 @@ describe("TodoStateManager workflow phase", () => {
             },
           },
           {
-            type: "message",
-            message: { role: "custom", customType: CLEAR_ENTRY_TYPE, content: "", display: false, timestamp: 0 },
+            type: "custom_message",
+            customType: CLEAR_ENTRY_TYPE,
+            content: "",
+            display: false,
           },
         ],
       },
@@ -119,8 +121,10 @@ describe("TodoStateManager workflow phase", () => {
             },
           },
           {
-            type: "message",
-            message: { role: "custom", customType: CLEAR_ENTRY_TYPE, content: "", display: false, timestamp: 0 },
+            type: "custom_message",
+            customType: CLEAR_ENTRY_TYPE,
+            content: "",
+            display: false,
           },
           {
             type: "message",

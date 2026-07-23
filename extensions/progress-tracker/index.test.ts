@@ -28,6 +28,7 @@ describe("progress tracker workflow mode", () => {
     const widgets: Array<[string, any]> = [];
     const ctx = {
       isIdle: () => true,
+      getContextUsage: () => ({ tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 }),
       sessionManager: { getBranch: () => [] },
       ui: {
         setWorkingVisible: () => {},
@@ -40,6 +41,6 @@ describe("progress tracker workflow mode", () => {
 
     const [, factory] = widgets.findLast(([id]) => id === "workflow-phase")!;
     const component = factory({ requestRender: () => {} }, { fg: (color: string, text: string) => `[${color}]${text}` });
-    expect(component.render(80)).toEqual(["[accent]● REVIEW · GOAL"]);
+    expect(component.render(80)).toEqual(["[accent]● REVIEW · [accent]ctx [accent]▰[dim]▱▱▱ [accent]8% (84.0k / 1.0M)"]);
   });
 });

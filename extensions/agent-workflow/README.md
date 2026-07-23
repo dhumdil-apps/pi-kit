@@ -3,10 +3,10 @@
 Injects one of **three session-mode flows** — Plan (default), Implement, or
 Review — plus shared tone/engineering/state/learning guidance into every turn.
 Motto: measure twice, cut once — plan in one session, implement in a fresh one,
-review with fresh eyes. The human switches modes with the `/plan`,
-`/implement`, and `/review` commands (the model cannot); Progress Tracker shows
-the current mode above the editor. The flows are guidance only; nothing here is
-enforced.
+review with fresh eyes. The human switches modes in place with `/plan`,
+`/implement`, and `/review`, or crosses a session boundary with `/handoff`
+(the model cannot do either); Progress Tracker shows the current mode above the
+editor. The flows are guidance only; nothing here is enforced.
 
 [`docs/FLOW.md`](../../docs/FLOW.md) is the canonical human-readable behavior
 contract; this extension's injected prompt is its operational mirror and the
@@ -16,9 +16,18 @@ project-specific stack and repository conventions.
 ## User surface
 
 - `/plan`, `/implement`, `/review` — human-only session-mode selectors
-  (`mode.ts`). Each flips the injected flow for subsequent turns, updates the
-  above-editor workflow indicator, and persists across reload/fork via a hidden
-  branch marker.
+  (`mode.ts`). Each flips the injected flow for subsequent turns **in the
+  current session**, updates the above-editor workflow indicator, and persists
+  across reload/fork via a hidden branch marker. The marker also records
+  whether the mode was entered at a boundary or in place; in-place modes carry
+  a short caveat in their flow.
+- `/handoff <plan|implement|review> [task-name]` — human-only session boundary
+  (`handoff.ts`). Resolves the task (explicit name, the current task, or the
+  single pending plan under `.pi/goal/`; several plans mean it asks), then
+  spawns a session seeded with the mode marker and task name and sends a
+  kickoff message carrying the plan and discovery paths. The seeded marker is
+  why mode is re-derived from the branch before every turn: the new session's
+  extension instance loads before the marker exists.
 - `manage_task` — set a concise task identity after exploration, refine it
   during planning, then create, transition, update, or resume its lifecycle
   plan. Saved names are branch-ready; the tool never changes Git branches.

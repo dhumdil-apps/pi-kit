@@ -5,7 +5,7 @@
  * Shows status icons, progress stats, and a flat list.
  */
 
-import type { ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { ContextUsage, ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { WorkflowMode } from "../../agent-workflow/mode.js";
 import type { TodoStateManager } from "../state-manager.js";
@@ -14,8 +14,11 @@ import type { WorkflowPhase } from "../types.js";
 const PHASE_WIDGET_ID = "workflow-phase";
 const TODO_WIDGET_ID = "todo-list";
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const PHASE_DISPLAY: Record<WorkflowPhase, { label: string; color: ThemeColor }> = {
-  goal: { label: "GOAL", color: "accent" },
+const ACTIVITY_ROTATION_MS = 10_000;
+// Four blocks regardless of context-window size, so the readout stays stable across models.
+const CONTEXT_BAR_SEGMENTS = 4;
+const PHASE_DISPLAY: Record<WorkflowPhase, { label?: string; color: ThemeColor }> = {
+  goal: { color: "accent" },
   planning: { label: "PLANNING", color: "accent" },
   implementation: { label: "IMPLEMENTATION", color: "accent" },
 };
@@ -38,33 +41,77 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
   return theme.fg("success", "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(width - filled));
 }
 
+/** Compact token count: 940, 84.0k, 1.0M. */
+function formatTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return `${tokens}`;
+}
+
+/**
+ * Context readout in the powerbar idiom — `ctx ▰▱▱▱ 8% (84.0k / 1.0M)`.
+ * Returns undefined while the token count is unknown (e.g. right after compaction).
+ */
+export function contextUsageText(usage: ContextUsage | undefined, theme: Theme): string | undefined {
+  if (!usage || usage.tokens == null || usage.contextWindow <= 0) return undefined;
+  const percent = Math.round(usage.percent ?? (usage.tokens / usage.contextWindow) * 100);
+  const color: ThemeColor = percent > 80 ? "error" : percent > 60 ? "warning" : "accent";
+  // Ceil, so any context in use shows at least one block rather than an empty track.
+  const filled = Math.min(CONTEXT_BAR_SEGMENTS, Math.max(0, Math.ceil((usage.tokens / usage.contextWindow) * CONTEXT_BAR_SEGMENTS)));
+  const bar = theme.fg(color, "▰".repeat(filled)) + theme.fg("dim", "▱".repeat(CONTEXT_BAR_SEGMENTS - filled));
+  const readout = `${percent}% (${formatTokens(usage.tokens)} / ${formatTokens(usage.contextWindow)})`;
+  return `${theme.fg(color, "ctx")} ${bar} ${theme.fg(color, readout)}`;
+}
+
+/** Select a random activity without immediately repeating the previous one. */
+function selectActivity(messages: string[], previousIndex?: number): number {
+  if (messages.length < 2 || previousIndex === undefined) return Math.floor(Math.random() * messages.length);
+  const index = Math.floor(Math.random() * (messages.length - 1));
+  return index >= previousIndex ? index + 1 : index;
+}
+
 /** Replace pi's transient working row with a persistent workflow indicator. */
-export function updatePhaseIndicator(phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, working: boolean): void {
+export function updatePhaseIndicator(phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, working: boolean, usage?: ContextUsage): void {
   ctx.ui.setWorkingVisible(false);
   ctx.ui.setWidget(
     PHASE_WIDGET_ID,
     (tui, theme) => {
+      const modeDisplay = MODE_DISPLAY[mode];
       let tick = 0;
-      const timer = working
+      let activityIndex = working ? selectActivity(modeDisplay.messages) : 0;
+      const spinnerTimer = working
         ? setInterval(() => {
             tick++;
             tui.requestRender();
           }, 120)
         : undefined;
-      timer?.unref?.();
+      const activityTimer = working
+        ? setInterval(() => {
+            activityIndex = selectActivity(modeDisplay.messages, activityIndex);
+            tui.requestRender();
+          }, ACTIVITY_ROTATION_MS)
+        : undefined;
+      spinnerTimer?.unref?.();
+      activityTimer?.unref?.();
 
       return {
         render: (width: number) => {
           const phaseDisplay = PHASE_DISPLAY[phase];
-          const modeDisplay = MODE_DISPLAY[mode];
-          const text = working
-            ? `${SPINNER_FRAMES[tick % SPINNER_FRAMES.length]} ${modeDisplay.label} · ${modeDisplay.messages[Math.floor(tick / 12) % modeDisplay.messages.length]}`
-            : `● ${modeDisplay.label} · ${phaseDisplay.label}`;
-          return [truncateToWidth(theme.fg(phaseDisplay.color, text), width)];
+          if (working) {
+            const text = `${SPINNER_FRAMES[tick % SPINNER_FRAMES.length]} ${modeDisplay.label} · ${modeDisplay.messages[activityIndex]}`;
+            return [truncateToWidth(theme.fg(phaseDisplay.color, text), width)];
+          }
+          const head = `● ${modeDisplay.label}${phaseDisplay.label ? ` · ${phaseDisplay.label}` : ""}`;
+          const context = contextUsageText(usage, theme);
+          const line = context
+            ? `${theme.fg(phaseDisplay.color, `${head} · `)}${context}`
+            : theme.fg(phaseDisplay.color, head);
+          return [truncateToWidth(line, width)];
         },
         invalidate: () => {},
         dispose: () => {
-          if (timer) clearInterval(timer);
+          if (spinnerTimer) clearInterval(spinnerTimer);
+          if (activityTimer) clearInterval(activityTimer);
         },
       };
     },

@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import createExtension from "./index.js";
+import { MODE_ENTRY_TYPE } from "./mode.js";
+
+type Mode = "plan" | "implement" | "review";
 
 function harness() {
 	const handlers = new Map<string, Array<(event?: any, ctx?: any) => any>>();
 	const commands = new Map<string, { handler: (args: string, ctx: any) => Promise<void> }>();
 	const emitted: Array<[string, unknown]> = [];
+	const branch: any[] = [];
+	const notify = vi.fn();
 	let sessionName: string | undefined;
 	const pi = {
 		on: vi.fn((name: string, handler: (event?: any, ctx?: any) => any) => {
@@ -14,32 +19,51 @@ function harness() {
 		registerTool: vi.fn(),
 		getSessionName: vi.fn(() => sessionName),
 		setSessionName: vi.fn((name: string) => { sessionName = name; }),
-		sendMessage: vi.fn(),
+		// Hidden markers are what the mode is derived from, so mirror them into the
+		// branch in the shape getBranch() really returns.
+		sendMessage: vi.fn((message: any) => {
+			if (message.display === false) {
+				branch.push({ type: "custom_message", customType: message.customType, display: false, content: message.content, details: message.details });
+			}
+		}),
 		events: { emit: vi.fn((name: string, value: unknown) => emitted.push([name, value])), on: vi.fn() },
 	};
 	createExtension(pi as any);
-	const promptFor = async (mode: "plan" | "implement" | "review"): Promise<string> => {
-		if (mode !== "plan") {
-			await commands.get(mode)!.handler("", { hasUI: true, ui: { notify: vi.fn() } });
-		}
+	const ctx = { hasUI: true, ui: { notify }, sessionManager: { getBranch: () => branch } };
+
+	const inject = async (): Promise<string> => {
 		const injectors = handlers.get("before_agent_start")!;
-		const result = await injectors[injectors.length - 1]({ systemPrompt: "base" });
+		const result = await injectors[injectors.length - 1]({ systemPrompt: "base" }, ctx);
 		return (result.systemPrompt as string).replace(/\s+/g, " ");
 	};
-	return { handlers, commands, emitted, promptFor };
+
+	/** Seed the mode the way a /handoff-spawned session does, then inject. */
+	const promptFor = async (mode: Mode): Promise<string> => {
+		branch.push({ type: "custom_message", customType: MODE_ENTRY_TYPE, display: false, content: `Workflow mode: ${mode}.`, details: { mode, origin: "boundary" } });
+		return inject();
+	};
+
+	/** Switch the mode in place through its command, then inject. */
+	const promptAfterCommand = async (mode: Mode): Promise<string> => {
+		await commands.get(mode)!.handler("", ctx);
+		return inject();
+	};
+
+	return { handlers, commands, emitted, notify, promptFor, promptAfterCommand };
 }
 
 describe("agent workflow lifecycle", () => {
-	it("registers only the mode commands and no runtime lifecycle hooks", async () => {
+	it("registers only the human-driven commands and no agent-observing hooks", async () => {
 		const { handlers, commands } = harness();
 		// Flash, /forensic, and the legacy /retro + /improvements are all retired;
 		// guard against reintroduction. The only commands are the human-only mode
-		// selectors, and the only turn-time hook is the system-prompt injector.
+		// selectors plus /handoff; the only turn-time hooks are the system-prompt
+		// injector and the deliberate post-save_plan hint.
 		for (const gone of ["flash", "forensic", "retro", "improvements"]) {
 			expect(commands.has(gone)).toBe(false);
 		}
-		for (const mode of ["plan", "implement", "review"]) {
-			expect(commands.has(mode)).toBe(true);
+		for (const command of ["plan", "implement", "review", "handoff"]) {
+			expect(commands.has(command)).toBe(true);
 		}
 		expect(handlers.has("input")).toBe(false);
 		expect(handlers.has("agent_settled")).toBe(false);
@@ -252,6 +276,71 @@ describe("agent workflow lifecycle", () => {
 		expect(guidance).toContain("never claim this is an independent human review");
 		// Fully skill-free: the review procedure is the flow itself.
 		expect(guidance).not.toContain("review skill");
+	});
+
+	it("routes a re-plan through update_plan and points at the handoff command", async () => {
+		const { promptFor } = harness();
+		const guidance = await promptFor("plan");
+		expect(guidance).toContain("this is a re-plan");
+		expect(guidance).toContain("instead of save_plan");
+		expect(guidance).toContain("operation=update_plan status=todo with the complete revised plan");
+		expect(guidance).toContain("Do not transition the plan out of todo");
+		expect(guidance).toContain("/handoff implement");
+	});
+
+	it("never lets implement mode pick between several pending plans silently", async () => {
+		const { promptFor } = harness();
+		const guidance = await promptFor("implement");
+		expect(guidance).toContain("If more than one pending plan exists");
+		expect(guidance).toContain("ask the user which task to execute; never pick one silently");
+	});
+
+	it("scopes review to the slice and records its verdict in the plan", async () => {
+		const { promptFor } = harness();
+		const guidance = await promptFor("review");
+		expect(guidance).toContain("normally the slice just implemented");
+		expect(guidance).toContain("uncommitted diff against HEAD");
+		expect(guidance).toContain("Widen to the full task diff");
+		expect(guidance).toContain("only when the user asks for it or the plan is being closed as done");
+		expect(guidance).toContain("operation=set_name with the plan's task name, then operation=resume");
+		expect(guidance).toContain("Record that verdict in the plan");
+		expect(guidance).toContain("current status unchanged");
+		expect(guidance).toContain("blocking, important, and optional counts");
+	});
+
+	it("adds the in-place caveats only when the mode was switched mid-session", async () => {
+		const boundary = harness();
+		const boundaryImplement = await boundary.promptFor("implement");
+		expect(boundaryImplement).not.toContain("in_place_switch");
+
+		const inplace = harness();
+		const inplaceImplement = await inplace.promptAfterCommand("implement");
+		expect(inplaceImplement).toContain("switched into IMPLEMENT in place");
+		expect(inplaceImplement).toContain("that approval carries forward");
+		expect(inplaceImplement).toContain("does not need re-reading");
+		// The flow itself is unchanged by the origin.
+		expect(inplaceImplement).toContain("Session mode: IMPLEMENT");
+
+		const inplaceReview = await harness().promptAfterCommand("review");
+		expect(inplaceReview).toContain("switched into REVIEW in place");
+		expect(inplaceReview).toContain("author-side pass, not a fresh-eyes review");
+		expect(await harness().promptAfterCommand("plan")).not.toContain("in_place_switch");
+	});
+
+	it("hints the next step only after a successful save_plan", async () => {
+		const { handlers, notify } = harness();
+		const hint = handlers.get("tool_execution_end")![0];
+		const ctx = { hasUI: true, ui: { notify } };
+
+		await hint({ toolName: "manage_task", isError: false, result: { details: { operation: "save_plan" } } }, ctx);
+		expect(notify).toHaveBeenCalledWith(expect.stringContaining("/handoff implement"), "info");
+
+		notify.mockClear();
+		await hint({ toolName: "manage_task", isError: true, result: { details: { operation: "save_plan" } } }, ctx);
+		await hint({ toolName: "manage_task", isError: false, result: { details: { operation: "update_plan" } } }, ctx);
+		await hint({ toolName: "manage_todo_list", isError: false, result: { details: { operation: "save_plan" } } }, ctx);
+		await hint({ toolName: "manage_task", isError: false, result: undefined }, ctx);
+		expect(notify).not.toHaveBeenCalled();
 	});
 
 	it("includes the ask-first memory policy in every mode", async () => {

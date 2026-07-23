@@ -42,7 +42,7 @@ pi list
 
 ## Included Features
 
-- **agent-workflow** — Guidance-driven development across three session modes — **Plan → Implement → Review** (`/plan`, `/implement`, `/review`) — with conversational question batches, plan + discovery-handoff persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
+- **agent-workflow** — Guidance-driven development across three session modes — **Plan → Implement → Review** — switched in place with `/plan`, `/implement`, `/review` or handed to a fresh seeded session with `/handoff <mode>`, with conversational question batches, plan + discovery-handoff persistence, and durable-learning policy. See [docs/FLOW.md](docs/FLOW.md).
 - **project-memory** — Optional project-level `.pi/MEMORY.md` consulted at task start and maintained with your confirmation at task close-out.
 - **progress-tracker** — Global workflow status route and interactive `/todos` checklist widget.
 - **session-dashboard** — Interactive welcome banner, spend visualization chart, and context indicators (`/help`).

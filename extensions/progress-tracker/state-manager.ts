@@ -108,16 +108,17 @@ export class TodoStateManager {
     this.phase = "goal";
 
     for (const entry of ctx.sessionManager.getBranch()) {
-      if (entry.type !== "message") continue;
-      const msg = entry.message;
-
-      if (msg.role === "custom" && msg.customType === CLEAR_ENTRY_TYPE) {
+      // getBranch() yields raw entries: a pi.sendMessage marker is a top-level
+      // custom_message, while tool results are message entries.
+      if (entry.type === "custom_message" && entry.customType === CLEAR_ENTRY_TYPE) {
         // A later /todos clear always wins over an earlier write, but a
         // write after this point (chronologically) should still win below.
         this.todos = [];
         continue;
       }
 
+      if (entry.type !== "message") continue;
+      const msg = entry.message;
       if (msg.role !== "toolResult" || msg.toolName !== "manage_todo_list") continue;
 
       const details = msg.details as TodoDetails | undefined;

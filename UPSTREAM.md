@@ -40,6 +40,9 @@ destructive-action consent handled conversationally by the workflow flows.
 ## Local compatibility changes
 
 - Powerbar imports the vendored Extension Settings module by relative path.
+- Powerbar's `context-usage` producer was dropped (2026-07-23) together with its
+  entry in the default left segments; the context readout now lives in the
+  Progress Tracker indicator above the editor.
 - Manage Todo List imports the current `@earendil-works/pi-*` package scope in place of its legacy `@mariozechner/pi-*` scope.
 - Headless safeguards keep Session Dashboard from hijacking non-interactive processes.
 

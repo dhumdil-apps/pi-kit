@@ -7,7 +7,7 @@ import type { OrderedListOption, SettingDefinition } from "../../../extension-pr
 import { getSetting } from "../../../extension-preferences/index.js";
 
 export const EXTENSION_NAME = "powerbar";
-const DEFAULT_LEFT_SEGMENTS = "git-branch,session-name,agent-stats,context-usage,tokens,cpu,ram,disk,net";
+const DEFAULT_LEFT_SEGMENTS = "git-branch,session-name,agent-stats,tokens,cpu,ram,disk,net";
 
 export interface PowerbarSettings {
 	left: string[];
