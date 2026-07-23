@@ -187,7 +187,7 @@ export default function createExtension(pi: ExtensionAPI): void {
 				pi.events.emit("powerbar:update", {
 					id: "net",
 					text: `${LABELS.net} ↓${humanBytes(net.value.down)} ↑${humanBytes(net.value.up)}`,
-					color: "muted",
+					color: "accent",
 					row: 3,
 				});
 			}
