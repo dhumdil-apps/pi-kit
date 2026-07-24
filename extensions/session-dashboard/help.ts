@@ -24,6 +24,8 @@ export const HELP_COMMANDS: HelpEntry[] = [
 export const HELP_SHORTCUTS: HelpEntry[] = [
 	{ name: "! <cmd>", description: "Run a shell command without leaving the prompt." },
 	{ name: "escape", description: "Cancel the current turn." },
+	{ name: "ctrl+j", description: "Insert a newline without submitting (works where shift+enter does not)." },
+	{ name: "ctrl+enter", description: "Submit the prompt." },
 ];
 
 /**
