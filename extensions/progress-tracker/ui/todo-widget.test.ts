@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { contextUsageText, updatePhaseIndicator, updateTodoWidget } from "./todo-widget.js";
 import { TodoStateManager } from "../state-manager.js";
 
@@ -6,10 +6,10 @@ const theme = { fg: (color: string, text: string) => `[${color}]${text}` } as an
 
 describe("phase indicator", () => {
 	it.each([
-		["goal", "plan", "accent", "● PLAN"],
-		["planning", "implement", "accent", "● IMPLEMENT · PLANNING"],
-		["implementation", "implement", "accent", "● IMPLEMENT · IMPLEMENTATION"],
-	] as const)("renders the idle %s phase with %s mode persistently", (phase, mode, color, expected) => {
+		["goal", "plan", "accent", "› PLAN"],
+		["planning", "implement", "accent", "› IMPLEMENT"],
+		["implementation", "implement", "accent", "› IMPLEMENT"],
+	] as const)("renders the %s phase as a stable %s mode indicator", (phase, mode, color, expected) => {
 		let factory: any;
 		const ctx = {
 			ui: {
@@ -42,26 +42,7 @@ describe("phase indicator", () => {
 		expect(contextUsageText({ tokens: 10, contextWindow: 0, percent: null } as any, theme)).toBeUndefined();
 	});
 
-	it("appends the context readout to the idle indicator", () => {
-		let factory: any;
-		const ctx = {
-			ui: {
-				setWorkingVisible: () => {},
-				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
-			},
-		} as any;
-
-		updatePhaseIndicator("planning", "implement", ctx, false, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
-		expect(factory({ requestRender: () => {} }, theme).render(120)).toEqual([
-			"[accent]● IMPLEMENT · PLANNING · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M",
-		]);
-
-		// The goal phase stays label-free, and the working row is unchanged.
-		updatePhaseIndicator("goal", "plan", ctx, false, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
-		expect(factory({ requestRender: () => {} }, theme).render(120)[0]).toContain("[accent]● PLAN · [accent]ctx");
-	});
-
-	it("keeps the context readout on the working spinner line", () => {
+	it("renders the same context readout while working without activity or phase text", () => {
 		let factory: any;
 		const ctx = {
 			ui: {
@@ -72,41 +53,9 @@ describe("phase indicator", () => {
 
 		updatePhaseIndicator("implementation", "implement", ctx, true, { tokens: 84_000, contextWindow: 1_000_000, percent: 8.4 } as any);
 		const line = factory({ requestRender: () => {} }, theme).render(120)[0];
-		// The spinner and activity stay, and ctx is appended rather than dropped.
-		expect(line).toContain("IMPLEMENT · ");
-		expect(line).toContain("ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M");
-	});
-
-	it.each([
-		["plan", ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"]],
-		["implement", ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"]],
-	] as const)("changes the active %s activity every 10 seconds without repeating it", (mode, messages) => {
-		vi.useFakeTimers();
-		vi.spyOn(Math, "random").mockReturnValue(0);
-		let factory: any;
-		const requestRender = vi.fn();
-		const ctx = {
-			ui: {
-				setWorkingVisible: () => {},
-				setWidget: (_id: string, nextFactory: unknown) => { factory = nextFactory; },
-			},
-		} as any;
-		updatePhaseIndicator("implementation", mode, ctx, true);
-		const component = factory({ requestRender }, { fg: (color: string, text: string) => `[${color}]${text}` });
-
-		expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${messages[0]}`);
-		vi.advanceTimersByTime(9_999);
-		expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${messages[0]}`);
-		const rendersBeforeChange = requestRender.mock.calls.length;
-		vi.advanceTimersByTime(1);
-		expect(component.render(80)[0]).toContain(`${mode.toUpperCase()} · ${messages[1]}`);
-		expect(requestRender).toHaveBeenCalledTimes(rendersBeforeChange + 1);
-		component.dispose();
-	});
-
-	afterEach(() => {
-		vi.useRealTimers();
-		vi.restoreAllMocks();
+		expect(line).toBe("[accent]› IMPLEMENT · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M");
+		expect(line).not.toContain("Building…");
+		expect(line).not.toContain("IMPLEMENTATION");
 	});
 });
 

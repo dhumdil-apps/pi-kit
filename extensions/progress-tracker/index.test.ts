@@ -41,6 +41,6 @@ describe("progress tracker workflow mode", () => {
 
     const [, factory] = widgets.findLast(([id]) => id === "workflow-phase")!;
     const component = factory({ requestRender: () => {} }, { fg: (color: string, text: string) => `[${color}]${text}` });
-    expect(component.render(80)).toEqual(["[accent]● IMPLEMENT · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M"]);
+    expect(component.render(80)).toEqual(["[accent]› IMPLEMENT · [accent]ctx [accent]█[dim]░░░ [accent]84.0k / 1.0M"]);
   });
 });

@@ -5,7 +5,7 @@
  * Shows status icons and a flat list.
  */
 
-import type { ContextUsage, ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { ContextUsage, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { contextUsageText } from "../../agent-workflow/context-usage.js";
 import type { WorkflowMode } from "../../agent-workflow/mode.js";
@@ -17,16 +17,9 @@ export { contextUsageText } from "../../agent-workflow/context-usage.js";
 
 const PHASE_WIDGET_ID = "workflow-phase";
 const TODO_WIDGET_ID = "todo-list";
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const ACTIVITY_ROTATION_MS = 10_000;
-const PHASE_DISPLAY: Record<WorkflowPhase, { label?: string; color: ThemeColor }> = {
-  goal: { color: "accent" },
-  planning: { label: "PLANNING", color: "accent" },
-  implementation: { label: "IMPLEMENTATION", color: "accent" },
-};
-const MODE_DISPLAY: Record<WorkflowMode, { label: string; messages: string[] }> = {
-  plan: { label: "PLAN", messages: ["Mapping…", "Exploring…", "Framing…", "Surveying…", "Designing…", "Specifying…"] },
-  implement: { label: "IMPLEMENT", messages: ["Building…", "Wiring…", "Refining…", "Crafting…", "Testing…", "Polishing…"] },
+const MODE_DISPLAY: Record<WorkflowMode, string> = {
+  plan: "PLAN",
+  implement: "IMPLEMENT",
 };
 
 /** Status icons for each todo state */
@@ -42,61 +35,22 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
   return theme.fg("success", "█".repeat(filled)) + theme.fg("dim", "░".repeat(width - filled));
 }
 
-/** Select a random activity without immediately repeating the previous one. */
-function selectActivity(messages: string[], previousIndex?: number): number {
-  if (messages.length < 2 || previousIndex === undefined) return Math.floor(Math.random() * messages.length);
-  const index = Math.floor(Math.random() * (messages.length - 1));
-  return index >= previousIndex ? index + 1 : index;
-}
-
 /** Replace pi's transient working row with a persistent workflow indicator. */
-export function updatePhaseIndicator(phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, working: boolean, usage?: ContextUsage): void {
+export function updatePhaseIndicator(_phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, _working: boolean, usage?: ContextUsage): void {
   ctx.ui.setWorkingVisible(false);
   ctx.ui.setWidget(
     PHASE_WIDGET_ID,
-    (tui, theme) => {
-      const modeDisplay = MODE_DISPLAY[mode];
-      let tick = 0;
-      let activityIndex = working ? selectActivity(modeDisplay.messages) : 0;
-      const spinnerTimer = working
-        ? setInterval(() => {
-            tick++;
-            tui.requestRender();
-          }, 120)
-        : undefined;
-      const activityTimer = working
-        ? setInterval(() => {
-            activityIndex = selectActivity(modeDisplay.messages, activityIndex);
-            tui.requestRender();
-          }, ACTIVITY_ROTATION_MS)
-        : undefined;
-      spinnerTimer?.unref?.();
-      activityTimer?.unref?.();
-
+    (_tui, theme) => {
+      const head = `› ${MODE_DISPLAY[mode]}`;
       return {
         render: (width: number) => {
-          const phaseDisplay = PHASE_DISPLAY[phase];
           const context = contextUsageText(usage, theme);
-          if (working) {
-            // Keep ctx visible while the agent works — the readout matters most
-            // mid-IMPLEMENT, when the continue-vs-fresh choice hinges on it.
-            const spinner = `${SPINNER_FRAMES[tick % SPINNER_FRAMES.length]} ${modeDisplay.label} · ${modeDisplay.messages[activityIndex]}`;
-            const line = context
-              ? `${theme.fg(phaseDisplay.color, `${spinner} · `)}${context}`
-              : theme.fg(phaseDisplay.color, spinner);
-            return [truncateToWidth(line, width)];
-          }
-          const head = `● ${modeDisplay.label}${phaseDisplay.label ? ` · ${phaseDisplay.label}` : ""}`;
           const line = context
-            ? `${theme.fg(phaseDisplay.color, `${head} · `)}${context}`
-            : theme.fg(phaseDisplay.color, head);
+            ? `${theme.fg("accent", `${head} · `)}${context}`
+            : theme.fg("accent", head);
           return [truncateToWidth(line, width)];
         },
         invalidate: () => {},
-        dispose: () => {
-          if (spinnerTimer) clearInterval(spinnerTimer);
-          if (activityTimer) clearInterval(activityTimer);
-        },
       };
     },
     { placement: "aboveEditor" },
