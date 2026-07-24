@@ -317,9 +317,9 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 				usageChart = JSON.stringify(model);
 			}
 
-			// One concise markdown line: working directory + loaded files (italic /
-			// de-emphasised) then `/help` as code so it pops. The core workflow
-			// commands and Raw Pi escape hatch follow as two compact hint lines.
+			// One concise markdown line at the top: working directory + loaded files
+			// (italic / de-emphasised) then `/help` as code so it pops. The usage
+			// chart, Raw Pi escape hatch, and handoff usage hint follow.
 			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
 			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
@@ -329,7 +329,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			const welcomeText = renderWelcomeText({
 				usageChart,
 				contextInfo,
-				tip: "*⌘ Workflow: `/handoff`* · *⚡ Raw Pi: `pi --no-extensions`*",
+				tip: "*⚡ Raw Pi: `pi --no-extensions`*\n*⌘ Handoff: save a plan, then `/handoff [task-name]`*",
 			});
 
 			pi.sendMessage(

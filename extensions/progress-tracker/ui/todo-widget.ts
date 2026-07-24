@@ -2,7 +2,7 @@
  * TodoWidget — read-only widget that shows the current todo list.
  *
  * Displayed above the editor using ctx.ui.setWidget().
- * Shows status icons, progress stats, and a flat list.
+ * Shows status icons and a flat list.
  */
 
 import type { ContextUsage, ExtensionContext, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
@@ -116,20 +116,9 @@ export function updateTodoWidget(state: TodoStateManager, ctx: ExtensionContext,
     return;
   }
 
-  const stats = state.getStats();
   ctx.ui.setWidget(TODO_WIDGET_ID, (_tui, theme) => {
     const lines: string[] = [];
     const gutter = theme.fg("accent", "▍ ");
-
-    lines.push(gutter);
-    const header =
-      gutter +
-      theme.fg("accent", theme.bold("Todo List")) +
-      "  " +
-      progressBar(stats.completed, stats.total, theme, stats.total) +
-      theme.fg("muted", `  ${stats.completed}/${stats.total}`);
-    lines.push(header);
-    lines.push(gutter);
 
     for (const todo of todos) {
       const icon = STATUS_ICONS[todo.status] ?? "⏳";

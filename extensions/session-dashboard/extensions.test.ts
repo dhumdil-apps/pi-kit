@@ -43,23 +43,23 @@ describe("session dashboard extension metadata", () => {
 	it("renders context and hints without a footer when omitted", () => {
 		const welcome = renderWelcomeText({
 			contextInfo: "~/work\n📜 AGENTS.md\n❓ `/help`",
-			tip: "⌘ Workflow\n⚡ Raw Pi",
+			tip: "⚡ Raw Pi\n⌘ Handoff: save a plan, then `/handoff [task-name]`",
 		});
 		expect(welcome.startsWith("~/work")).toBe(true);
-		expect(welcome.indexOf("❓ `/help`")).toBeLessThan(welcome.indexOf("⌘ Workflow"));
-		expect(welcome.indexOf("⌘ Workflow")).toBeLessThan(welcome.indexOf("⚡ Raw Pi"));
-		expect(welcome.trimEnd()).toBe("~/work\n📜 AGENTS.md\n❓ `/help`\n\n⌘ Workflow\n⚡ Raw Pi");
+		expect(welcome.indexOf("❓ `/help`")).toBeLessThan(welcome.indexOf("⚡ Raw Pi"));
+		expect(welcome.indexOf("⚡ Raw Pi")).toBeLessThan(welcome.indexOf("⌘ Handoff"));
+		expect(welcome.trimEnd()).toBe("~/work\n📜 AGENTS.md\n❓ `/help`\n\n⚡ Raw Pi\n⌘ Handoff: save a plan, then `/handoff [task-name]`");
 		expect(welcome).not.toContain("🧩 **Extensions**");
 		expect(welcome).not.toContain("Session context");
 		expect(welcome).not.toContain("Quick reference");
 	});
 
-	it("places the usage chart before the context without a footer", () => {
+	it("places the context before the usage chart without a footer", () => {
 		const welcome = renderWelcomeText({
 			contextInfo: "~/work",
 			usageChart: '{"model":true}',
 		});
-		expect(welcome.indexOf('{"model":true}')).toBeLessThan(welcome.indexOf("~/work"));
-		expect(welcome.trimEnd()).toBe(`${USAGE_CHART_START}\n{"model":true}\n${USAGE_CHART_END}\n\n~/work`);
+		expect(welcome.indexOf("~/work")).toBeLessThan(welcome.indexOf('{"model":true}'));
+		expect(welcome.trimEnd()).toBe(`~/work\n\n${USAGE_CHART_START}\n{"model":true}\n${USAGE_CHART_END}`);
 	});
 });

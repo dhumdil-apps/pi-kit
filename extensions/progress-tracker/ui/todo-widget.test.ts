@@ -120,4 +120,18 @@ describe("todo widget", () => {
 
 		expect(calls).toEqual([["todo-list", undefined]]);
 	});
+
+	it("renders todo rows without a duplicated progress header", () => {
+		const state = new TodoStateManager();
+		state.write([{ id: 1, title: "Remove header", description: "Keep the row", status: "in-progress" }]);
+		let factory: any;
+		const ctx = { ui: { setWidget: (_id: string, widget: unknown) => { factory = widget; } } } as any;
+
+		updateTodoWidget(state, ctx, true);
+
+		const lines = factory({}, theme).render();
+		expect(lines).toEqual(["[accent]▍ [warning]› [accent]1. [warning]Remove header"]);
+		expect(lines.join("\n")).not.toContain("Todo List");
+		expect(lines.join("\n")).not.toContain("1/1");
+	});
 });
