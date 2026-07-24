@@ -17,6 +17,9 @@ export { contextUsageText } from "../../agent-workflow/context-usage.js";
 
 const PHASE_WIDGET_ID = "workflow-phase";
 const TODO_WIDGET_ID = "todo-list";
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const SPINNER_INTERVAL_MS = 120;
+const IDLE_MARKER = "›";
 const MODE_DISPLAY: Record<WorkflowMode, string> = {
   plan: "PLAN",
   implement: "IMPLEMENT",
@@ -36,14 +39,25 @@ export function progressBar(completed: number, total: number, theme: Theme, widt
 }
 
 /** Replace pi's transient working row with a persistent workflow indicator. */
-export function updatePhaseIndicator(_phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, _working: boolean, usage?: ContextUsage): void {
+export function updatePhaseIndicator(_phase: WorkflowPhase, mode: WorkflowMode, ctx: ExtensionContext, working: boolean, usage?: ContextUsage): void {
   ctx.ui.setWorkingVisible(false);
   ctx.ui.setWidget(
     PHASE_WIDGET_ID,
-    (_tui, theme) => {
-      const head = `› ${MODE_DISPLAY[mode]}`;
+    (tui, theme) => {
+      let tick = 0;
+      // Only an active run animates; an idle widget keeps no timer alive.
+      const spinnerTimer = working
+        ? setInterval(() => {
+            tick++;
+            tui.requestRender();
+          }, SPINNER_INTERVAL_MS)
+        : undefined;
+      spinnerTimer?.unref?.();
+
       return {
         render: (width: number) => {
+          const marker = working ? SPINNER_FRAMES[tick % SPINNER_FRAMES.length] : IDLE_MARKER;
+          const head = `${marker} ${MODE_DISPLAY[mode]}`;
           const context = contextUsageText(usage, theme);
           const line = context
             ? `${theme.fg("accent", `${head} · `)}${context}`
@@ -51,6 +65,9 @@ export function updatePhaseIndicator(_phase: WorkflowPhase, mode: WorkflowMode, 
           return [truncateToWidth(line, width)];
         },
         invalidate: () => {},
+        dispose: () => {
+          if (spinnerTimer) clearInterval(spinnerTimer);
+        },
       };
     },
     { placement: "aboveEditor" },

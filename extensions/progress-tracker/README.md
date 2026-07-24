@@ -10,13 +10,16 @@ todos remain a separate widget and may track work in any phase.
 
 - `manage_todo_list` tool — `read`/`write` ordinary todos, or `phase` to select
   `goal`, `planning`, or `implementation` (one todo in progress at a time).
-- Persistent workflow indicator — shows `› <MODE>` followed by the context
-  readout `ctx █░░░ 84.0k / 1.0M`, refreshed at turn boundaries and colored
+- Persistent workflow indicator — shows `› <MODE>` when idle and swaps the
+  marker for a braille spinner (`⠋ <MODE>`) that advances every 120 ms while the
+  agent works; the timer runs only during an active run and is cleared when pi
+  disposes the widget. Either marker is followed by the same context readout
+  `ctx █░░░ 84.0k / 1.0M`, refreshed at turn boundaries and colored
   accent / warning / error — warning past 100k tokens or 40% full, error past
   200k or 80%, whichever trips first, so a wide context window still warns
   before quality degrades (this is the bundle's only context indicator — Status
   Bar no longer ships one). The bar carries the proportion, so the percentage is
-  not printed. The indicator is stable while the agent works; it does not repeat
+  not printed. Apart from the spinner the line is stable; it does not repeat
   workflow phase or transient activity text.
 - `/todos` command — report the phase indicator location and toggle the
   independent local todo widget.
