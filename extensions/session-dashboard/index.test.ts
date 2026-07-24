@@ -118,11 +118,11 @@ describe("session dashboard startup", () => {
 		await startup;
 
 		const content = sendMessage.mock.calls[0]?.[0].content as string;
-		expect(content).toContain("⌘ Handoff: save a plan, then `/handoff [task-name]`");
+		expect(content).toContain("⌘ Handoff* `/handoff [task-name]`");
 		expect(content).not.toContain("/mode");
 		expect(content).not.toContain("π Measure twice, cut once. What’s your goal?");
 		expect(content.indexOf("⚡ Raw Pi")).toBeLessThan(content.indexOf("⌘ Handoff"));
-		expect(content.endsWith("*⌘ Handoff: save a plan, then `/handoff [task-name]`*")).toBe(true);
+		expect(content.endsWith("*⌘ Handoff* `/handoff [task-name]` *— once a plan is saved*")).toBe(true);
 		expect(setWidget).toHaveBeenLastCalledWith("session-dashboard-loading", undefined);
 	});
 

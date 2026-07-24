@@ -3,10 +3,12 @@
 Startup banner for interactive parent sessions.
 
 The dashboard ends with its Raw Pi escape-hatch hint followed by a compact
-handoff instruction: save an approved plan, then run `/handoff [task-name]` to
-open a fresh Implement session. `extensions.ts` still supplies the grouped
-metadata and descriptions for `/help`; its focused test requires an exact
-one-to-one match with the active extension manifest.
+handoff instruction, which opens a fresh Implement session from an approved
+plan. Both tip lines use the same grammar as the context line above them — an
+italic label, then the command as bare code so the thing you actually type is
+the thing that stands out. `extensions.ts` still supplies the grouped metadata
+and descriptions for `/help`; its focused test requires an exact one-to-one
+match with the active extension manifest.
 
 One concise, plain-markdown context line appears first, chips separated by ` · `:
 the working directory and loaded context files (`📜 …`, italic / de-emphasised,

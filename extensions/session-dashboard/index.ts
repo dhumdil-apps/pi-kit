@@ -319,7 +319,9 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 
 			// One concise markdown line at the top: working directory + loaded files
 			// (italic / de-emphasised) then `/help` as code so it pops. The usage
-			// chart, Raw Pi escape hatch, and handoff usage hint follow.
+			// chart, Raw Pi escape hatch, and handoff usage hint follow. The tip
+			// lines borrow the same grammar: italic label, command as bare code so
+			// the thing you actually type is the thing that stands out.
 			const chips = [`*${truncateLeft(tildify(cwd), 60)}*`];
 			const contextFiles = contextFileList(cwd);
 			if (contextFiles.length > 0) chips.push(`*📜 ${contextFiles.join(CONTEXT_SEP)}*`);
@@ -329,7 +331,7 @@ export default function sessionDashboardExtension(pi: ExtensionAPI): void {
 			const welcomeText = renderWelcomeText({
 				usageChart,
 				contextInfo,
-				tip: "*⚡ Raw Pi: `pi --no-extensions`*\n*⌘ Handoff: save a plan, then `/handoff [task-name]`*",
+				tip: "*⚡ Raw Pi* `pi --no-extensions`\n*⌘ Handoff* `/handoff [task-name]` *— once a plan is saved*",
 			});
 
 			pi.sendMessage(
