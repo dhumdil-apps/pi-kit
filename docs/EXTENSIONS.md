@@ -7,13 +7,15 @@ extension.
 ## Active extensions
 
 - **Extension Preferences** — One global UI for registered extension settings (`/extension-settings`)
-- **Interrupt Confirmation** — Confirms interrupt keys before stopping a running agent (Red confirmation overlay)
+- **Interrupt Confirmation** — Confirms interrupt keys before stopping a running agent (native prompt)
+- **Terminal Keys** — Keeps newline and submit working in every terminal (ctrl+j inserts a newline, ctrl+enter submits)
+- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`save_plan`, `/handoff`; see [FLOW.md](FLOW.md))
 - **Status Bar** — Footer/status composition (Configured through `/extension-settings`)
 - **Usage Monitor** — Live provider quota data for Status Bar
 - **Usage History** — Historical token/cost reporting (`/usage`)
 - **Progress Tracker** — Global workflow route, context-usage readout, plus separate local todo widget (`manage_todo_list`, `/todos`)
+- **Agent Status Bridge** — Off by default; reports display-only workflow status to a configured local observer
 - **Session Dashboard** — Pi-glyph welcome, 30-day per-model spend chart, and project-context line
-- **Agent Workflow** — Conversational workflow, plan persistence, and durable learning (`save_plan`, `/handoff`; see [FLOW.md](FLOW.md))
 
 ## Supporting resources
 
@@ -33,6 +35,8 @@ agent in its own session, with the plan file on disk as the handoff.
 These are the settings currently exposed through `/extension-settings`:
 
 - **Status Bar** — `left`, `right`, `separator`, `placement`, `bar-style`, `bar-width`
+- **Terminal Keys** — `newline-on-ctrl-j` (`auto` / `always` / `off`)
+- **Agent Status Bridge** — `enabled` (`false` by default)
 
 Status Bar defaults place
 `git-branch,session-name,agent-stats,tokens,cpu,ram,disk,net` on

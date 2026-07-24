@@ -6,7 +6,7 @@ Use this page as the navigation map for the `pi-kit` package and development rep
 
 - **[Install & Setup](../README.md#quick-start)** — Installation, setup, & verification
 - **[Extension & Resource Catalog](EXTENSIONS.md)** — Catalog of extensions, prompts, & themes
-- **[The Working Flow](FLOW.md)** — Session modes, handoffs, & autonomous runs
+- **[The Working Flow](FLOW.md)** — Session modes, plan approval, & handoffs
 - **[Commands & Tools](COMMANDS.md)** — Quick reference for commands & tools
 - **[Troubleshooting](TROUBLESHOOTING.md)** — Troubleshooting & diagnostic steps
 
@@ -20,4 +20,4 @@ Use this page as the navigation map for the `pi-kit` package and development rep
 - **Git Repository**: Source for extensions, prompts, themes, tests, and documentation.
 - **`~/.pi/agent/settings.json`**: Machine-local source for selected model, theme, and package source.
 - **`~/.pi/agent/settings-extensions.json`**: Global extension preferences configured via `/extension-settings`.
-- **Project Files**: User-owned `.pi/MEMORY.md`, goals, and local configuration.
+- **Project Files**: User-owned `.pi/MEMORY.md`, `.pi/plan/` plans, and local configuration.

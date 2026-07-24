@@ -22,8 +22,11 @@ there is no enforced state machine.
 
 - `! <command>` runs a shell command directly.
 - `Esc` cancels the current tool/UI action. While the agent is running, interrupt
-  keys first open a red confirmation overlay: Enter confirms cancellation, while
-  Esc or **Keep running** dismisses the overlay without stopping the agent.
+  keys first open a confirmation prompt: Enter confirms cancellation, while Esc
+  or **Keep running** dismisses it without stopping the agent.
+- `Ctrl+J` inserts a newline without submitting, and `Ctrl+Enter` submits. Use
+  them where `Shift+Enter` does not reach Pi — VS Code's terminal being the
+  common case (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)).
 - `Ctrl+C` clears/cancels; `Ctrl+D` exits from an empty prompt.
 - The bundle intercepts no tool calls: agent-issued commands, writes, and `curl`
   run without a permission prompt.
